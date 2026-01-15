@@ -486,6 +486,255 @@ user = db.query(User).filter(User.email == email).first()
 
 ---
 
+## Task Approval Workflow Security
+
+### Admin-Only Actions
+
+The task approval workflow implements strict authorization controls to ensure only administrators can approve or reject critical tasks.
+
+| Action | Required Role | Audit Logged |
+|--------|---------------|--------------|
+| View pending tasks | Admin | Yes |
+| Approve task | Admin | Yes |
+| Reject task | Admin | Yes |
+| Request amendment | Admin, Reviewer | Yes |
+| View task history | Admin | Yes |
+
+**Implementation**:
+```typescript
+// Middleware check for admin-only endpoints
+const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (req.user.role !== 'admin') {
+    auditLog('unauthorized_access_attempt', req.user.id, 'task_approval');
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+```
+
+### Task State Transitions
+
+```
+pending → approved (admin only)
+pending → rejected (admin only)
+pending → amendment_requested (admin/reviewer)
+amendment_requested → pending (researcher resubmit)
+```
+
+---
+
+## File Upload Security
+
+### Upload Restrictions
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| Max File Size | 10 MB | Prevent DoS attacks |
+| Allowed Extensions | .pdf, .doc, .docx, .xlsx, .png, .jpg | Restrict file types |
+| MIME Type Validation | Strict | Prevent type spoofing |
+| Filename Sanitization | Yes | Prevent path traversal |
+
+### Security Measures
+
+```typescript
+// File upload validation
+const uploadConfig = {
+  maxFileSize: 10 * 1024 * 1024, // 10 MB
+  allowedMimeTypes: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png',
+    'image/jpeg'
+  ],
+  sanitizeFilename: true,
+  scanForMalware: true // Production only
+};
+```
+
+### Storage Security
+
+- Files stored outside web root
+- Unique UUID-based filenames (original name stored in metadata)
+- Access controlled through authenticated API endpoints
+- File access logged in audit trail
+
+### Virus Scanning (Production)
+
+```
+Scan Engine: ClamAV (planned)
+Scan Timing: On upload, before storage
+Quarantine: Suspicious files isolated
+Notification: Admin alerted on detection
+```
+
+---
+
+## Notification Permissions and Privacy
+
+### Notification Types
+
+| Type | Recipients | Contains PHI | Retention |
+|------|------------|--------------|-----------|
+| Task Assignment | Assigned user | No | 90 days |
+| Review Request | Reviewers | No | 90 days |
+| Status Change | Form owner | No | 90 days |
+| Amendment Request | Form owner | No | 90 days |
+| System Alert | Admins | No | 30 days |
+
+### Permission Controls
+
+```typescript
+// Notification permission matrix
+const notificationPermissions = {
+  task_assigned: ['admin', 'reviewer', 'researcher'],
+  review_requested: ['admin', 'reviewer'],
+  form_approved: ['researcher'],
+  form_rejected: ['researcher'],
+  amendment_requested: ['researcher'],
+  system_alert: ['admin']
+};
+```
+
+### Privacy Measures
+
+- Notifications contain minimal information (IDs, not content)
+- Email notifications use generic subjects (no PHI)
+- In-app notifications visible only to intended recipients
+- Notification content never includes form data
+
+### Email Notification Security
+
+```
+Transport: TLS 1.2+ required
+Content: Generic (links back to app)
+Headers: No PHI in subject or preview
+Unsubscribe: Per notification type
+```
+
+---
+
+## Amendment Audit Trail
+
+### What is Tracked
+
+| Event | Data Captured |
+|-------|---------------|
+| Amendment Requested | Reviewer ID, reason, timestamp, form version |
+| Amendment Submitted | Researcher ID, changes summary, timestamp |
+| Amendment Reviewed | Reviewer ID, decision, timestamp |
+| Version Created | Previous version ID, change diff |
+
+### Audit Log Schema (Amendments)
+
+```sql
+-- Amendment-specific audit fields
+{
+  "action": "amendment_requested",
+  "resource_type": "form",
+  "resource_id": "uuid",
+  "details": {
+    "form_version": 3,
+    "requested_by": "reviewer-uuid",
+    "reason": "Additional documentation required",
+    "sections_affected": ["section_2", "section_5"],
+    "deadline": "2026-01-20T00:00:00Z"
+  }
+}
+```
+
+### Version History
+
+- All form versions preserved (never overwritten)
+- Diff available between any two versions
+- Amendment history linked to form lifecycle
+- Full chain of custody maintained
+
+---
+
+## Report Access Controls
+
+### Report Types and Permissions
+
+| Report Type | Admin | Reviewer | Researcher |
+|-------------|-------|----------|------------|
+| System Analytics | Yes | No | No |
+| User Activity | Yes | No | No |
+| Form Statistics | Yes | Yes | Own only |
+| Review Metrics | Yes | Yes | No |
+| Audit Reports | Yes | No | No |
+| Export Data | Yes | Limited | Own only |
+
+### Data Filtering
+
+```python
+# Report data filtering by role
+def filter_report_data(user: User, report_type: str, data: list) -> list:
+    if user.role == 'admin':
+        return data  # Full access
+    elif user.role == 'reviewer':
+        return [d for d in data if d.get('is_public') or d.get('reviewer_id') == user.id]
+    else:  # researcher
+        return [d for d in data if d.get('owner_id') == user.id]
+```
+
+### Analytics Data Privacy
+
+- Aggregated data only (no individual records)
+- Minimum sample size for statistics (n >= 5)
+- PHI excluded from all reports
+- Export requires admin approval
+
+---
+
+## Email Security
+
+### SMTP Configuration
+
+| Setting | Development | Production |
+|---------|-------------|------------|
+| Transport | Local/Mailhog | SMTP over TLS |
+| Port | 1025 | 587 (TLS) or 465 (SSL) |
+| Authentication | None | Required |
+| From Address | noreply@localhost | noreply@yourdomain.com |
+
+### Email Security Headers
+
+```
+X-Mailer: Not disclosed
+X-Priority: Normal (no urgency manipulation)
+Reply-To: Configured support address
+List-Unsubscribe: Present for marketing emails
+```
+
+### Anti-Spoofing (Production)
+
+| Protocol | Status | Purpose |
+|----------|--------|---------|
+| SPF | Required | Sender verification |
+| DKIM | Required | Email signing |
+| DMARC | Required | Policy enforcement |
+
+### Email Content Security
+
+- No inline JavaScript
+- No tracking pixels with PHI
+- Links point to application domain only
+- Plain text alternative always provided
+- Template injection prevention
+
+### Rate Limiting
+
+```
+Per User: 10 emails/hour
+Per IP: 50 emails/hour
+System Total: 1000 emails/hour
+Burst: 5 emails/minute per user
+```
+
+---
+
 ## Contact
 
 For security concerns or vulnerability reports, contact the security team.
@@ -494,4 +743,4 @@ For security concerns or vulnerability reports, contact the security team.
 
 ---
 
-*Last Updated: January 14, 2026*
+*Last Updated: January 15, 2026*

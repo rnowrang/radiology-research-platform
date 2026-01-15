@@ -172,6 +172,31 @@ DEBUG=true
 NODE_ENV=development
 ```
 
+### New Feature Environment Variables
+
+```bash
+# Email/Notification Configuration
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=notifications@example.com
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM=noreply@example.com
+SMTP_TLS=true
+
+# File Upload Configuration
+MAX_UPLOAD_SIZE=10485760          # 10 MB in bytes
+ALLOWED_FILE_TYPES=.pdf,.doc,.docx,.xlsx,.png,.jpg
+UPLOAD_SCAN_ENABLED=false         # Enable virus scanning (production)
+
+# Task Approval Workflow
+TASK_APPROVAL_NOTIFICATIONS=true
+AMENDMENT_DEADLINE_DAYS=7
+
+# Report/Analytics
+ANALYTICS_RETENTION_DAYS=365
+REPORT_MIN_SAMPLE_SIZE=5
+```
+
 ---
 
 ## Production Deployment
@@ -491,6 +516,57 @@ docker exec radiology-forms which soffice
 docker exec radiology-forms ls -la /app/storage/generated
 ```
 
+#### Email Notifications Not Sending
+```bash
+# Check SMTP configuration
+docker-compose exec gateway env | grep SMTP
+
+# Test SMTP connection
+docker-compose exec gateway node -e "
+  const net = require('net');
+  const socket = net.connect(587, 'smtp.example.com', () => {
+    console.log('SMTP connection successful');
+    socket.end();
+  });
+"
+
+# Check email logs
+docker-compose logs gateway | grep -i email
+```
+
+#### File Upload Fails
+```bash
+# Check upload directory permissions
+docker exec radiology-forms ls -la /app/storage/uploads
+
+# Verify max file size configuration
+docker-compose exec gateway env | grep MAX_UPLOAD
+
+# Check for disk space
+docker exec radiology-forms df -h /app/storage
+```
+
+#### Task Approval Workflow Issues
+```bash
+# Check pending tasks in database
+docker exec -it radiology-db psql -U radiology -d radiology_research \
+  -c "SELECT id, status, created_at FROM tasks WHERE status = 'pending';"
+
+# Verify admin user permissions
+docker exec -it radiology-db psql -U radiology -d radiology_research \
+  -c "SELECT id, email, role FROM users WHERE role = 'admin';"
+```
+
+#### Analytics/Reports Not Loading
+```bash
+# Check if recharts data is being generated
+docker-compose logs frontend | grep -i analytics
+
+# Verify report endpoints
+curl -X GET http://localhost:3001/api/reports/health \
+  -H "Authorization: Bearer <admin-token>"
+```
+
 ### Logs
 
 ```bash
@@ -540,4 +616,86 @@ echo "All services healthy"
 
 ---
 
-*Last Updated: January 14, 2026*
+## New Service Dependencies
+
+### Email Service (Optional)
+
+For production email notifications, configure an SMTP service:
+
+| Provider | Notes |
+|----------|-------|
+| AWS SES | Recommended for AWS deployments |
+| SendGrid | Good for high-volume sending |
+| Mailgun | Developer-friendly API |
+| SMTP Server | Self-hosted option |
+
+### File Storage
+
+For production file uploads with large volumes:
+
+| Option | Use Case |
+|--------|----------|
+| Local Volume | Development, small deployments |
+| AWS S3 | Scalable cloud storage |
+| MinIO | Self-hosted S3-compatible |
+
+### Redis (Recommended for Production)
+
+For caching analytics data and session management:
+
+```yaml
+# Add to docker-compose.prod.yml
+redis:
+  image: redis:7-alpine
+  restart: always
+  volumes:
+    - redis_data:/data
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+```
+
+---
+
+## Updated Docker Configuration Notes
+
+### Volume Mounts for New Features
+
+```yaml
+# Add to forms-service in docker-compose.yml
+volumes:
+  - storage_data:/app/storage
+  - ./storage/uploads:/app/storage/uploads      # File uploads
+  - ./storage/generated:/app/storage/generated  # Generated reports
+```
+
+### Health Checks for New Services
+
+```yaml
+# Email service health (if using separate container)
+healthcheck:
+  test: ["CMD", "nc", "-z", "smtp.example.com", "587"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+```
+
+### Resource Limits Update
+
+For deployments with analytics/reporting features:
+
+```yaml
+forms-service:
+  deploy:
+    resources:
+      limits:
+        memory: 1.5G  # Increased for report generation
+      reservations:
+        memory: 512M
+```
+
+---
+
+*Last Updated: January 15, 2026*

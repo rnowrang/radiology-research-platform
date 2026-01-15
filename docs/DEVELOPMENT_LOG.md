@@ -329,20 +329,155 @@ frontend/src/
 
 ---
 
-### Phase 6: Testing & Verification (January 14, 2026)
+### Phase 6: Feature Implementation (January 2026)
 
-#### 6.1 Services Verified Running
+#### 6.1 User Management Admin
+- Admin user management dashboard
+- User creation, editing, and deactivation
+- Role assignment and permission management
+- User activity tracking and reporting
+- Bulk user operations
+
+#### 6.2 Notifications System
+- Real-time notification delivery
+- Notification types: review updates, mentions, task assignments, system alerts
+- Notification preferences per user
+- Read/unread status tracking
+- Notification history and archival
+
+#### 6.3 File Management
+- File upload with drag-and-drop support
+- File type validation and size limits
+- File versioning and history
+- File associations with forms and projects
+- Secure file download with access control
+- File preview for common formats (PDF, images)
+
+#### 6.4 Global Search
+- Full-text search across forms, projects, and users
+- Search filters by type, status, date range
+- Search result highlighting
+- Recent search history
+- Advanced search with boolean operators
+
+#### 6.5 Editing Locks & @Mentions
+- Real-time editing locks to prevent conflicts
+- Lock acquisition and release on form edit
+- Lock timeout with automatic release
+- @mention support in comments and discussions
+- Mention autocomplete with user search
+- Notification on mention
+
+#### 6.6 Activity Feeds
+- Project-level activity feeds
+- Form-level activity tracking
+- User activity timeline
+- Activity filtering by type and date
+- Activity export for reporting
+
+#### 6.7 Multi-Stage Review Workflow
+- Configurable review stages per template
+- Sequential and parallel review paths
+- Review assignment and reassignment
+- Review due dates and reminders
+- Review status dashboard
+- Reviewer workload balancing
+
+#### 6.8 Amendment System
+- Post-approval amendment requests
+- Amendment field change tracking
+- Amendment review workflow
+- Amendment history and audit trail
+- Amendment comparison view (diff)
+
+#### 6.9 Reports & Analytics
+- Dashboard with key metrics
+- Form submission statistics
+- Review turnaround time reports
+- User productivity metrics
+- Export to CSV/Excel
+- Scheduled report generation
+
+#### 6.10 Email System
+- Transactional email delivery
+- Email templates for notifications
+- Configurable email preferences
+- Email delivery status tracking
+- Retry logic for failed deliveries
+
+---
+
+### Phase 7: Task Workflow System (January 2026)
+
+#### 7.1 Task Definitions and Templates
+- Created task definition schema
+- Configurable task templates with required fields
+- Task categories: documentation, compliance, training, data collection
+- Task priority levels and due date calculations
+- Task dependencies and prerequisites
+
+#### 7.2 Project Type to Task Mappings
+- Defined project types (Standard IRB, Minimal Risk, Exempt, etc.)
+- Created mapping rules between project types and required tasks
+- Configurable task sets per project type
+- Optional vs required task designation
+- Task ordering and sequencing rules
+
+#### 7.3 Auto-Task Creation on Project Creation
+- Automatic task generation when projects are created
+- Task assignment based on project type mappings
+- Default assignee rules (project owner, department admin)
+- Due date calculation based on project timeline
+- Notification to assignees on task creation
+
+#### 7.4 Task Review Workflow
+- Task submission by assignees
+- Task review by supervisors/admins
+- Review actions: approve, reject, request revision
+- Revision comments and feedback
+- Approval history and audit trail
+- Bulk task approval for admins
+
+#### 7.5 Admin Workflow Configuration Page
+- Admin UI for managing task definitions
+- Project type configuration interface
+- Task-to-project-type mapping editor
+- Drag-and-drop task ordering
+- Preview of generated task sets
+- Import/export workflow configurations
+
+#### 7.6 Task Review Page
+- Reviewer dashboard for pending tasks
+- Task detail view with submission content
+- Inline review actions (approve/reject/revision)
+- Review comments and annotations
+- Task history and previous submissions
+- Filter by project, assignee, status
+
+#### 7.7 Task Progress Tracking in Projects
+- Project dashboard with task progress
+- Visual progress indicators (progress bars, charts)
+- Task completion percentage
+- Blocked/overdue task highlighting
+- Task timeline view
+- Export task status reports
+
+---
+
+### Phase 8: Testing & Verification (January 14, 2026)
+
+#### 8.1 Services Verified Running
 - Database: Healthy (port 5434)
 - Gateway: Running (port 3001)
 - Forms Service: Running (port 8001)
 - Frontend: Running (port 5174)
 
-#### 6.2 API Endpoints Tested
+#### 8.2 API Endpoints Tested
 - `GET /api/templates` - Returns 4 seeded templates
 - `GET /api/health` (Gateway) - Returns healthy status
 - Gateway auth middleware - Correctly blocks unauthenticated requests
 
-#### 6.3 Bug Fixes
+#### 8.3 Bug Fixes
 - Fixed SQLAlchemy dialect issue: Changed `postgres://` to `postgresql://` in database URL handling
 
 ---
@@ -367,16 +502,35 @@ frontend/src/
 
 ## Next Steps / TODO
 
-1. [ ] Load full JSON schemas into database templates
-2. [ ] Test complete form submission workflow
-3. [ ] Test PDF generation with actual form data
-4. [ ] Implement review workflow UI
-5. [ ] Add project management pages
-6. [ ] Implement notifications system
-7. [ ] Add file upload functionality
-8. [ ] Production deployment configuration
-9. [ ] SSL/TLS setup
-10. [ ] Automated testing suite
+### Completed
+- [x] Load full JSON schemas into database templates
+- [x] Test complete form submission workflow
+- [x] Test PDF generation with actual form data
+- [x] Implement review workflow UI
+- [x] Add project management pages
+- [x] Implement notifications system
+- [x] Add file upload functionality
+- [x] Implement user management admin
+- [x] Add global search functionality
+- [x] Implement editing locks and @mentions
+- [x] Add activity feeds
+- [x] Implement multi-stage review workflow
+- [x] Add amendment system
+- [x] Implement reports and analytics
+- [x] Add email system
+- [x] Implement task workflow system
+
+### Remaining
+1. [ ] Production deployment configuration
+2. [ ] SSL/TLS setup
+3. [ ] Automated testing suite
+4. [ ] Performance optimization and caching
+5. [ ] Mobile responsive improvements
+6. [ ] API rate limiting fine-tuning
+7. [ ] Backup and disaster recovery procedures
+8. [ ] User documentation and help system
+9. [ ] Integration with external systems (if needed)
+10. [ ] Load testing and capacity planning
 
 ---
 
@@ -389,4 +543,4 @@ frontend/src/
 
 ---
 
-*Last Updated: January 14, 2026*
+*Last Updated: January 15, 2026*

@@ -1,11 +1,11 @@
 # Radiology Research Platform
 
-A comprehensive research management platform for IRB forms, research projects, and workflow automation.
+A comprehensive research management platform for IRB forms, research projects, and workflow automation. The platform provides end-to-end support for the research lifecycle including form management, multi-stage review workflows, task automation, real-time collaboration, and HIPAA-compliant audit logging.
 
 ## Status
 
-**Current Version**: 1.0.0 (Development)
-**Last Updated**: January 14, 2026
+**Current Version**: 2.0.0 (Development)
+**Last Updated**: January 15, 2026
 
 ## Architecture
 
@@ -119,7 +119,14 @@ radiology-research-platform/
 - User registration and profile management
 - Role-based access control (admin, reviewer, researcher)
 - Research project CRUD operations
-- Task and notification management
+- Task workflow system with auto-task creation
+- Task review workflow (submit, approve, reject, request revision)
+- Real-time notification delivery
+- Email notification system
+- Global search across forms, projects, and users
+- Editing locks for concurrent edit prevention
+- Activity feed tracking
+- User management admin functions
 - HIPAA-compliant audit logging
 - Proxying form-related requests to Forms Service
 
@@ -133,7 +140,11 @@ radiology-research-platform/
 - Form data storage and versioning
 - DOCX template filling with python-docx
 - PDF generation via LibreOffice
-- Form review workflow
+- Multi-stage form review workflow
+- Amendment system for post-approval changes
+- File upload and management
+- @mention processing in comments
+- Reports and analytics data generation
 
 **Critical Component**: `forms-service/app/services/document.py`
 - 1200+ lines of document generation logic
@@ -151,6 +162,15 @@ radiology-research-platform/
 - Collapsible sections with progress tracking
 - Review workflow interface
 - Role-based navigation
+- Global search with filters
+- Real-time notifications
+- Activity feeds
+- File management with drag-and-drop upload
+- Task workflow management
+- Admin configuration panels
+- Reports and analytics dashboards
+- @mention support in comments
+- Editing lock indicators
 
 ## Development
 
@@ -241,6 +261,14 @@ Key environment variables (see `.env.example` for full list):
 | DB_PASSWORD | Database password | radiology_secret |
 | JWT_SECRET | JWT signing secret | (generate secure key) |
 | CORS_ORIGIN | Allowed CORS origin | http://localhost:5174 |
+| SMTP_HOST | Email server hostname | localhost |
+| SMTP_PORT | Email server port | 587 |
+| SMTP_USER | Email server username | (optional) |
+| SMTP_PASSWORD | Email server password | (optional) |
+| SMTP_FROM | Default from address | noreply@example.com |
+| UPLOAD_MAX_SIZE_MB | Maximum file upload size | 50 |
+| EDITING_LOCK_TTL_MINUTES | Editing lock timeout | 5 |
+| SEARCH_RESULTS_LIMIT | Max search results | 100 |
 
 ## Troubleshooting
 

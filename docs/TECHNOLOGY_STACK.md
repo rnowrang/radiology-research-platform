@@ -70,6 +70,13 @@ This document provides a comprehensive overview of all technologies used in the 
 | @radix-ui/react-tooltip | ^1.0.7 | Tooltips |
 | @radix-ui/react-popover | ^1.0.7 | Popovers |
 | @radix-ui/react-alert-dialog | ^1.0.5 | Alert dialogs |
+| @radix-ui/react-switch | ^1.0.3 | Toggle switches |
+
+### Data Visualization
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| recharts | ^2.10.0 | Charts and analytics visualizations |
 
 ### Forms & Validation
 
@@ -399,4 +406,4 @@ VITE_API_URL=http://localhost:3001/api
 
 ---
 
-*Last Updated: January 14, 2026*
+*Last Updated: January 15, 2026*
