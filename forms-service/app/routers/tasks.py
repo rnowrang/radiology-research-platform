@@ -15,6 +15,11 @@ from app.schemas.task import (
     TaskUpdate,
     TaskResponse,
     TaskListResponse,
+    TaskSubmitRequest,
+    TaskApproveRequest,
+    TaskRejectRequest,
+    TaskRevisionRequest,
+    PendingReviewItem,
 )
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -93,7 +98,13 @@ def list_tasks(
             form_title=form_title,
             assigned_to_id=task.assigned_to_id,
             created_by_id=task.created_by_id,
+            task_definition_id=task.task_definition_id,
+            is_required=task.is_required if task.is_required is not None else True,
             completed_at=task.completed_at,
+            submitted_at=task.submitted_at,
+            reviewed_at=task.reviewed_at,
+            reviewer_comments=task.reviewer_comments,
+            revision_count=task.revision_count if task.revision_count is not None else 0,
             created_at=task.created_at,
         ))
 
@@ -131,6 +142,8 @@ def create_task(
         project_id=task_data.project_id,
         form_instance_id=task_data.form_instance_id,
         assigned_to_id=task_data.assigned_to_id,
+        task_definition_id=task_data.task_definition_id,
+        is_required=task_data.is_required,
         created_by_id=user_id,
         status="pending",
     )
@@ -150,7 +163,14 @@ def create_task(
         form_instance_id=task.form_instance_id,
         assigned_to_id=task.assigned_to_id,
         created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        is_required=task.is_required if task.is_required is not None else True,
         completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count if task.revision_count is not None else 0,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -178,7 +198,14 @@ def get_task(
         form_instance_id=task.form_instance_id,
         assigned_to_id=task.assigned_to_id,
         created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        is_required=task.is_required if task.is_required is not None else True,
         completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count if task.revision_count is not None else 0,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -202,10 +229,10 @@ def update_task(
 
     update_data = task_update.model_dump(exclude_unset=True)
 
-    # Handle status change to completed
-    if update_data.get("status") == "completed" and task.status != "completed":
+    # Handle status change to completed/approved
+    if update_data.get("status") in ("completed", "approved") and task.status not in ("completed", "approved"):
         task.completed_at = datetime.utcnow()
-    elif update_data.get("status") != "completed":
+    elif update_data.get("status") not in ("completed", "approved"):
         task.completed_at = None
 
     for field, value in update_data.items():
@@ -226,7 +253,14 @@ def update_task(
         form_instance_id=task.form_instance_id,
         assigned_to_id=task.assigned_to_id,
         created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        is_required=task.is_required if task.is_required is not None else True,
         completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count if task.revision_count is not None else 0,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -265,7 +299,14 @@ def complete_task(
         form_instance_id=task.form_instance_id,
         assigned_to_id=task.assigned_to_id,
         created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        is_required=task.is_required if task.is_required is not None else True,
         completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count if task.revision_count is not None else 0,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -290,3 +331,208 @@ def delete_task(
     db.commit()
 
     return {"success": True, "message": "Task deleted"}
+
+
+# =============================================================================
+# Review Workflow
+# =============================================================================
+
+def _build_task_response(task: Task) -> TaskResponse:
+    """Helper to build a TaskResponse from a Task model."""
+    return TaskResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        task_type=task.task_type,
+        status=task.status,
+        priority=task.priority,
+        due_date=task.due_date,
+        project_id=task.project_id,
+        form_instance_id=task.form_instance_id,
+        assigned_to_id=task.assigned_to_id,
+        created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        is_required=task.is_required if task.is_required is not None else True,
+        completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count if task.revision_count is not None else 0,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
+@router.post("/{task_id}/submit", response_model=TaskResponse)
+def submit_task_for_review(
+    task_id: int,
+    request: TaskSubmitRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Submit a task for review."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user can submit (creator or assignee)
+    if user_id and task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to submit this task")
+
+    # Can only submit from certain statuses
+    if task.status not in ("pending", "in_progress", "revision_required"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot submit task with status '{task.status}'. Must be pending, in_progress, or revision_required."
+        )
+
+    task.status = "submitted"
+    task.submitted_at = datetime.utcnow()
+    task.reviewed_at = None
+    task.reviewed_by_id = None
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/approve", response_model=TaskResponse)
+def approve_task(
+    task_id: int,
+    request: TaskApproveRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Approve a submitted task."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Can only approve submitted tasks
+    if task.status != "submitted":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot approve task with status '{task.status}'. Must be submitted."
+        )
+
+    task.status = "approved"
+    task.reviewed_at = datetime.utcnow()
+    task.reviewed_by_id = user_id
+    task.reviewer_comments = request.comments
+    task.completed_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/reject", response_model=TaskResponse)
+def reject_task(
+    task_id: int,
+    request: TaskRejectRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Reject a submitted task."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Can only reject submitted tasks
+    if task.status != "submitted":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reject task with status '{task.status}'. Must be submitted."
+        )
+
+    task.status = "rejected"
+    task.reviewed_at = datetime.utcnow()
+    task.reviewed_by_id = user_id
+    task.reviewer_comments = request.comments
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/request-revision", response_model=TaskResponse)
+def request_task_revision(
+    task_id: int,
+    request: TaskRevisionRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Request revision of a submitted task."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Can only request revision for submitted tasks
+    if task.status != "submitted":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot request revision for task with status '{task.status}'. Must be submitted."
+        )
+
+    task.status = "revision_required"
+    task.reviewed_at = datetime.utcnow()
+    task.reviewed_by_id = user_id
+    task.reviewer_comments = request.comments
+    task.revision_count = (task.revision_count or 0) + 1
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.get("/pending-review/list", response_model=List[PendingReviewItem])
+def list_pending_review_tasks(
+    project_id: Optional[UUID] = Query(None, description="Filter by project"),
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Get all tasks awaiting review (status = 'submitted')."""
+    query = db.query(Task).filter(Task.status == "submitted")
+
+    if project_id:
+        query = query.filter(Task.project_id == project_id)
+
+    tasks = query.order_by(Task.submitted_at.asc()).all()
+
+    result = []
+    for task in tasks:
+        project_title = None
+        if task.project_id:
+            project = db.query(Project).filter(Project.id == task.project_id).first()
+            if project:
+                project_title = project.title
+
+        result.append(PendingReviewItem(
+            id=task.id,
+            title=task.title,
+            description=task.description,
+            task_type=task.task_type,
+            status=task.status,
+            priority=task.priority,
+            project_id=task.project_id,
+            project_title=project_title,
+            submitted_at=task.submitted_at,
+            created_by_id=task.created_by_id,
+            revision_count=task.revision_count if task.revision_count is not None else 0,
+        ))
+
+    return result

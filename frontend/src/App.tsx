@@ -23,6 +23,8 @@ import { UsersPage } from '@/pages/admin/UsersPage';
 import { ReviewStagesPage } from '@/pages/admin/ReviewStagesPage';
 import { ReportsPage } from '@/pages/admin/ReportsPage';
 import { EmailSettingsPage } from '@/pages/admin/EmailSettingsPage';
+import { WorkflowConfigPage } from '@/pages/admin/WorkflowConfigPage';
+import { TaskReviewPage } from '@/pages/admin/TaskReviewPage';
 import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { useAuthStore } from '@/stores/authStore';
 import { authApi } from '@/lib/api';
@@ -137,6 +139,22 @@ function App() {
           element={
             <ProtectedRoute requiredRoles={['admin']}>
               <EmailSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/workflow-config"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <WorkflowConfigPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/task-review"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <TaskReviewPage />
             </ProtectedRoute>
           }
         />

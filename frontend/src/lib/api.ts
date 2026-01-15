@@ -200,6 +200,55 @@ export const tasksApi = {
   create: (data: any) => api.post('/tasks', data),
   update: (id: number, data: any) => api.put(`/tasks/${id}`, data),
   complete: (id: number) => api.post(`/tasks/${id}/complete`),
+  // Enhanced task workflow methods
+  submit: (id: number) => api.post(`/tasks/${id}/submit`),
+  approve: (id: number, comments?: string) =>
+    api.post(`/tasks/${id}/approve`, { comments }),
+  reject: (id: number, comments: string) =>
+    api.post(`/tasks/${id}/reject`, { comments }),
+  requestRevision: (id: number, comments: string) =>
+    api.post(`/tasks/${id}/request-revision`, { comments }),
+  getPendingReview: () => api.get('/tasks/pending-review'),
+  getProjectTasks: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
+  getProjectTaskProgress: (projectId: string) =>
+    api.get(`/projects/${projectId}/task-progress`),
+};
+
+// Task Definitions API (admin)
+export interface TaskDefinitionData {
+  name: string;
+  description?: string;
+  task_type: 'document_upload' | 'form_completion' | 'approval_required';
+  auto_submit?: boolean;
+  default_required?: boolean;
+  display_order?: number;
+  is_active?: boolean;
+}
+
+export const taskDefinitionsApi = {
+  getAll: () => api.get('/admin/task-definitions'),
+  get: (id: number) => api.get(`/admin/task-definitions/${id}`),
+  create: (data: TaskDefinitionData) => api.post('/admin/task-definitions', data),
+  update: (id: number, data: Partial<TaskDefinitionData>) =>
+    api.put(`/admin/task-definitions/${id}`, data),
+  delete: (id: number) => api.delete(`/admin/task-definitions/${id}`),
+};
+
+// Project Type Mappings API (admin)
+export interface ProjectTypeMappingData {
+  project_type: string;
+  task_definition_id: number;
+  is_required?: boolean;
+  display_order?: number;
+}
+
+export const projectTypeMappingsApi = {
+  getAll: () => api.get('/admin/project-type-mappings'),
+  getByType: (projectType: string) =>
+    api.get(`/admin/project-type-mappings/${projectType}`),
+  create: (data: ProjectTypeMappingData) =>
+    api.post('/admin/project-type-mappings', data),
+  delete: (id: number) => api.delete(`/admin/project-type-mappings/${id}`),
 };
 
 export const notificationsApi = {

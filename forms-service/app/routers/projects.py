@@ -9,6 +9,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.project import Project, ProjectCollaborator
 from app.models.form import FormInstance
+from app.models.task import Task
 from app.schemas.project import (
     ProjectCreate,
     ProjectUpdate,
@@ -17,6 +18,8 @@ from app.schemas.project import (
     ProjectCollaboratorCreate,
     ProjectCollaboratorResponse,
 )
+from app.schemas.task_definition import ProjectTaskProgress
+from app.services import task_definition as task_def_service
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -114,6 +117,15 @@ def create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+
+    # Auto-create tasks based on project type
+    if project.project_type:
+        task_def_service.create_project_tasks(
+            db=db,
+            project_id=project.id,
+            project_type=project.project_type,
+            owner_id=pi_id,
+        )
 
     return ProjectResponse(
         id=project.id,
@@ -396,3 +408,64 @@ def list_project_forms(
         }
         for form in forms
     ]
+
+
+# =============================================================================
+# Project Tasks
+# =============================================================================
+
+@router.get("/{project_id}/tasks")
+def list_project_tasks(
+    project_id: UUID,
+    status: Optional[str] = Query(None, description="Filter by task status"),
+    db: Session = Depends(get_db),
+):
+    """List all tasks associated with a project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    query = db.query(Task).filter(Task.project_id == project_id)
+
+    if status:
+        query = query.filter(Task.status == status)
+
+    tasks = query.order_by(Task.id).all()
+
+    return [
+        {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "task_type": task.task_type,
+            "status": task.status,
+            "priority": task.priority,
+            "due_date": task.due_date,
+            "is_required": task.is_required if task.is_required is not None else True,
+            "task_definition_id": task.task_definition_id,
+            "assigned_to_id": str(task.assigned_to_id) if task.assigned_to_id else None,
+            "created_by_id": str(task.created_by_id),
+            "submitted_at": task.submitted_at,
+            "reviewed_at": task.reviewed_at,
+            "reviewed_by_id": str(task.reviewed_by_id) if task.reviewed_by_id else None,
+            "reviewer_comments": task.reviewer_comments,
+            "revision_count": task.revision_count if task.revision_count is not None else 0,
+            "completed_at": task.completed_at,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at,
+        }
+        for task in tasks
+    ]
+
+
+@router.get("/{project_id}/task-progress", response_model=ProjectTaskProgress)
+def get_project_task_progress(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Get task completion progress for a project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return task_def_service.get_project_task_progress(db, project_id)

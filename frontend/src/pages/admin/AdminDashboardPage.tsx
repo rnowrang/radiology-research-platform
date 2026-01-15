@@ -10,6 +10,8 @@ import {
   GitBranch,
   BarChart3,
   Mail,
+  Settings2,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   Card,
@@ -19,7 +21,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formsApi, projectsApi } from '@/lib/api';
+import { formsApi, projectsApi, api } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 
 interface DashboardStats {
@@ -29,6 +31,7 @@ interface DashboardStats {
   formsInReview: number;
   totalProjects: number;
   activeProjects: number;
+  pendingTaskReviews: number;
 }
 
 export function AdminDashboardPage() {
@@ -48,8 +51,21 @@ export function AdminDashboardPage() {
     },
   });
 
+  const { data: pendingTasksData } = useQuery({
+    queryKey: ['adminPendingTasks'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/tasks/pending-review', { params: { limit: 1 } });
+        return response.data.pagination?.total || 0;
+      } catch {
+        return 0;
+      }
+    },
+  });
+
   const forms = formsData || [];
   const projects = projectsData || [];
+  const pendingTaskReviews = pendingTasksData || 0;
 
   const stats: DashboardStats = {
     totalUsers: 0, // Would need users endpoint
@@ -58,6 +74,7 @@ export function AdminDashboardPage() {
     formsInReview: forms.filter((f: any) => f.status === 'in_review').length,
     totalProjects: projects.length,
     activeProjects: projects.filter((p: any) => p.status === 'active').length,
+    pendingTaskReviews,
   };
 
   return (
@@ -214,6 +231,38 @@ export function AdminDashboardPage() {
                   <p className="font-medium">Email Settings</p>
                   <p className="text-sm text-muted-foreground">
                     Configure and test email notifications
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </Link>
+            <Link
+              to="/admin/workflow-config"
+              className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Settings2 className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium">Workflow Configuration</p>
+                  <p className="text-sm text-muted-foreground">
+                    Manage task definitions and project mappings
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </Link>
+            <Link
+              to="/admin/task-review"
+              className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium">Task Review</p>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.pendingTaskReviews > 0
+                      ? `${stats.pendingTaskReviews} task${stats.pendingTaskReviews !== 1 ? 's' : ''} pending review`
+                      : 'Review submitted tasks'}
                   </p>
                 </div>
               </div>

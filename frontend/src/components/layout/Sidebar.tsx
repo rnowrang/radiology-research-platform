@@ -4,6 +4,7 @@ import {
   FolderKanban,
   FileText,
   ClipboardCheck,
+  CheckSquare,
   Users,
   Settings,
   FileSearch,
@@ -36,6 +37,11 @@ const mainNavItems = [
     title: 'Forms',
     href: '/forms',
     icon: FileText,
+  },
+  {
+    title: 'Tasks',
+    href: '/tasks',
+    icon: CheckSquare,
   },
   {
     title: 'Review Queue',

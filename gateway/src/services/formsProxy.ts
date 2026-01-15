@@ -630,6 +630,135 @@ export const formsProxy = {
       headers: { 'X-User-Role': userRole },
     });
   },
+
+  // ==========================================================================
+  // Task Definitions - Admin Management
+  // ==========================================================================
+
+  getTaskDefinitions: async (activeOnly: boolean = true): Promise<AxiosResponse> => {
+    return formsClient.get('/api/admin/task-definitions', {
+      params: { active_only: activeOnly },
+    });
+  },
+
+  createTaskDefinition: async (data: {
+    name: string;
+    description?: string;
+    task_type: string;
+    auto_submit?: boolean;
+    default_required?: boolean;
+    display_order?: number;
+    is_active?: boolean;
+  }): Promise<AxiosResponse> => {
+    return formsClient.post('/api/admin/task-definitions', data);
+  },
+
+  updateTaskDefinition: async (
+    definitionId: number,
+    data: {
+      name?: string;
+      description?: string;
+      task_type?: string;
+      auto_submit?: boolean;
+      default_required?: boolean;
+      display_order?: number;
+      is_active?: boolean;
+    }
+  ): Promise<AxiosResponse> => {
+    return formsClient.put(`/api/admin/task-definitions/${definitionId}`, data);
+  },
+
+  deleteTaskDefinition: async (definitionId: number): Promise<AxiosResponse> => {
+    return formsClient.delete(`/api/admin/task-definitions/${definitionId}`);
+  },
+
+  // ==========================================================================
+  // Project Type Mappings - Admin Management
+  // ==========================================================================
+
+  getProjectTypeMappings: async (): Promise<AxiosResponse> => {
+    return formsClient.get('/api/admin/project-type-mappings');
+  },
+
+  getProjectTypeMappingsByType: async (projectType: string): Promise<AxiosResponse> => {
+    return formsClient.get(`/api/admin/project-type-mappings/${projectType}`);
+  },
+
+  createProjectTypeMapping: async (data: {
+    project_type: string;
+    task_definition_id: number;
+    is_required?: boolean;
+    display_order?: number;
+  }): Promise<AxiosResponse> => {
+    return formsClient.post('/api/admin/project-type-mappings', data);
+  },
+
+  deleteProjectTypeMapping: async (mappingId: number): Promise<AxiosResponse> => {
+    return formsClient.delete(`/api/admin/project-type-mappings/${mappingId}`);
+  },
+
+  // ==========================================================================
+  // Enhanced Task Operations - Workflow Actions
+  // ==========================================================================
+
+  submitTask: async (taskId: number, userId: string, notes?: string): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/submit`, { notes }, {
+      headers: { 'X-User-ID': userId },
+    });
+  },
+
+  approveTask: async (
+    taskId: number,
+    userId: string,
+    userRole: string,
+    notes?: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/approve`, { notes }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
+
+  rejectTask: async (
+    taskId: number,
+    userId: string,
+    userRole: string,
+    notes: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/reject`, { notes }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
+
+  requestTaskRevision: async (
+    taskId: number,
+    userId: string,
+    userRole: string,
+    notes: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/request-revision`, { notes }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
+
+  getPendingReviewTasks: async (userRole: string): Promise<AxiosResponse> => {
+    return formsClient.get('/api/tasks/pending-review', {
+      headers: { 'X-User-Role': userRole },
+    });
+  },
+
+  // ==========================================================================
+  // Project Tasks and Progress
+  // ==========================================================================
+
+  getProjectTasks: async (projectId: string, userId: string): Promise<AxiosResponse> => {
+    return formsClient.get(`/api/projects/${projectId}/tasks`, {
+      headers: { 'X-User-ID': userId },
+    });
+  },
+
+  getProjectTaskProgress: async (projectId: string): Promise<AxiosResponse> => {
+    return formsClient.get(`/api/projects/${projectId}/task-progress`);
+  },
 };
 
 export default formsProxy;

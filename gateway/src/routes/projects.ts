@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { projectController } from '../controllers/projectController.js';
 import { fileController } from '../controllers/fileController.js';
 import { activityController } from '../controllers/activityController.js';
+import { taskController } from '../controllers/taskController.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
@@ -27,5 +28,9 @@ router.get('/:projectId/files', asyncHandler(fileController.listProjectFiles));
 
 // Activity routes
 router.get('/:id/activity', asyncHandler(activityController.getProjectActivity));
+
+// Task routes
+router.get('/:projectId/tasks', asyncHandler(taskController.getProjectTasks));
+router.get('/:projectId/task-progress', asyncHandler(taskController.getProjectTaskProgress));
 
 export default router;

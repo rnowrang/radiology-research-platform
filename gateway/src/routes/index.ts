@@ -12,6 +12,7 @@ import amendmentRoutes from './amendments.js';
 import reviewStagesRoutes from './review-stages.js';
 import reportsRoutes from './reports.js';
 import emailRoutes from './email.js';
+import taskDefinitionsRoutes from './task-definitions.js';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.use('/tasks', taskRoutes);
 router.use('/admin/users', usersRoutes);
 router.use('/admin/reports', reportsRoutes);
 router.use('/admin/email', emailRoutes);
+router.use('/admin', taskDefinitionsRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/files', filesRoutes);
 router.use('/search', searchRoutes);

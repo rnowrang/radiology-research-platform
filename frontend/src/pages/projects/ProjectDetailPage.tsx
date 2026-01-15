@@ -10,9 +10,19 @@ import {
   Users,
   Calendar,
   MoreVertical,
+  CheckSquare,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -29,6 +39,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -38,10 +56,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
-import { projectsApi, formsApi } from '@/lib/api';
+import { projectsApi, formsApi, api } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 
 interface ProjectResponse {
@@ -76,6 +101,45 @@ interface FormItem {
   updated_at?: string;
 }
 
+interface ProjectTask {
+  id: number;
+  title: string;
+  description?: string;
+  task_type?: string;
+  status: string;
+  priority: string;
+  is_required: boolean;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  due_date?: string;
+  completed_at?: string;
+  submitted_at?: string;
+  revision_count: number;
+  reviewer_comments?: string;
+  created_at: string;
+}
+
+interface TaskProgress {
+  total: number;
+  completed: number;
+  pending: number;
+  in_progress: number;
+  submitted: number;
+  approved: number;
+  required_total: number;
+  required_completed: number;
+  progress_percentage: number;
+}
+
+interface CustomTaskFormData {
+  title: string;
+  description: string;
+  task_type: string;
+  assigned_to_id: string;
+  due_date: string;
+  is_required: boolean;
+}
+
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
   active: { label: 'Active', variant: 'default' },
@@ -100,6 +164,42 @@ const projectTypes: Record<string, string> = {
   other: 'Other',
 };
 
+const taskStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }> = {
+  pending: { label: 'Pending', variant: 'secondary', icon: Clock },
+  in_progress: { label: 'In Progress', variant: 'default', icon: Clock },
+  submitted: { label: 'Submitted', variant: 'default', icon: Clock },
+  approved: { label: 'Approved', variant: 'outline', icon: CheckCircle },
+  rejected: { label: 'Rejected', variant: 'destructive', icon: AlertCircle },
+  revision_required: { label: 'Revision Required', variant: 'destructive', icon: AlertCircle },
+  completed: { label: 'Completed', variant: 'outline', icon: CheckCircle },
+  blocked: { label: 'Blocked', variant: 'destructive', icon: AlertCircle },
+  cancelled: { label: 'Cancelled', variant: 'outline', icon: AlertCircle },
+};
+
+const taskTypes = [
+  { value: 'document_upload', label: 'Document Upload' },
+  { value: 'form_completion', label: 'Form Completion' },
+  { value: 'approval_required', label: 'Approval Required' },
+  { value: 'general', label: 'General' },
+];
+
+const taskTypeLabels: Record<string, string> = {
+  document_upload: 'Document Upload',
+  form_completion: 'Form Completion',
+  approval_required: 'Approval Required',
+  general: 'General',
+};
+
+// API functions for project tasks
+const projectTasksApi = {
+  list: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
+  getProgress: (projectId: string) => api.get(`/projects/${projectId}/task-progress`),
+  create: (projectId: string, data: any) => api.post(`/projects/${projectId}/tasks`, data),
+  update: (taskId: number, data: any) => api.put(`/tasks/${taskId}`, data),
+  submit: (taskId: number) => api.post(`/tasks/${taskId}/submit`),
+  complete: (taskId: number) => api.post(`/tasks/${taskId}/complete`),
+};
+
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -109,6 +209,15 @@ export function ProjectDetailPage() {
 
   const [activeTab, setActiveTab] = useState('forms');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [newTask, setNewTask] = useState<CustomTaskFormData>({
+    title: '',
+    description: '',
+    task_type: 'document_upload',
+    assigned_to_id: '',
+    due_date: '',
+    is_required: false,
+  });
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
@@ -124,6 +233,24 @@ export function ProjectDetailPage() {
     queryFn: async () => {
       const response = await formsApi.list({ projectId: id });
       return response.data.data as FormItem[];
+    },
+    enabled: !!id,
+  });
+
+  const { data: tasks, isLoading: tasksLoading } = useQuery({
+    queryKey: ['projectTasks', id],
+    queryFn: async () => {
+      const response = await projectTasksApi.list(id!);
+      return response.data.data as ProjectTask[];
+    },
+    enabled: !!id,
+  });
+
+  const { data: taskProgress } = useQuery({
+    queryKey: ['projectTaskProgress', id],
+    queryFn: async () => {
+      const response = await projectTasksApi.getProgress(id!);
+      return response.data.data as TaskProgress;
     },
     enabled: !!id,
   });
@@ -161,6 +288,83 @@ export function ProjectDetailPage() {
     },
   });
 
+  const createTaskMutation = useMutation({
+    mutationFn: (data: CustomTaskFormData) => projectTasksApi.create(id!, {
+      ...data,
+      due_date: data.due_date || undefined,
+      assigned_to_id: data.assigned_to_id || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+      setShowCreateTaskDialog(false);
+      setNewTask({
+        title: '',
+        description: '',
+        task_type: 'document_upload',
+        assigned_to_id: '',
+        due_date: '',
+        is_required: false,
+      });
+      toast({ title: 'Task created successfully' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to create task',
+      });
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, data }: { taskId: number; data: any }) =>
+      projectTasksApi.update(taskId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to update task',
+      });
+    },
+  });
+
+  const submitTaskMutation = useMutation({
+    mutationFn: (taskId: number) => projectTasksApi.submit(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+      toast({ title: 'Task submitted for review' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to submit task',
+      });
+    },
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: (taskId: number) => projectTasksApi.complete(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+      toast({ title: 'Task completed' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to complete task',
+      });
+    },
+  });
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not set';
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -171,6 +375,28 @@ export function ProjectDetailPage() {
   };
 
   const isOwner = user?.id === project?.principal_investigator_id;
+  const isAdmin = user?.role === 'admin';
+  const canManageTasks = isOwner || isAdmin;
+  const projectTasks = tasks || [];
+  const progress = taskProgress || {
+    total: 0,
+    completed: 0,
+    pending: 0,
+    in_progress: 0,
+    submitted: 0,
+    approved: 0,
+    required_total: 0,
+    required_completed: 0,
+    progress_percentage: 0,
+  };
+
+  const handleCreateTask = () => {
+    if (!newTask.title.trim()) {
+      toast({ variant: 'destructive', title: 'Task title is required' });
+      return;
+    }
+    createTaskMutation.mutate(newTask);
+  };
 
   if (projectLoading) {
     return (
@@ -317,6 +543,9 @@ export function ProjectDetailPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="forms">Forms ({projectForms.length})</TabsTrigger>
+          <TabsTrigger value="tasks">
+            Tasks ({projectTasks.length})
+          </TabsTrigger>
           <TabsTrigger value="collaborators">
             Collaborators ({project.collaborators.length})
           </TabsTrigger>
@@ -390,6 +619,194 @@ export function ProjectDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-6">
+          <div className="space-y-4">
+            {/* Task Progress Bar */}
+            {projectTasks.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Task Progress</CardTitle>
+                    <span className="text-sm text-muted-foreground">
+                      {progress.completed + progress.approved} of {progress.total} complete
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Progress value={progress.progress_percentage} className="h-2" />
+                  <div className="flex gap-4 mt-3 text-sm">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-gray-300" />
+                      Pending: {progress.pending}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      In Progress: {progress.in_progress}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      Submitted: {progress.submitted}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Completed: {progress.completed + progress.approved}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tasks List */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Project Tasks</CardTitle>
+                  <CardDescription>Tasks and requirements for this project</CardDescription>
+                </div>
+                {canManageTasks && (
+                  <Button onClick={() => setShowCreateTaskDialog(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Custom Task
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {tasksLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                  </div>
+                ) : projectTasks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No tasks yet</h3>
+                    <p className="text-muted-foreground mt-1">
+                      Tasks will be created automatically when the project is set up
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {projectTasks.map((task) => {
+                      const taskConfig = taskStatusConfig[task.status] || taskStatusConfig.pending;
+                      const StatusIcon = taskConfig.icon;
+                      const isOverdue = task.due_date &&
+                        !['completed', 'approved', 'cancelled'].includes(task.status) &&
+                        new Date(task.due_date) < new Date();
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`flex items-center gap-4 p-4 border rounded-lg ${
+                            isOverdue ? 'border-destructive bg-destructive/5' : ''
+                          }`}
+                        >
+                          <Checkbox
+                            checked={['completed', 'approved'].includes(task.status)}
+                            onCheckedChange={(checked) => {
+                              if (checked && !['completed', 'approved'].includes(task.status)) {
+                                completeTaskMutation.mutate(task.id);
+                              }
+                            }}
+                            disabled={['completed', 'approved', 'submitted'].includes(task.status)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${
+                                ['completed', 'approved'].includes(task.status) ? 'line-through text-muted-foreground' : ''
+                              }`}>
+                                {task.title}
+                              </span>
+                              {task.is_required && (
+                                <Badge variant="secondary" className="text-xs">Required</Badge>
+                              )}
+                              {task.task_type && (
+                                <Badge variant="outline" className="text-xs">
+                                  {taskTypeLabels[task.task_type] || task.task_type}
+                                </Badge>
+                              )}
+                              {task.revision_count > 0 && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Revision #{task.revision_count}
+                                </Badge>
+                              )}
+                            </div>
+                            {task.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              {task.assigned_to_name && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {task.assigned_to_name}
+                                </span>
+                              )}
+                              {task.due_date && (
+                                <span className={`flex items-center gap-1 ${isOverdue ? 'text-destructive' : ''}`}>
+                                  <Calendar className="h-3 w-3" />
+                                  {isOverdue ? 'Overdue: ' : 'Due: '}
+                                  {formatDate(task.due_date)}
+                                </span>
+                              )}
+                            </div>
+                            {task.reviewer_comments && (
+                              <p className="text-xs text-amber-600 mt-2">
+                                Reviewer: {task.reviewer_comments}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={taskConfig.variant}>
+                              <StatusIcon className="mr-1 h-3 w-3" />
+                              {taskConfig.label}
+                            </Badge>
+                            {task.status === 'in_progress' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => submitTaskMutation.mutate(task.id)}
+                                disabled={submitTaskMutation.isPending}
+                              >
+                                Submit
+                              </Button>
+                            )}
+                            {task.status === 'pending' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateTaskMutation.mutate({
+                                  taskId: task.id,
+                                  data: { status: 'in_progress' },
+                                })}
+                                disabled={updateTaskMutation.isPending}
+                              >
+                                Start
+                              </Button>
+                            )}
+                            {task.status === 'revision_required' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateTaskMutation.mutate({
+                                  taskId: task.id,
+                                  data: { status: 'in_progress' },
+                                })}
+                                disabled={updateTaskMutation.isPending}
+                              >
+                                Revise
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="collaborators" className="mt-6">
@@ -525,6 +942,128 @@ export function ProjectDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Custom Task Dialog */}
+      <Dialog open={showCreateTaskDialog} onOpenChange={setShowCreateTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Custom Task</DialogTitle>
+            <DialogDescription>
+              Add a custom task to this project
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="task_title">
+                Title <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="task_title"
+                value={newTask.title}
+                onChange={(e) =>
+                  setNewTask((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="Task title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task_description">Description</Label>
+              <Textarea
+                id="task_description"
+                value={newTask.description}
+                onChange={(e) =>
+                  setNewTask((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Task description"
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-4 grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="task_type">Task Type</Label>
+                <Select
+                  value={newTask.task_type}
+                  onValueChange={(value) =>
+                    setNewTask((prev) => ({ ...prev, task_type: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taskTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assigned_to">Assign To (optional)</Label>
+                <Select
+                  value={newTask.assigned_to_id}
+                  onValueChange={(value) =>
+                    setNewTask((prev) => ({ ...prev, assigned_to_id: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select collaborator" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {project.collaborators.map((collab) => (
+                      <SelectItem key={collab.user_id} value={collab.user_id}>
+                        {collab.user_id.slice(0, 8)}...
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task_due_date">Due Date (optional)</Label>
+              <Input
+                id="task_due_date"
+                type="date"
+                value={newTask.due_date}
+                onChange={(e) =>
+                  setNewTask((prev) => ({ ...prev, due_date: e.target.value }))
+                }
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="task_required"
+                checked={newTask.is_required}
+                onCheckedChange={(checked) =>
+                  setNewTask((prev) => ({ ...prev, is_required: checked as boolean }))
+                }
+              />
+              <Label htmlFor="task_required" className="text-sm font-normal">
+                Mark as required task
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateTaskDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTask}
+              disabled={createTaskMutation.isPending}
+            >
+              {createTaskMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Create Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
