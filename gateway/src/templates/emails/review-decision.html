@@ -1,0 +1,82 @@
+<h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 16px;" class="text-primary">
+  Form Review Decision
+</h2>
+
+<p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px;" class="text-secondary">
+  A decision has been made on your form submission.
+</p>
+
+<!-- Decision Status -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td align="center">
+      {{#decisionClass}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;
+        {{#success}}background-color: #dcfce7; color: #166534;{{/success}}
+        {{#error}}background-color: #fee2e2; color: #991b1b;{{/error}}
+        {{#warning}}background-color: #fef3c7; color: #92400e;{{/warning}}
+      ">
+        {{decision}}
+      </div>
+      {{/decisionClass}}
+      {{^decisionClass}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; background-color: #e5e7eb; color: #374151;">
+        {{decision}}
+      </div>
+      {{/decisionClass}}
+    </td>
+  </tr>
+</table>
+
+<!-- Form Details Card -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 20px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="padding-bottom: 8px;">
+            <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Form Title</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span style="color: #1f2937; font-size: 18px; font-weight: 600;">{{formTitle}}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Reviewer Notes -->
+{{#hasNotes}}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td>
+      <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;">
+        Reviewer Notes
+      </p>
+      <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; padding: 16px; border-radius: 0 4px 4px 0;">
+        <p style="color: #4b5563; font-size: 14px; line-height: 22px; margin: 0; white-space: pre-wrap;">{{notes}}</p>
+      </div>
+    </td>
+  </tr>
+</table>
+{{/hasNotes}}
+
+<!-- Next Steps -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="background-color: #eff6ff; border-radius: 8px; padding: 20px;">
+      <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 8px;">
+        What's Next?
+      </p>
+      <p style="color: #3730a3; font-size: 14px; line-height: 22px; margin: 0;">
+        {{#success}}Your form has been approved. You may proceed with the next steps in your research process.{{/success}}
+        {{#error}}Please review the feedback provided and contact the reviewer if you have questions about the decision.{{/error}}
+        {{#warning}}Please review the requested changes and resubmit your form for another review.{{/warning}}
+        {{^decisionClass}}Log in to view the full details and any required actions.{{/decisionClass}}
+      </p>
+    </td>
+  </tr>
+</table>

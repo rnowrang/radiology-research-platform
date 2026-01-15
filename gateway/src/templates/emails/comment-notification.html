@@ -1,0 +1,86 @@
+{{#isMention}}
+<h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 16px;" class="text-primary">
+  You Were Mentioned
+</h2>
+
+<p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px;" class="text-secondary">
+  <strong>{{commenterName}}</strong> mentioned you in a comment on a form.
+</p>
+{{/isMention}}
+
+{{^isMention}}
+<h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 16px;" class="text-primary">
+  New Comment on Your Form
+</h2>
+
+<p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px;" class="text-secondary">
+  <strong>{{commenterName}}</strong> left a comment on one of your forms.
+</p>
+{{/isMention}}
+
+<!-- Form Title -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 16px;">
+  <tr>
+    <td>
+      <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;">
+        Form
+      </p>
+      <p style="color: #1f2937; font-size: 16px; font-weight: 600; margin: 0;">
+        {{formTitle}}
+      </p>
+    </td>
+  </tr>
+</table>
+
+<!-- Comment Content -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td>
+      <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;">
+        Comment
+      </p>
+      <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; padding: 16px; border-radius: 0 4px 4px 0;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td>
+              <!-- User Avatar Placeholder -->
+              <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                <tr>
+                  <td style="width: 32px; height: 32px; background-color: #2563eb; border-radius: 50%; text-align: center; vertical-align: middle;">
+                    <span style="color: #ffffff; font-size: 14px; font-weight: 600; line-height: 32px;">
+                      {{commenterName}}
+                    </span>
+                  </td>
+                  <td style="padding-left: 12px;">
+                    <span style="color: #1f2937; font-size: 14px; font-weight: 600;">{{commenterName}}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p style="color: #4b5563; font-size: 14px; line-height: 22px; margin: 0; white-space: pre-wrap;">{{comment}}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<!-- Info Box -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="background-color: #eff6ff; border-radius: 8px; padding: 16px;">
+      <p style="color: #1e40af; font-size: 14px; line-height: 22px; margin: 0;">
+        {{#isMention}}
+        You were specifically mentioned in this comment. Please review and respond if necessary.
+        {{/isMention}}
+        {{^isMention}}
+        Log in to the platform to view the full conversation and respond to this comment.
+        {{/isMention}}
+      </p>
+    </td>
+  </tr>
+</table>

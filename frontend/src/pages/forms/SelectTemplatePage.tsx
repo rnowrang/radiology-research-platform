@@ -41,7 +41,7 @@ export function SelectTemplatePage() {
   async function loadTemplates() {
     try {
       const response = await templatesApi.list();
-      setTemplates(response.data);
+      setTemplates(response.data.data || []);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -65,14 +65,14 @@ export function SelectTemplatePage() {
     setCreating(true);
     try {
       const response = await formsApi.create({
-        templateId: selectedTemplate.id,
+        template_id: selectedTemplate.id,
         title: formTitle.trim(),
       });
       toast({
         title: 'Form created',
         description: 'Your new form has been created',
       });
-      navigate(`/forms/${response.data.id}`);
+      navigate(`/forms/${response.data.data.id}`);
     } catch (error) {
       toast({
         variant: 'destructive',

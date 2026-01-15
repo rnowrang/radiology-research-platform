@@ -13,7 +13,7 @@ class FormInstance(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     template_id = Column(Integer, ForeignKey("templates.id"), nullable=False)
-    project_id = Column(UUID(as_uuid=True), nullable=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
     owner_id = Column(UUID(as_uuid=True), nullable=False)
     title = Column(String(500), nullable=False)
     status = Column(String(50), default="draft")
@@ -29,6 +29,9 @@ class FormInstance(Base):
     data = relationship("FormData", back_populates="form_instance", uselist=False)
     versions = relationship("FormVersion", back_populates="form_instance", order_by="FormVersion.version_number.desc()")
     field_changes = relationship("FieldChange", back_populates="form_instance")
+    review_actions = relationship("ReviewAction", back_populates="form_instance", order_by="ReviewAction.created_at.desc()")
+    reviews = relationship("FormReview", back_populates="form_instance")
+    comment_threads = relationship("CommentThread", back_populates="form_instance")
 
 
 class FormData(Base):
@@ -67,3 +70,4 @@ class FormVersion(Base):
     # Relationships
     form_instance = relationship("FormInstance", back_populates="versions")
     field_changes = relationship("FieldChange", back_populates="version")
+    review_actions = relationship("ReviewAction", back_populates="version")

@@ -28,18 +28,7 @@ async def generate_documents(
             detail="Form not found",
         )
 
-    # If version_id not provided, use current version
-    if version_id is None:
-        version = (
-            db.query(FormVersion)
-            .filter(FormVersion.form_instance_id == form_id)
-            .order_by(FormVersion.version_number.desc())
-            .first()
-        )
-        if version:
-            version_id = version.id
-
-    # Generate documents
+    # Generate documents (uses current form data if no version_id provided)
     docx_path, pdf_path = DocumentService.generate_documents(db, form_id, version_id)
 
     return {

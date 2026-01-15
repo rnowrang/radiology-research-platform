@@ -83,6 +83,7 @@ export type FieldType =
   | 'textarea'
   | 'number'
   | 'email'
+  | 'phone'
   | 'date'
   | 'checkbox'
   | 'radio'
@@ -179,6 +180,29 @@ export interface FormVersion {
 }
 
 // Review types
+export interface ReviewQueueItem {
+  id: number;
+  title: string;
+  template_name: string;
+  template_version: string;
+  owner_id: string;
+  owner_name?: string;
+  status: FormStatus;
+  submitted_at?: string;
+  current_version_number: number;
+  unresolved_comments: number;
+}
+
+export interface ReviewAction {
+  id: number;
+  form_instance_id: number;
+  version_id?: number;
+  performed_by_id: string;
+  action_type: 'submit_for_review' | 'request_changes' | 'approve' | 'reject' | 'return_to_draft';
+  notes?: string;
+  created_at: string;
+}
+
 export interface FormReview {
   id: number;
   formInstanceId: number;
@@ -259,6 +283,85 @@ export interface Notification {
   link?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+// Lock types
+export interface EditingLock {
+  id: number;
+  formInstanceId: number;
+  sectionId?: string;
+  lockedById: string;
+  lockedByName?: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface LockInfo {
+  is_locked: boolean;
+  lock_id?: number;
+  locked_by_id?: string;
+  locked_by_name?: string;
+  expires_at?: string;
+  created_at?: string;
+}
+
+// Mention types
+export interface MentionableUser {
+  id: string;
+  name: string;
+  email: string;
+  username: string;
+}
+
+export interface CommentMention {
+  id: number;
+  commentId: number;
+  mentionedUserId: string;
+  mentionedUser?: User;
+  notified: boolean;
+  createdAt: string;
+}
+
+// Amendment types
+export type AmendmentType =
+  | 'protocol_change'
+  | 'personnel_change'
+  | 'funding_change'
+  | 'site_change'
+  | 'procedure_change'
+  | 'consent_update'
+  | 'other';
+
+export type AmendmentStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'withdrawn';
+
+export interface Amendment {
+  id: number;
+  form_instance_id: number;
+  amendment_type: AmendmentType;
+  status: AmendmentStatus;
+  description?: string;
+  submitted_at?: string;
+  submitted_by_id?: string;
+  reviewed_at?: string;
+  reviewed_by_id?: string;
+  review_notes?: string;
+  created_at: string;
+  created_by_id: string;
+  field_changes_count?: number;
+}
+
+export interface AmendmentFieldChange {
+  id: number;
+  amendment_id: number;
+  field_id: string;
+  field_label?: string;
+  old_value?: any;
+  new_value?: any;
+  justification?: string;
+}
+
+export interface AmendmentWithChanges extends Amendment {
+  field_changes: AmendmentFieldChange[];
 }
 
 // API response types

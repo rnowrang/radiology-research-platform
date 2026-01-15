@@ -36,4 +36,15 @@ export const config = {
     lockoutDuration: 30 * 60 * 1000, // 30 minutes
     passwordMinLength: 8,
   },
+
+  email: {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || 'noreply@example.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'Radiology Research Platform',
+    appUrl: process.env.APP_URL || 'http://localhost:5173',
+  },
 };

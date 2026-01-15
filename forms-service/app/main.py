@@ -10,6 +10,12 @@ from app.routers import (
     versions_router,
     export_router,
     health_router,
+    review_router,
+    review_stages_router,
+    projects_router,
+    tasks_router,
+    locks_router,
+    amendments_router,
 )
 
 settings = get_settings()
@@ -37,6 +43,12 @@ app.include_router(templates_router)
 app.include_router(forms_router)
 app.include_router(versions_router)
 app.include_router(export_router)
+app.include_router(review_router)
+app.include_router(review_stages_router)
+app.include_router(projects_router)
+app.include_router(tasks_router)
+app.include_router(locks_router)
+app.include_router(amendments_router)
 
 
 @app.on_event("startup")

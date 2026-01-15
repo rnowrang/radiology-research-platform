@@ -1,7 +1,6 @@
-import { Bell, Search, User, LogOut, Settings } from 'lucide-react';
+import { User, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/authStore';
+import { NotificationBell } from './NotificationBell';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
 
 export function Header() {
   const navigate = useNavigate();
@@ -22,7 +23,8 @@ export function Header() {
     navigate('/login');
   };
 
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -35,23 +37,11 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center justify-between px-6">
         <div className="flex items-center gap-4">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="pl-8"
-            />
-          </div>
+          <GlobalSearch />
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
-              3
-            </span>
-          </Button>
+          <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

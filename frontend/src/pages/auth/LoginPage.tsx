@@ -47,7 +47,7 @@ export function LoginPage() {
     setIsLoading(true);
     try {
       const response = await authApi.login(data.email, data.password);
-      const { user, accessToken, refreshToken } = response.data;
+      const { user, accessToken, refreshToken } = response.data.data;
       login(user, accessToken, refreshToken);
       toast({
         title: 'Welcome back!',

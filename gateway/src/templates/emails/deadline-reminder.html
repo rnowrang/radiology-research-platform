@@ -1,0 +1,144 @@
+<h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 16px;" class="text-primary">
+  Deadline Reminder
+</h2>
+
+<p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px;" class="text-secondary">
+  This is a reminder about an upcoming deadline that requires your attention.
+</p>
+
+<!-- Urgency Badge -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td align="center">
+      {{#urgent}}
+      <div style="display: inline-block; padding: 8px 20px; background-color: #fee2e2; color: #991b1b; border-radius: 9999px; font-weight: 600; font-size: 14px;">
+        Due Tomorrow!
+      </div>
+      {{/urgent}}
+      {{#warning}}
+      <div style="display: inline-block; padding: 8px 20px; background-color: #fef3c7; color: #92400e; border-radius: 9999px; font-weight: 600; font-size: 14px;">
+        Due in {{daysUntil}} days
+      </div>
+      {{/warning}}
+      {{#normal}}
+      <div style="display: inline-block; padding: 8px 20px; background-color: #dbeafe; color: #1e40af; border-radius: 9999px; font-weight: 600; font-size: 14px;">
+        {{daysUntil}} days remaining
+      </div>
+      {{/normal}}
+    </td>
+  </tr>
+</table>
+
+<!-- Form Details Card -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 20px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="padding-bottom: 12px;">
+            <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Form</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span style="color: #1f2937; font-size: 18px; font-weight: 600;">{{formTitle}}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top: 16px; padding-bottom: 8px;">
+            <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Deadline</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div style="display: inline-flex; align-items: center;">
+              <span style="color: #dc2626; font-size: 20px; margin-right: 8px;">&#128197;</span>
+              <span style="color: #dc2626; font-size: 16px; font-weight: 600;">{{deadline}}</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Action Required -->
+{{#urgent}}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td style="background-color: #fee2e2; border-radius: 8px; padding: 16px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="width: 24px; vertical-align: top; padding-right: 12px;">
+            <span style="font-size: 18px;">&#9888;</span>
+          </td>
+          <td>
+            <p style="color: #991b1b; font-size: 14px; line-height: 20px; margin: 0; font-weight: 600;">
+              Urgent: Action Required
+            </p>
+            <p style="color: #991b1b; font-size: 13px; line-height: 20px; margin: 4px 0 0;">
+              This deadline is tomorrow. Please complete and submit your form as soon as possible.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{{/urgent}}
+
+{{#warning}}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td style="background-color: #fef3c7; border-radius: 8px; padding: 16px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="width: 24px; vertical-align: top; padding-right: 12px;">
+            <span style="font-size: 18px;">&#128276;</span>
+          </td>
+          <td>
+            <p style="color: #92400e; font-size: 14px; line-height: 20px; margin: 0; font-weight: 500;">
+              This is a friendly reminder to complete your form before the deadline.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{{/warning}}
+
+{{#normal}}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td style="background-color: #eff6ff; border-radius: 8px; padding: 16px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="width: 24px; vertical-align: top; padding-right: 12px;">
+            <span style="font-size: 18px;">&#128197;</span>
+          </td>
+          <td>
+            <p style="color: #1e40af; font-size: 14px; line-height: 20px; margin: 0; font-weight: 500;">
+              You have {{daysUntil}} days to complete and submit this form.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{{/normal}}
+
+<!-- Tips -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
+      <p style="color: #6b7280; font-size: 13px; line-height: 20px; margin: 0;" class="text-muted">
+        <strong>Tips:</strong><br>
+        - Review all sections for completeness<br>
+        - Attach any required supporting documents<br>
+        - Allow time for review and potential revisions
+      </p>
+    </td>
+  </tr>
+</table>

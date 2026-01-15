@@ -8,6 +8,22 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { FormsListPage } from '@/pages/forms/FormsListPage';
 import { SelectTemplatePage } from '@/pages/forms/SelectTemplatePage';
 import { FormEditorPage } from '@/pages/forms/FormEditorPage';
+import { FormViewPage } from '@/pages/forms/FormViewPage';
+import { AmendmentsPage } from '@/pages/forms/AmendmentsPage';
+import { AmendmentDetailPage } from '@/pages/forms/AmendmentDetailPage';
+import { ReviewQueuePage } from '@/pages/review/ReviewQueuePage';
+import { ProjectsPage } from '@/pages/projects/ProjectsPage';
+import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
+import { CreateProjectPage } from '@/pages/projects/CreateProjectPage';
+import { TasksPage } from '@/pages/tasks/TasksPage';
+import { ProfilePage } from '@/pages/profile/ProfilePage';
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
+import { AuditLogsPage } from '@/pages/admin/AuditLogsPage';
+import { UsersPage } from '@/pages/admin/UsersPage';
+import { ReviewStagesPage } from '@/pages/admin/ReviewStagesPage';
+import { ReportsPage } from '@/pages/admin/ReportsPage';
+import { EmailSettingsPage } from '@/pages/admin/EmailSettingsPage';
+import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { useAuthStore } from '@/stores/authStore';
 import { authApi } from '@/lib/api';
 
@@ -24,7 +40,7 @@ function App() {
 
       try {
         const response = await authApi.me();
-        setUser(response.data);
+        setUser(response.data.data);
       } catch (error) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -56,54 +72,77 @@ function App() {
         <Route path="/forms" element={<FormsListPage />} />
         <Route path="/forms/new" element={<SelectTemplatePage />} />
         <Route path="/forms/:id" element={<FormEditorPage />} />
+        <Route path="/forms/:id/view" element={<FormViewPage />} />
+        <Route path="/forms/:id/amendments" element={<AmendmentsPage />} />
+        <Route path="/forms/:id/amendments/:amendmentId" element={<AmendmentDetailPage />} />
 
-        {/* Projects routes - placeholder */}
-        <Route
-          path="/projects"
-          element={
-            <div className="space-y-4">
-              <h1 className="text-3xl font-bold">Projects</h1>
-              <p className="text-muted-foreground">Coming soon...</p>
-            </div>
-          }
-        />
+        {/* Projects routes */}
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/new" element={<CreateProjectPage />} />
+        <Route path="/projects/:id" element={<ProjectDetailPage />} />
 
-        {/* Review routes - placeholder */}
+        {/* Review routes */}
         <Route
           path="/review"
           element={
             <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
-              <div className="space-y-4">
-                <h1 className="text-3xl font-bold">Review Queue</h1>
-                <p className="text-muted-foreground">Coming soon...</p>
-              </div>
+              <ReviewQueuePage />
             </ProtectedRoute>
           }
         />
 
-        {/* Admin routes - placeholder */}
+        {/* Admin routes */}
         <Route
-          path="/admin/*"
+          path="/admin"
           element={
             <ProtectedRoute requiredRoles={['admin']}>
-              <div className="space-y-4">
-                <h1 className="text-3xl font-bold">Admin</h1>
-                <p className="text-muted-foreground">Coming soon...</p>
-              </div>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/audit"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <AuditLogsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review-stages"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <ReviewStagesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <ReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/email"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <EmailSettingsPage />
             </ProtectedRoute>
           }
         />
 
-        {/* Profile route - placeholder */}
-        <Route
-          path="/profile"
-          element={
-            <div className="space-y-4">
-              <h1 className="text-3xl font-bold">Profile</h1>
-              <p className="text-muted-foreground">Coming soon...</p>
-            </div>
-          }
-        />
+        {/* Profile route */}
+        <Route path="/profile" element={<ProfilePage />} />
 
         {/* Settings route - placeholder */}
         <Route
@@ -116,16 +155,11 @@ function App() {
           }
         />
 
-        {/* Tasks route - placeholder */}
-        <Route
-          path="/tasks"
-          element={
-            <div className="space-y-4">
-              <h1 className="text-3xl font-bold">Tasks</h1>
-              <p className="text-muted-foreground">Coming soon...</p>
-            </div>
-          }
-        />
+        {/* Tasks route */}
+        <Route path="/tasks" element={<TasksPage />} />
+
+        {/* Search route */}
+        <Route path="/search" element={<SearchResultsPage />} />
       </Route>
 
       {/* Unauthorized page */}

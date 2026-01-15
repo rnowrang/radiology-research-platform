@@ -39,15 +39,27 @@ export function DashboardPage() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const [formsRes, projectsRes, tasksRes] = await Promise.all([
-          formsApi.list(),
-          projectsApi.list(),
-          tasksApi.list(),
-        ]);
+        // Load forms (this endpoint exists)
+        const formsRes = await formsApi.list();
+        const forms = (formsRes.data.data || []) as FormInstance[];
 
-        const forms = formsRes.data as FormInstance[];
-        const projects = projectsRes.data as Project[];
-        const tasks = tasksRes.data as Task[];
+        // Try to load projects and tasks, but don't fail if they don't exist
+        let projects: Project[] = [];
+        let tasks: Task[] = [];
+
+        try {
+          const projectsRes = await projectsApi.list();
+          projects = (projectsRes.data.data || []) as Project[];
+        } catch {
+          // Projects endpoint not implemented yet
+        }
+
+        try {
+          const tasksRes = await tasksApi.list();
+          tasks = (tasksRes.data.data || []) as Task[];
+        } catch {
+          // Tasks endpoint not implemented yet
+        }
 
         setStats({
           totalForms: forms.length,

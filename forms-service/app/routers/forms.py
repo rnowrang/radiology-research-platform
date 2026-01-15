@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.database import get_db
 from app.models.template import Template
 from app.models.form import FormInstance, FormData, FormVersion
@@ -113,12 +115,50 @@ async def create_form(
     }
 
 
-@router.get("/{form_id}", response_model=FormInstanceResponse)
+def transform_schema_for_frontend(schema: dict) -> dict:
+    """Transform schema to nest fields within their sections."""
+    if not schema:
+        return {"sections": []}
+
+    sections = schema.get("sections", [])
+    fields = schema.get("fields", [])
+
+    # If fields are already nested in sections, return as-is
+    if sections and sections[0].get("fields"):
+        return schema
+
+    # Group fields by section_id
+    fields_by_section = {}
+    for field in fields:
+        section_id = field.get("section_id")
+        if section_id not in fields_by_section:
+            fields_by_section[section_id] = []
+        fields_by_section[section_id].append(field)
+
+    # Sort fields within each section by order
+    for section_id in fields_by_section:
+        fields_by_section[section_id].sort(key=lambda f: f.get("order", 0))
+
+    # Attach fields to sections
+    transformed_sections = []
+    for section in sorted(sections, key=lambda s: s.get("order", 0)):
+        section_copy = dict(section)
+        section_copy["fields"] = fields_by_section.get(section["id"], [])
+        transformed_sections.append(section_copy)
+
+    return {
+        "title": schema.get("title", ""),
+        "description": schema.get("description", ""),
+        "sections": transformed_sections,
+    }
+
+
+@router.get("/{form_id}")
 async def get_form(
     form_id: int,
     db: Session = Depends(get_db),
 ):
-    """Get a form instance with its data."""
+    """Get a form instance with its data and template schema."""
     form = db.query(FormInstance).filter(FormInstance.id == form_id).first()
     if not form:
         raise HTTPException(
@@ -129,9 +169,34 @@ async def get_form(
     # Get form data
     form_data = db.query(FormData).filter(FormData.form_instance_id == form_id).first()
 
+    # Build template object with transformed schema
+    template_obj = None
+    if form.template:
+        transformed_schema = transform_schema_for_frontend(form.template.schema)
+        template_obj = {
+            "id": form.template.id,
+            "name": form.template.name,
+            "description": form.template.description,
+            "version": form.template.version,
+            "schema": transformed_schema,
+        }
+
     return {
-        **form.__dict__,
+        "id": form.id,
+        "template_id": form.template_id,
+        "project_id": form.project_id,
+        "owner_id": str(form.owner_id),
+        "title": form.title,
+        "status": form.status,
+        "current_version_number": form.current_version_number,
+        "completion_percentage": form.completion_percentage,
+        "submitted_at": form.submitted_at,
+        "approved_at": form.approved_at,
+        "created_at": form.created_at,
+        "updated_at": form.updated_at,
         "data": form_data.data if form_data else {},
+        "conditional_state": form_data.conditional_state if form_data else {},
+        "template": template_obj,
         "template_name": form.template.name if form.template else None,
     }
 
@@ -222,6 +287,7 @@ async def update_form_data(
             parent[keys[-1]] = change.new_value
 
     form_data.data = current_data
+    flag_modified(form_data, "data")  # Tell SQLAlchemy the JSONB column was modified
     db.commit()
     db.refresh(form_data)
 

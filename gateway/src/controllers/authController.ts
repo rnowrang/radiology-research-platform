@@ -6,6 +6,18 @@ import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS } from '../config/constants.js';
 import { ValidationError } from '../utils/errors.js';
 
+// Transform user object to camelCase for frontend
+const toUserResponse = (user: any) => ({
+  id: user.id,
+  email: user.email,
+  fullName: user.full_name,
+  role: user.role,
+  isActive: user.is_active,
+  emailVerified: user.email_verified,
+  createdAt: user.created_at,
+  updatedAt: user.updated_at,
+});
+
 export const authController = {
   register: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -30,7 +42,7 @@ export const authController = {
 
       res.status(201).json({
         success: true,
-        data: user,
+        data: { user: toUserResponse(user) },
         message: 'Registration successful',
       });
     } catch (error) {
@@ -79,7 +91,7 @@ export const authController = {
       res.json({
         success: true,
         data: {
-          user: result.user,
+          user: toUserResponse(result.user),
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
         },
@@ -151,7 +163,7 @@ export const authController = {
     try {
       res.json({
         success: true,
-        data: req.user,
+        data: toUserResponse(req.user),
       });
     } catch (error) {
       next(error);

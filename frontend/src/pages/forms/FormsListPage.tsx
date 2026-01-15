@@ -52,7 +52,7 @@ export function FormsListPage() {
   async function loadForms() {
     try {
       const response = await formsApi.list();
-      setForms(response.data);
+      setForms(response.data.data || []);
     } catch (error) {
       toast({
         variant: 'destructive',

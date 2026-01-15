@@ -139,6 +139,12 @@ class DocumentService:
             )
         
         # Get form data (from version or current)
+        # Always get current form data as fallback
+        form_data_record = db.query(FormData).filter(
+            FormData.form_instance_id == form_id
+        ).first()
+        current_form_data = form_data_record.data if form_data_record else {}
+
         if version_id:
             version = db.query(FormVersion).filter(FormVersion.id == version_id).first()
             if not version:
@@ -146,12 +152,10 @@ class DocumentService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Version not found"
                 )
-            form_data = version.data_snapshot
+            # Use version snapshot if it has data, otherwise use current form data
+            form_data = version.data_snapshot if version.data_snapshot else current_form_data
         else:
-            form_data_record = db.query(FormData).filter(
-                FormData.form_instance_id == form_id
-            ).first()
-            form_data = form_data_record.data if form_data_record else {}
+            form_data = current_form_data
         
         # Generate filled DOCX
         docx_path = DocumentService._fill_docx(
@@ -835,13 +839,18 @@ class DocumentService:
                 continue
 
             field_type = field_def.get("type", "text")
+            anchor = field_def.get("anchor")
 
             # Handle checkbox fields specially
             if field_type == "checkbox" and isinstance(value, list):
-                DocumentService._fill_checkbox_field(doc, value, field_def)
+                # For table_cell anchors, use the anchor-based filling
+                if anchor and anchor.get("type") == "table_cell":
+                    DocumentService._write_value_to_anchor(doc, anchor, value, field_def)
+                else:
+                    # For paragraph-based checkboxes, use the special handler
+                    DocumentService._fill_checkbox_field(doc, value, field_def)
                 continue
 
-            anchor = field_def.get("anchor")
             if not anchor:
                 continue
 

@@ -148,6 +148,21 @@ export const formsController = {
     }
   },
 
+  // Review Queue
+  getReviewQueue: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (req.user?.role !== USER_ROLES.ADMIN && req.user?.role !== USER_ROLES.REVIEWER) {
+        throw new ForbiddenError('Only reviewers can access the review queue');
+      }
+
+      const { status } = req.query;
+      const response = await formsProxy.getReviewQueue(req.user!.role, status as string);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   // Review actions
   submitForReview: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -177,7 +192,11 @@ export const formsController = {
       const formId = parseInt(req.params.formId, 10);
       const { notes } = req.body;
 
-      const response = await formsProxy.requestChanges(formId, req.user!.id, notes);
+      if (!notes) {
+        throw new ValidationError('Notes are required when requesting changes');
+      }
+
+      const response = await formsProxy.requestChanges(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.UPDATE,
@@ -201,7 +220,7 @@ export const formsController = {
       const formId = parseInt(req.params.formId, 10);
       const { notes } = req.body;
 
-      const response = await formsProxy.approveForm(formId, req.user!.id, notes);
+      const response = await formsProxy.approveForm(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.APPROVE,
@@ -224,7 +243,11 @@ export const formsController = {
       const formId = parseInt(req.params.formId, 10);
       const { notes } = req.body;
 
-      const response = await formsProxy.rejectForm(formId, req.user!.id, notes);
+      if (!notes) {
+        throw new ValidationError('Notes are required when rejecting a form');
+      }
+
+      const response = await formsProxy.rejectForm(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.REJECT,
@@ -238,11 +261,42 @@ export const formsController = {
     }
   },
 
+  returnToDraft: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { notes } = req.body;
+
+      const response = await formsProxy.returnToDraft(formId, req.user!.id, notes);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'form',
+        resourceId: formId.toString(),
+        details: { action: 'return_to_draft' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getReviewHistory: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const response = await formsProxy.getReviewHistory(formId);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   // Comments
   getComments: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const formId = parseInt(req.params.formId, 10);
-      const response = await formsProxy.getComments(formId);
+      const includeResolved = req.query.include_resolved === 'true';
+      const response = await formsProxy.getComments(formId, includeResolved);
       res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
@@ -252,7 +306,7 @@ export const formsController = {
   addComment: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const formId = parseInt(req.params.formId, 10);
-      const { content, field_id, section_id, thread_id } = req.body;
+      const { content, field_id, section_id, parent_comment_id } = req.body;
 
       if (!content) {
         throw new ValidationError('Comment content is required');
@@ -264,7 +318,7 @@ export const formsController = {
         content,
         field_id,
         section_id,
-        thread_id
+        parent_comment_id
       );
 
       await logAudit(req, {
@@ -275,6 +329,42 @@ export const formsController = {
       });
 
       res.status(201).json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  resolveThread: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const threadId = parseInt(req.params.threadId, 10);
+      const response = await formsProxy.resolveThread(threadId, req.user!.id);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'comment_thread',
+        resourceId: threadId.toString(),
+        details: { action: 'resolve' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  reopenThread: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const threadId = parseInt(req.params.threadId, 10);
+      const response = await formsProxy.reopenThread(threadId);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'comment_thread',
+        resourceId: threadId.toString(),
+        details: { action: 'reopen' },
+      });
+
+      res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
     }
@@ -367,6 +457,94 @@ export const formsController = {
       const formId = parseInt(req.params.formId, 10);
       const { fieldId } = req.params;
       const response = await formsProxy.getFieldHistory(formId, fieldId);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Editing Locks
+  checkLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const response = await formsProxy.checkLock(formId);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  acquireLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { section_id, duration_minutes } = req.body;
+      const response = await formsProxy.acquireLock(formId, req.user!.id, section_id, duration_minutes);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  releaseLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { section_id } = req.body;
+      const response = await formsProxy.releaseLock(formId, req.user!.id, section_id);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  extendLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { section_id, duration_minutes } = req.body;
+      const response = await formsProxy.extendLock(formId, req.user!.id, section_id, duration_minutes);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getAllLocks: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const response = await formsProxy.getAllLocks(formId);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  checkSectionLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { sectionId } = req.params;
+      const response = await formsProxy.checkSectionLock(formId, sectionId);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  acquireSectionLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { sectionId } = req.params;
+      const { duration_minutes } = req.body;
+      const response = await formsProxy.acquireSectionLock(formId, sectionId, req.user!.id, duration_minutes);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  releaseSectionLock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const formId = parseInt(req.params.formId, 10);
+      const { sectionId } = req.params;
+      const response = await formsProxy.releaseSectionLock(formId, sectionId, req.user!.id);
       res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);

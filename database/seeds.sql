@@ -10,12 +10,12 @@
 
 INSERT INTO users (id, email, password_hash, full_name, role, is_active, email_verified) VALUES
 -- Admin user
-('a0000000-0000-0000-0000-000000000001', 'admin@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.N8Z.FZjKQGzKPe', 'Admin User', 'admin', true, true),
+('a0000000-0000-0000-0000-000000000001', 'admin@example.com', '$2b$12$Au6IV6e2oJVgnWuzgh1JCOCfP59EFXBazBI0.b/KVQcIyEh2lOvfS', 'Admin User', 'admin', true, true),
 -- Reviewer user
-('a0000000-0000-0000-0000-000000000002', 'reviewer@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.N8Z.FZjKQGzKPe', 'Jane Reviewer', 'reviewer', true, true),
+('a0000000-0000-0000-0000-000000000002', 'reviewer@example.com', '$2b$12$Au6IV6e2oJVgnWuzgh1JCOCfP59EFXBazBI0.b/KVQcIyEh2lOvfS', 'Jane Reviewer', 'reviewer', true, true),
 -- Researcher users
-('a0000000-0000-0000-0000-000000000003', 'researcher@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.N8Z.FZjKQGzKPe', 'John Researcher', 'researcher', true, true),
-('a0000000-0000-0000-0000-000000000004', 'researcher2@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.N8Z.FZjKQGzKPe', 'Sarah Scientist', 'researcher', true, true);
+('a0000000-0000-0000-0000-000000000003', 'researcher@example.com', '$2b$12$Au6IV6e2oJVgnWuzgh1JCOCfP59EFXBazBI0.b/KVQcIyEh2lOvfS', 'John Researcher', 'researcher', true, true),
+('a0000000-0000-0000-0000-000000000004', 'researcher2@example.com', '$2b$12$Au6IV6e2oJVgnWuzgh1JCOCfP59EFXBazBI0.b/KVQcIyEh2lOvfS', 'Sarah Scientist', 'researcher', true, true);
 
 -- =============================================================================
 -- EMAIL PREFERENCES
