@@ -1,0 +1,1736 @@
+{
+    "sections": [
+        {
+            "id": "sec_investigator",
+            "title": "I. Investigator Information",
+            "order": 0,
+            "collapsible": true,
+            "description": "All study personnel must have human subject education and conflict of interest training completed"
+        },
+        {
+            "id": "sec_protocol",
+            "title": "II. Title of Protocol",
+            "order": 1,
+            "collapsible": true
+        },
+        {
+            "id": "sec_project_period",
+            "title": "III. Project Period",
+            "order": 2,
+            "collapsible": true
+        },
+        {
+            "id": "sec_funding",
+            "title": "IV. Funding Sources",
+            "order": 3,
+            "collapsible": true
+        },
+        {
+            "id": "sec_required_info",
+            "title": "V. Required Information",
+            "order": 4,
+            "collapsible": true,
+            "description": "Regulatory requirements and study classification"
+        },
+        {
+            "id": "sec_population",
+            "title": "VI. Description of Population",
+            "order": 5,
+            "collapsible": true
+        },
+        {
+            "id": "sec_methods_risks",
+            "title": "VII. Subject-Related Methods and Risks",
+            "order": 6,
+            "collapsible": true
+        },
+        {
+            "id": "sec_benefits",
+            "title": "VIII. Benefits",
+            "order": 7,
+            "collapsible": true
+        },
+        {
+            "id": "sec_confidentiality",
+            "title": "IX. Confidentiality and Data Security",
+            "order": 8,
+            "collapsible": true
+        },
+        {
+            "id": "sec_signatures",
+            "title": "X. Supporting Signatures",
+            "order": 9,
+            "collapsible": true
+        }
+    ],
+    "fields": [
+        {
+            "id": "investigator.pi_name",
+            "type": "text",
+            "label": "Principal Investigator (name, degrees)",
+            "section_id": "sec_investigator",
+            "order": 0,
+            "required": true,
+            "group_start": "A. Principal Investigator",
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 0
+            }
+        },
+        {
+            "id": "investigator.pi_obtaining_consent",
+            "type": "checkbox",
+            "label": "PI Obtaining Consent?",
+            "section_id": "sec_investigator",
+            "order": 1,
+            "options": [
+                {"value": "yes", "label": "Yes"}
+            ],
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "investigator.pi_dept",
+            "type": "text",
+            "label": "Department/Section",
+            "section_id": "sec_investigator",
+            "order": 2,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 2
+            }
+        },
+        {
+            "id": "investigator.pi_ext",
+            "type": "text",
+            "label": "Extension",
+            "section_id": "sec_investigator",
+            "order": 3,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 4
+            }
+        },
+        {
+            "id": "investigator.pi_email",
+            "type": "email",
+            "label": "E-Mail",
+            "section_id": "sec_investigator",
+            "order": 4,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 5
+            }
+        },
+        {
+            "id": "investigator.pi_faculty_appt",
+            "type": "radio",
+            "label": "Faculty Appointment",
+            "section_id": "sec_investigator",
+            "order": 5,
+            "options": [
+                {"value": "full_time", "label": "Full Time Faculty"},
+                {"value": "part_time", "label": "Part Time Faculty"},
+                {"value": "volunteer", "label": "Volunteer Faculty"},
+                {"value": "other", "label": "Other"}
+            ],
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 7
+            }
+        },
+        {
+            "id": "investigator.research_personnel",
+            "type": "repeatable",
+            "label": "All Persons Conducting Human Subjects Research",
+            "section_id": "sec_investigator",
+            "order": 6,
+            "group_start": "B. Research Personnel",
+            "anchor": {
+                "type": "table",
+                "table_index": 0,
+                "start_row": 3
+            },
+            "repeatable_config": {
+                "min_rows": 0,
+                "max_rows": 5,
+                "add_button_text": "Add Research Personnel",
+                "columns": [
+                    {"id": "name", "label": "Name, Degrees", "type": "text", "width": "20%"},
+                    {"id": "consent", "label": "Obtaining Consent?", "type": "checkbox", "width": "10%"},
+                    {"id": "dept", "label": "Dept./Section", "type": "text", "width": "15%"},
+                    {"id": "ext", "label": "Ext.", "type": "text", "width": "10%"},
+                    {"id": "email", "label": "E-Mail", "type": "email", "width": "20%"},
+                    {"id": "role", "label": "Role on Study", "type": "text", "width": "25%"}
+                ],
+                "column_mapping": [0, 1, 2, 4, 5, 7]
+            }
+        },
+        {
+            "id": "investigator.other_personnel",
+            "type": "repeatable",
+            "label": "Other Personnel Involved in Design, Conduct, or Reporting",
+            "section_id": "sec_investigator",
+            "order": 7,
+            "group_start": "C. Other Personnel",
+            "anchor": {
+                "type": "table",
+                "table_index": 0,
+                "start_row": 9
+            },
+            "repeatable_config": {
+                "min_rows": 0,
+                "max_rows": 2,
+                "add_button_text": "Add Other Personnel",
+                "columns": [
+                    {"id": "name", "label": "Name, Degrees", "type": "text", "width": "20%"},
+                    {"id": "consent", "label": "Obtaining Consent?", "type": "checkbox", "width": "10%"},
+                    {"id": "dept", "label": "Dept./Section", "type": "text", "width": "15%"},
+                    {"id": "ext", "label": "Ext.", "type": "text", "width": "10%"},
+                    {"id": "email", "label": "E-Mail", "type": "email", "width": "20%"},
+                    {"id": "role", "label": "Role on Study", "type": "text", "width": "25%"}
+                ],
+                "column_mapping": [0, 1, 2, 4, 5, 7]
+            }
+        },
+        {
+            "id": "investigator.contact_name",
+            "type": "text",
+            "label": "Preferred Contact Person",
+            "section_id": "sec_investigator",
+            "order": 8,
+            "group_start": "D. Preferred Contact Person",
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 11,
+                "column_index": 0,
+                "append_to_label": true
+            }
+        },
+        {
+            "id": "investigator.contact_building",
+            "type": "text",
+            "label": "Building - Room #",
+            "section_id": "sec_investigator",
+            "order": 9,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 11,
+                "column_index": 1,
+                "append_to_label": true
+            }
+        },
+        {
+            "id": "investigator.contact_ext",
+            "type": "text",
+            "label": "Extension",
+            "section_id": "sec_investigator",
+            "order": 10,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 11,
+                "column_index": 3,
+                "append_to_label": true
+            }
+        },
+        {
+            "id": "investigator.contact_fax",
+            "type": "text",
+            "label": "FAX",
+            "section_id": "sec_investigator",
+            "order": 11,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 11,
+                "column_index": 4,
+                "append_to_label": true
+            }
+        },
+        {
+            "id": "investigator.contact_email",
+            "type": "email",
+            "label": "E-mail",
+            "section_id": "sec_investigator",
+            "order": 12,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 11,
+                "column_index": 6,
+                "append_to_label": true
+            }
+        },
+        {
+            "id": "protocol.title",
+            "type": "textarea",
+            "label": "Title of Protocol",
+            "section_id": "sec_protocol",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 12,
+                "column_index": 0,
+                "cell_paragraph_index": 1
+            }
+        },
+        {
+            "id": "project.start_date",
+            "type": "date",
+            "label": "Project Period From",
+            "section_id": "sec_project_period",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 13,
+                "column_index": 0,
+                "replace_pattern": "From\\s+to",
+                "replace_with": "From {value} to"
+            }
+        },
+        {
+            "id": "project.end_date",
+            "type": "date",
+            "label": "Project Period To",
+            "section_id": "sec_project_period",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 13,
+                "column_index": 0,
+                "replace_pattern": "to$",
+                "replace_with": "to {value}"
+            }
+        },
+        {
+            "id": "funding.intramural_dept",
+            "type": "text",
+            "label": "If intramural, what department or fund?",
+            "section_id": "sec_funding",
+            "order": 0
+        },
+        {
+            "id": "funding.extramural_sponsor",
+            "type": "text",
+            "label": "If extramural, what is the name of the sponsor?",
+            "section_id": "sec_funding",
+            "order": 1
+        },
+        {
+            "id": "funding.federally_funded",
+            "type": "radio",
+            "label": "Is the study federally funded?",
+            "section_id": "sec_funding",
+            "order": 2,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.initiated_by",
+            "type": "radio",
+            "label": "Is this study initiated by:",
+            "section_id": "sec_required_info",
+            "order": 0,
+            "required": true,
+            "group_start": "A. Study Initiation",
+            "options": [
+                {"value": "local", "label": "Local investigator"},
+                {"value": "sponsor_investigator", "label": "Local investigator as sponsor-investigator (for FDA-regulated studies)"},
+                {"value": "cooperative", "label": "Cooperative group"},
+                {"value": "external", "label": "External sponsor/manufacturer"},
+                {"value": "other", "label": "Other, specify:"}
+            ]
+        },
+        {
+            "id": "study.initiated_other",
+            "type": "text",
+            "label": "Other - Specify",
+            "section_id": "sec_required_info",
+            "order": 1,
+            "visible": false,
+            "indent": 1
+        },
+        {
+            "id": "study.drugs_biologics_devices",
+            "type": "checkbox",
+            "label": "Are any of the following used in this study? (check all that apply)",
+            "section_id": "sec_required_info",
+            "order": 2,
+            "group_start": "B. Drugs, Biologics, and Devices",
+            "options": [
+                {"value": "drugs", "label": "Drugs"},
+                {"value": "biologics", "label": "Biologics"},
+                {"value": "devices", "label": "Devices"}
+            ]
+        },
+        {
+            "id": "study.fda_regulations_apply",
+            "type": "radio",
+            "label": "Do FDA regulations for an Investigational New Drug or Investigational Device apply?",
+            "section_id": "sec_required_info",
+            "order": 3,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "yes", "label": "Yes"},
+                {"value": "no", "label": "No - For confirmation whether an IND or IDE is necessary, request letter from FDA"}
+            ]
+        },
+        {
+            "id": "study.ind_number",
+            "type": "text",
+            "label": "IND Number",
+            "section_id": "sec_required_info",
+            "order": 4,
+            "visible": false,
+            "indent": 2
+        },
+        {
+            "id": "study.ide_number",
+            "type": "text",
+            "label": "IDE Number",
+            "section_id": "sec_required_info",
+            "order": 5,
+            "visible": false,
+            "indent": 2
+        },
+        {
+            "id": "study.phase",
+            "type": "checkbox",
+            "label": "Study Phase (check appropriately)",
+            "section_id": "sec_required_info",
+            "order": 6,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "phase1", "label": "Phase I"},
+                {"value": "phase2", "label": "Phase II"},
+                {"value": "phase3", "label": "Phase III"},
+                {"value": "phase4", "label": "Phase IV"},
+                {"value": "emergency", "label": "Emergency Use"},
+                {"value": "other", "label": "Other"}
+            ]
+        },
+        {
+            "id": "study.phase_other",
+            "type": "text",
+            "label": "Other Phase - Specify",
+            "section_id": "sec_required_info",
+            "order": 7,
+            "visible": false,
+            "indent": 2
+        },
+        {
+            "id": "study.schedule_drugs",
+            "type": "radio",
+            "label": "Will any Schedule I or II drugs be investigated in this study?",
+            "section_id": "sec_required_info",
+            "order": 8,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - This use must be approved by the California State Research Advisory Panel"}
+            ]
+        },
+        {
+            "id": "study.schedule_drugs_approval",
+            "type": "radio",
+            "label": "Who will obtain approval from California State Research Advisory Panel?",
+            "section_id": "sec_required_info",
+            "order": 9,
+            "visible": false,
+            "indent": 2,
+            "options": [
+                {"value": "investigator", "label": "I (Investigator) will obtain this approval"},
+                {"value": "sponsor", "label": "The sponsor will obtain this approval"}
+            ]
+        },
+        {
+            "id": "study.device_worksheet_notice",
+            "type": "checkbox",
+            "label": "Device Study Requirements",
+            "section_id": "sec_required_info",
+            "order": 10,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "acknowledged", "label": "I acknowledge: If device is checked, complete the CTC Device Study Worksheet and submit three copies with the original IRB application."}
+            ]
+        },
+        {
+            "id": "study.is_student_project",
+            "type": "radio",
+            "label": "Is this a student project? (includes fellows, residents, interns, graduate and undergraduate students)",
+            "section_id": "sec_required_info",
+            "order": 11,
+            "group_start": "C. Student Project",
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.student_name",
+            "type": "text",
+            "label": "Student Name",
+            "section_id": "sec_required_info",
+            "order": 12,
+            "visible": false,
+            "indent": 1
+        },
+        {
+            "id": "study.student_program",
+            "type": "text",
+            "label": "Student Program/Department",
+            "section_id": "sec_required_info",
+            "order": 13,
+            "visible": false,
+            "indent": 1
+        },
+        {
+            "id": "study.ionizing_radiation",
+            "type": "radio",
+            "label": "Will subjects be exposed to any ionizing radiation?",
+            "section_id": "sec_required_info",
+            "order": 14,
+            "group_start": "D. Ionizing Radiation",
+            "options": [
+                {"value": "no", "label": "No - Radiation Safety Committee (RSC) review not required"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.radiation_direct_benefit",
+            "type": "radio",
+            "label": "Will participants in this study receive direct medical benefits?",
+            "section_id": "sec_required_info",
+            "order": 15,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "no", "label": "No - RSC review REQUIRED"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.radiation_routine",
+            "type": "radio",
+            "label": "Is the proposed use of radiation/radioactive materials normally considered routine? (Examples: X-ray, nuclear medicine scan)",
+            "section_id": "sec_required_info",
+            "order": 16,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "no", "label": "No - RSC review REQUIRED"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.radiation_greater_dose",
+            "type": "radio",
+            "label": "Will subjects receive a greater radiation dose than patients undergoing routine treatment for the same medical condition?",
+            "section_id": "sec_required_info",
+            "order": 17,
+            "visible": false,
+            "indent": 1,
+            "options": [
+                {"value": "no", "label": "No - RSC review not required"},
+                {"value": "yes", "label": "Yes - RSC review REQUIRED"}
+            ]
+        },
+        {
+            "id": "study.scro_required",
+            "type": "radio",
+            "label": "Does the project involve the creation or use of human embryonic stem cells; the creation or use of human induced pluripotent stem cells; or the introduction of human cells into non-human animals?",
+            "section_id": "sec_required_info",
+            "order": 18,
+            "group_start": "E. Stem Cell Research Oversight (SCRO)",
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - Letter of approval from SCRO required"}
+            ]
+        },
+        {
+            "id": "study.ibc_infectious",
+            "type": "radio",
+            "label": "Are human or animal infectious agents (bacteria, virus, yeast, fungi, prions, rickettsias, parasites, etc.) introduced or manipulated in this study?",
+            "section_id": "sec_required_info",
+            "order": 19,
+            "group_start": "F. Institutional Biosafety Committee (IBC)",
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - Letter of approval from IBC required"}
+            ]
+        },
+        {
+            "id": "study.ibc_recombinant",
+            "type": "radio",
+            "label": "Will recombinant or synthetic nucleic acids, or gene transfer be used?",
+            "section_id": "sec_required_info",
+            "order": 20,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.ibc_hazardous",
+            "type": "radio",
+            "label": "Will carcinogens, mutagens, nanoparticles, or other toxic or hazardous materials be used?",
+            "section_id": "sec_required_info",
+            "order": 21,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "study.phs_submission",
+            "type": "radio",
+            "label": "Is the study being submitted to Public Health Service for sponsorship?",
+            "section_id": "sec_required_info",
+            "order": 22,
+            "group_start": "G. Public Health Service",
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - PHS policy requires assurance that the composition of the proposed study population benefits all persons at risk"}
+            ]
+        },
+        {
+            "id": "population.healthy_llu",
+            "type": "text",
+            "label": "Healthy (normal) subjects - Number at LLU",
+            "section_id": "sec_population",
+            "order": 0,
+            "group_start": "A. Subject Numbers",
+            "table_group": "subject_numbers",
+            "table_row": 0,
+            "table_col": 0,
+            "table_config": {
+                "columns": [
+                    {"id": "llu", "label": "Number at LLU"},
+                    {"id": "studywide", "label": "Number Study-wide"},
+                    {"id": "age_range", "label": "Age Range"}
+                ],
+                "rows": [
+                    {"id": "healthy", "label": "Healthy (normal) subjects"},
+                    {"id": "patients", "label": "Patients"},
+                    {"id": "total", "label": "Total Number"}
+                ]
+            },
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "population.healthy_studywide",
+            "type": "text",
+            "label": "Healthy (normal) subjects - Number Study-wide",
+            "section_id": "sec_population",
+            "order": 1,
+            "table_group": "subject_numbers",
+            "table_row": 0,
+            "table_col": 1,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 2
+            }
+        },
+        {
+            "id": "population.healthy_age_range",
+            "type": "text",
+            "label": "Healthy (normal) subjects - Age Range",
+            "section_id": "sec_population",
+            "order": 2,
+            "table_group": "subject_numbers",
+            "table_row": 0,
+            "table_col": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 3
+            }
+        },
+        {
+            "id": "population.patients_llu",
+            "type": "text",
+            "label": "Patients - Number at LLU",
+            "section_id": "sec_population",
+            "order": 3,
+            "table_group": "subject_numbers",
+            "table_row": 1,
+            "table_col": 0,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 2,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "population.patients_studywide",
+            "type": "text",
+            "label": "Patients - Number Study-wide",
+            "section_id": "sec_population",
+            "order": 4,
+            "table_group": "subject_numbers",
+            "table_row": 1,
+            "table_col": 1,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 2,
+                "column_index": 2
+            }
+        },
+        {
+            "id": "population.patients_age_range",
+            "type": "text",
+            "label": "Patients - Age Range",
+            "section_id": "sec_population",
+            "order": 5,
+            "table_group": "subject_numbers",
+            "table_row": 1,
+            "table_col": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 2,
+                "column_index": 3
+            }
+        },
+        {
+            "id": "population.total_llu",
+            "type": "text",
+            "label": "Total Number - at LLU",
+            "section_id": "sec_population",
+            "order": 6,
+            "table_group": "subject_numbers",
+            "table_row": 2,
+            "table_col": 0,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 3,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "population.total_studywide",
+            "type": "text",
+            "label": "Total Number - Study-wide",
+            "section_id": "sec_population",
+            "order": 7,
+            "table_group": "subject_numbers",
+            "table_row": 2,
+            "table_col": 1,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 3,
+                "column_index": 2
+            }
+        },
+        {
+            "id": "population.total_age_range",
+            "type": "text",
+            "label": "Total Number - Age Range",
+            "section_id": "sec_population",
+            "order": 8,
+            "table_group": "subject_numbers",
+            "table_row": 2,
+            "table_col": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 3,
+                "column_index": 3
+            }
+        },
+        {
+            "id": "population.vulnerable",
+            "type": "checkbox",
+            "label": "Vulnerable Populations",
+            "section_id": "sec_population",
+            "order": 10,
+            "group_start": "B. Classification of Subjects (check all that apply)",
+            "column_group": "classification",
+            "column_index": 0,
+            "options": [
+                {"value": "abortuses", "label": "Abortuses/Embryos"},
+                {"value": "diminished_capacity", "label": "Diminished decision-making capacity"},
+                {"value": "economically_disadvantaged", "label": "Economically disadvantaged"},
+                {"value": "educationally_disadvantaged", "label": "Educationally disadvantaged"},
+                {"value": "fetuses", "label": "Fetuses"},
+                {"value": "minors", "label": "Minors/Children (under 18 years of age)"},
+                {"value": "neonates", "label": "Neonates"},
+                {"value": "pregnant", "label": "Pregnant women"},
+                {"value": "prisoners", "label": "Prisoners"}
+            ]
+        },
+        {
+            "id": "population.special",
+            "type": "checkbox",
+            "label": "Special Populations",
+            "section_id": "sec_population",
+            "order": 11,
+            "column_group": "classification",
+            "column_index": 1,
+            "options": [
+                {"value": "elderly", "label": "Elderly/aged"},
+                {"value": "illiterate", "label": "Illiterate"},
+                {"value": "institutionalized", "label": "Institutionalized"},
+                {"value": "patients_inpatients", "label": "Patients: Inpatients"},
+                {"value": "patients_outpatients", "label": "Patients: Outpatients"},
+                {"value": "terminally_ill", "label": "Terminally ill patients"},
+                {"value": "traumatized", "label": "Traumatized"}
+            ]
+        },
+        {
+            "id": "population.special_other",
+            "type": "text",
+            "label": "Other, specify",
+            "section_id": "sec_population",
+            "order": 12,
+            "column_group": "classification",
+            "column_index": 1,
+            "placeholder": "Specify..."
+        },
+        {
+            "id": "population.other_populations",
+            "type": "checkbox",
+            "label": "Other Populations",
+            "section_id": "sec_population",
+            "order": 13,
+            "column_group": "classification",
+            "column_index": 2,
+            "options": [
+                {"value": "employees", "label": "Employees"},
+                {"value": "female_only", "label": "Female (excludes males)"},
+                {"value": "healthy", "label": "Healthy (non-patient)"},
+                {"value": "male_only", "label": "Male (excludes females)"},
+                {"value": "minorities", "label": "Minorities"},
+                {"value": "non_english", "label": "Non-English speaking populations"},
+                {"value": "physically_handicapped", "label": "Physically handicapped"},
+                {"value": "sda_cohort", "label": "Seventh-day Adventist cohort"},
+                {"value": "students", "label": "Students"}
+            ]
+        },
+        {
+            "id": "population.other_populations_other",
+            "type": "text",
+            "label": "Other, specify",
+            "section_id": "sec_population",
+            "order": 14,
+            "column_group": "classification",
+            "column_index": 2,
+            "placeholder": "Specify..."
+        },
+        {
+            "id": "population.inclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for inclusion of subjects",
+            "section_id": "sec_population",
+            "order": 15,
+            "required": true,
+            "group_start": "C. Inclusion/Exclusion Criteria",
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for inclusion"
+            }
+        },
+        {
+            "id": "population.exclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for exclusion of subjects (other than those opposite the inclusion criteria)",
+            "section_id": "sec_population",
+            "order": 16,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for exclusion"
+            }
+        },
+        {
+            "id": "recruitment.source",
+            "type": "checkbox",
+            "label": "Source of subjects",
+            "section_id": "sec_population",
+            "order": 20,
+            "group_start": "E. Recruitment Plan",
+            "options": [
+                {"value": "own_patients", "label": "PI/collaborators will recruit his/her/their own patients/clients/students/employees"},
+                {"value": "letter_referrals", "label": "PI will send an IRB-approved letter to colleagues asking for referrals"},
+                {"value": "letter_patients", "label": "PI will send an IRB-approved letter to colleagues asking to send 'Dear Patient' letters"},
+                {"value": "other", "label": "Other, specify:"}
+            ]
+        },
+        {
+            "id": "recruitment.source_other",
+            "type": "textarea",
+            "label": "Other source - specify",
+            "section_id": "sec_population",
+            "order": 21,
+            "visible": false,
+            "indent": 1
+        },
+        {
+            "id": "recruitment.flyers_used",
+            "type": "radio",
+            "label": "Will recruitment require use of flyers, posters, hand-outs, or other forms of advertising?",
+            "section_id": "sec_population",
+            "order": 22,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - Attach copy for IRB review/approval"}
+            ]
+        },
+        {
+            "id": "recruitment.verbal_used",
+            "type": "radio",
+            "label": "Will recruitment require verbal (including telephone) recruitment?",
+            "section_id": "sec_population",
+            "order": 23,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes - Attach script (See Phone Script Elements)"}
+            ]
+        },
+        {
+            "id": "recruitment.electronic_used",
+            "type": "radio",
+            "label": "Will recruitment involve electronic (web or e-mail) recruiting?",
+            "section_id": "sec_population",
+            "order": 24,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ]
+        },
+        {
+            "id": "recruitment.electronic_description",
+            "type": "textarea",
+            "label": "Describe electronic recruitment method",
+            "section_id": "sec_population",
+            "order": 25,
+            "visible": false,
+            "indent": 1
+        },
+        {
+            "id": "consent.plan",
+            "type": "textarea",
+            "label": "Describe your plan for obtaining consent",
+            "section_id": "sec_population",
+            "order": 30,
+            "required": true,
+            "group_start": "F. Consent Plan",
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "plan for obtaining consent"
+            }
+        },
+        {
+            "id": "consent.location",
+            "type": "text",
+            "label": "What location will be used for the subject to sign the consent?",
+            "section_id": "sec_population",
+            "order": 31,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "location will be used for the subject"
+            }
+        },
+        {
+            "id": "consent.timing",
+            "type": "radio",
+            "label": "Relative to the performance of research interventions, is consent obtained:",
+            "section_id": "sec_population",
+            "order": 32,
+            "options": [
+                {"value": "conjunction", "label": "In conjunction with the performance of research interventions"},
+                {"value": "separate", "label": "At a separate appointment from the performance of research interventions"}
+            ]
+        },
+        {
+            "id": "consent.documents_required",
+            "type": "checkbox",
+            "label": "Which consent documents are required? (check all that apply)",
+            "section_id": "sec_population",
+            "order": 33,
+            "options": [
+                {"value": "informed_consent", "label": "Informed Consent Document(s)"},
+                {"value": "parent_permission", "label": "Consent/Permission of Parent/Guardian"},
+                {"value": "assent_13_17", "label": "Assent of Minor (13-17 yrs old; provide signature with parent on Consent Permission Form)"},
+                {"value": "assent_7_12", "label": "Assent of Minor (7-12 yrs old; simplified text)"},
+                {"value": "hipaa_auth", "label": "Authorization for Use of Protected Health Information"}
+            ]
+        },
+        {
+            "id": "consent.waiver_requested",
+            "type": "checkbox",
+            "label": "If a consent waiver is requested, select one of the following:",
+            "section_id": "sec_population",
+            "order": 34,
+            "options": [
+                {"value": "waiver_consent", "label": "Waiver of consent"},
+                {"value": "waiver_written", "label": "Waiver of written consent (Provide text of verbal consent)"},
+                {"value": "waiver_signed", "label": "Waiver of signed consent (Provide text for Information sheet)"},
+                {"value": "waiver_hipaa", "label": "Waiver of HIPAA authorization"}
+            ]
+        },
+        {
+            "id": "consent.inducement",
+            "type": "textarea",
+            "label": "Amount of inducement being offered to the subjects, if any (include plan for pro-rated payment, if appropriate)",
+            "section_id": "sec_population",
+            "order": 40,
+            "group_start": "G. Amount of Inducement"
+        },
+        {
+            "id": "methods.location",
+            "type": "text",
+            "label": "What location will subject-related procedures take place?",
+            "section_id": "sec_methods_risks",
+            "order": 0
+        },
+        {
+            "id": "methods.procedures_minimal",
+            "type": "checkbox",
+            "label": "Study-related procedures - Usually Minimal Risk",
+            "section_id": "sec_methods_risks",
+            "order": 1,
+            "options": [
+                {"value": "archived_data", "label": "Archived data"},
+                {"value": "biopsy", "label": "Biopsy"},
+                {"value": "blood_draw", "label": "Blood drawing"},
+                {"value": "data_bank", "label": "Data bank"},
+                {"value": "focus_group", "label": "Focus group"},
+                {"value": "interview", "label": "Interview"},
+                {"value": "medical_records", "label": "Medical records review"},
+                {"value": "observation", "label": "Observation"},
+                {"value": "physical_exam", "label": "Physical examination"},
+                {"value": "specimens", "label": "Specimens (collection)"},
+                {"value": "survey", "label": "Survey/questionnaire"},
+                {"value": "tissue_bank", "label": "Tissue bank"},
+                {"value": "other_minimal", "label": "Other (specify below)"}
+            ]
+        },
+        {
+            "id": "methods.procedures_greater",
+            "type": "checkbox",
+            "label": "Study-related procedures - Potentially Greater than Minimal Risk",
+            "section_id": "sec_methods_risks",
+            "order": 2,
+            "options": [
+                {"value": "contrast_agents", "label": "Contrast agents"},
+                {"value": "device_approved", "label": "Device - approved"},
+                {"value": "device_investigational", "label": "Device - investigational"},
+                {"value": "drug_approved", "label": "Drug - approved"},
+                {"value": "drug_investigational", "label": "Drug - investigational"},
+                {"value": "genetic_testing", "label": "Genetic testing"},
+                {"value": "mri", "label": "MRI"},
+                {"value": "placebo", "label": "Placebo"},
+                {"value": "radiation", "label": "Radiation"},
+                {"value": "randomization", "label": "Randomization"},
+                {"value": "surgery", "label": "Surgery/invasive procedure"},
+                {"value": "vaccine", "label": "Vaccine"},
+                {"value": "other_greater", "label": "Other (specify below)"}
+            ]
+        },
+        {
+            "id": "methods.procedures_other",
+            "type": "textarea",
+            "label": "Other procedures - specify",
+            "section_id": "sec_methods_risks",
+            "order": 3
+        },
+        {
+            "id": "methods.risks",
+            "type": "textarea",
+            "label": "List the risks that may result from study-related procedures (Do NOT say 'None' - consider breach of confidentiality or privacy as a risk for all studies)",
+            "section_id": "sec_methods_risks",
+            "order": 4,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "List the risks"
+            }
+        },
+        {
+            "id": "methods.risk_level_adults",
+            "type": "radio",
+            "label": "For studies involving only adults, estimate the magnitude of risks the subject assumes by entering this study:",
+            "section_id": "sec_methods_risks",
+            "order": 5,
+            "required": true,
+            "options": [
+                {"value": "minimal", "label": "Minimal risk"},
+                {"value": "greater", "label": "Greater than minimal risk (MUST have detailed data safety monitoring plan in protocol)"}
+            ]
+        },
+        {
+            "id": "methods.risk_level_children",
+            "type": "radio",
+            "label": "For studies involving children or both children and adults, estimate the magnitude of risks:",
+            "section_id": "sec_methods_risks",
+            "order": 6,
+            "visible": false,
+            "options": [
+                {"value": "minimal", "label": "Minimal risk"},
+                {"value": "greater_benefit", "label": "Greater than minimal risk, but holds prospect of direct benefit to subjects"},
+                {"value": "greater_knowledge", "label": "Greater than minimal risk, no prospect of direct benefit, but likely to yield generalizable knowledge"},
+                {"value": "moderate", "label": "Moderate risk"},
+                {"value": "high", "label": "High risk"}
+            ]
+        },
+        {
+            "id": "methods.risk_prevention",
+            "type": "textarea",
+            "label": "State plan for preventing or minimizing these risks",
+            "section_id": "sec_methods_risks",
+            "order": 7,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "plan for preventing or minimizing"
+            }
+        },
+        {
+            "id": "methods.safety_monitoring",
+            "type": "radio",
+            "label": "How are this study's safety data monitored?",
+            "section_id": "sec_methods_risks",
+            "order": 8,
+            "options": [
+                {"value": "dsmb", "label": "By an independent Data and Safety Monitoring Board/Data Monitoring Committee"},
+                {"value": "sponsor", "label": "Other sponsor provided plan for data monitoring"},
+                {"value": "local", "label": "Locally by the investigator"}
+            ]
+        },
+        {
+            "id": "benefits.to_subjects",
+            "type": "textarea",
+            "label": "State the expected benefits to the subjects (It is acceptable for subjects not to benefit individually in some studies)",
+            "section_id": "sec_benefits",
+            "order": 0,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "expected benefits to the subjects"
+            }
+        },
+        {
+            "id": "benefits.to_humanity",
+            "type": "textarea",
+            "label": "State the expected benefits to humanity",
+            "section_id": "sec_benefits",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "benefits to humanity"
+            }
+        },
+        {
+            "id": "confidentiality.electronic_collection",
+            "type": "radio",
+            "label": "Will you collect and store research data electronically?",
+            "section_id": "sec_confidentiality",
+            "order": 0,
+            "options": [
+                {"value": "no", "label": "No - Research data will not be collected or stored electronically"},
+                {"value": "yes", "label": "Yes - Research data will be collected and stored electronically"}
+            ]
+        },
+        {
+            "id": "confidentiality.electronic_protections",
+            "type": "checkbox",
+            "label": "Confirm all required protections are in place:",
+            "section_id": "sec_confidentiality",
+            "order": 1,
+            "visible": false,
+            "options": [
+                {"value": "password", "label": "Password protection"},
+                {"value": "secure_server", "label": "Data saved only to a secure storage location (LLU/LLUMC secured server or network)"},
+                {"value": "portable_encrypted", "label": "If portable device used, data saved only if device is encrypted, storage is temporary, and portable device is password protected"},
+                {"value": "proper_destruction", "label": "Devices and removable media no longer needed will be forwarded to IS for proper destruction"}
+            ]
+        },
+        {
+            "id": "confidentiality.electronic_unable_reason",
+            "type": "textarea",
+            "label": "If unable to secure the data as indicated above, briefly summarize the reason:",
+            "section_id": "sec_confidentiality",
+            "order": 2,
+            "visible": false
+        },
+        {
+            "id": "confidentiality.electronic_transmittal",
+            "type": "radio",
+            "label": "Will you transmit or transport electronic research data?",
+            "section_id": "sec_confidentiality",
+            "order": 3,
+            "options": [
+                {"value": "no", "label": "No - Electronic research data will not be transmitted or transported"},
+                {"value": "yes", "label": "Yes - Electronic research data will be transmitted and/or transported"}
+            ]
+        },
+        {
+            "id": "confidentiality.electronic_transmittal_methods",
+            "type": "checkbox",
+            "label": "Check proposed method(s):",
+            "section_id": "sec_confidentiality",
+            "order": 4,
+            "visible": false,
+            "options": [
+                {"value": "email_llu", "label": "Email - LLU/LLUMC email system will be used only"},
+                {"value": "web_interface", "label": "Web interface - Only as required/provided by research sponsor"},
+                {"value": "fax_system", "label": "Fax (through system application) - Must be IS approved application"},
+                {"value": "portable_device", "label": "Portable device and/or removable media - Data must be encrypted"},
+                {"value": "other", "label": "Other (specify below)"}
+            ]
+        },
+        {
+            "id": "confidentiality.electronic_transmittal_other",
+            "type": "text",
+            "label": "Other transmittal method - specify",
+            "section_id": "sec_confidentiality",
+            "order": 5,
+            "visible": false
+        },
+        {
+            "id": "confidentiality.hardcopy_stored",
+            "type": "radio",
+            "label": "Will you store research data in hard copy format?",
+            "section_id": "sec_confidentiality",
+            "order": 6,
+            "options": [
+                {"value": "no", "label": "No - Research data will not be stored in hard copy format"},
+                {"value": "yes", "label": "Yes - Research data will be stored in hard copy format"}
+            ]
+        },
+        {
+            "id": "confidentiality.hardcopy_storage",
+            "type": "checkbox",
+            "label": "Check all security measures that will be taken:",
+            "section_id": "sec_confidentiality",
+            "order": 7,
+            "visible": false,
+            "options": [
+                {"value": "locked_suite", "label": "Locked suite"},
+                {"value": "locked_office", "label": "Locked office"},
+                {"value": "locked_cabinet", "label": "Locked file cabinet"},
+                {"value": "data_coded", "label": "Data coded by PI or research team with master list secured and kept separately"},
+                {"value": "data_deidentified", "label": "Data de-identified"}
+            ]
+        },
+        {
+            "id": "confidentiality.hardcopy_transmittal",
+            "type": "radio",
+            "label": "Will any hard copy research data be transmitted (e.g., via fax) or transported?",
+            "section_id": "sec_confidentiality",
+            "order": 8,
+            "options": [
+                {"value": "no", "label": "No - Hard copy research data will not be transmitted or transported"},
+                {"value": "yes", "label": "Yes - Hard copy research data will be transmitted and/or transported"}
+            ]
+        },
+        {
+            "id": "confidentiality.hardcopy_transmittal_methods",
+            "type": "checkbox",
+            "label": "Check proposed method(s):",
+            "section_id": "sec_confidentiality",
+            "order": 9,
+            "visible": false,
+            "options": [
+                {"value": "fax", "label": "Fax - Cover sheet with confidentiality statement"},
+                {"value": "courier", "label": "Courier - Data in sealed envelope marked confidential"},
+                {"value": "hand_delivery", "label": "Hand-delivery - Data in sealed envelope marked confidential"},
+                {"value": "mail", "label": "U.S. Mail or Express Mail service (FedEx, UPS)"},
+                {"value": "vehicle", "label": "Vehicle - Data must not be left in vehicle unattended"},
+                {"value": "shredded", "label": "Hardcopy data no longer needed will be shredded"},
+                {"value": "other", "label": "Other (specify below)"}
+            ]
+        },
+        {
+            "id": "confidentiality.hardcopy_transmittal_other",
+            "type": "text",
+            "label": "Other transmittal method - specify",
+            "section_id": "sec_confidentiality",
+            "order": 10,
+            "visible": false
+        },
+        {
+            "id": "confidentiality.collecting_health_info",
+            "type": "radio",
+            "label": "Are you collecting health information?",
+            "section_id": "sec_confidentiality",
+            "order": 11,
+            "options": [
+                {"value": "no", "label": "No - Skip this section"},
+                {"value": "yes", "label": "Yes - Complete this section"}
+            ]
+        },
+        {
+            "id": "confidentiality.phi_shared",
+            "type": "radio",
+            "label": "Will Protected Health Information (PHI) be shared with individuals outside LLUH (the OHCA)?",
+            "section_id": "sec_confidentiality",
+            "order": 12,
+            "visible": false,
+            "options": [
+                {"value": "no", "label": "No - No PHI will be shared outside LLUH (OHCA) during the course of the research study"},
+                {"value": "yes", "label": "Yes (requires Authorization or waiver)"}
+            ]
+        },
+        {
+            "id": "confidentiality.phi_shared_with",
+            "type": "checkbox",
+            "label": "PHI will be shared with (check all that apply):",
+            "section_id": "sec_confidentiality",
+            "order": 13,
+            "visible": false,
+            "options": [
+                {"value": "statistician", "label": "Statistician"},
+                {"value": "consultant", "label": "Consultant(s) or Contractor(s)"},
+                {"value": "lab", "label": "Other Research Laboratory(ies)"},
+                {"value": "registry", "label": "Data, Tissue, Specimen Registry(s)"},
+                {"value": "publication", "label": "Publication(s)"},
+                {"value": "coordinating", "label": "Coordinating Center"},
+                {"value": "dmc", "label": "Data Monitoring Committee(s)"},
+                {"value": "subjects", "label": "Subjects"},
+                {"value": "sponsor", "label": "Sponsor(s)"},
+                {"value": "other", "label": "Other"}
+            ]
+        },
+        {
+            "id": "confidentiality.phi_shared_format",
+            "type": "radio",
+            "label": "If PHI will be shared, what format?",
+            "section_id": "sec_confidentiality",
+            "order": 14,
+            "visible": false,
+            "options": [
+                {"value": "phi_given", "label": "Recipient will be given PHI - Must be described in consent and PHI Authorization"},
+                {"value": "linked_code", "label": "Recipient will be given data with a linked code"},
+                {"value": "limited", "label": "Recipient will be given a Limited Data Set"},
+                {"value": "none", "label": "No PHI will be shared"}
+            ]
+        },
+        {
+            "id": "signatures.pi_declaration",
+            "type": "checkbox",
+            "label": "Principal Investigator Declaration",
+            "section_id": "sec_signatures",
+            "order": 0,
+            "required": true,
+            "options": [
+                {"value": "yes", "label": "I certify that all information provided in this application is accurate and complete, and I agree to conduct this research in accordance with IRB requirements."}
+            ]
+        }
+    ],
+    "rules": [
+        {
+            "id": "rule_initiated_other",
+            "conditions": [
+                {
+                    "field": "study.initiated_by",
+                    "operator": "equals",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.initiated_other"},
+                {"action": "require", "field": "study.initiated_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.initiated_other"},
+                {"action": "optional", "field": "study.initiated_other"}
+            ]
+        },
+        {
+            "id": "rule_drugs_devices",
+            "conditions": [
+                {
+                    "field": "study.drugs_biologics_devices",
+                    "operator": "is_not_empty",
+                    "value": ""
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.fda_regulations_apply"},
+                {"action": "show", "field": "study.phase"},
+                {"action": "show", "field": "study.schedule_drugs"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.fda_regulations_apply"},
+                {"action": "hide", "field": "study.phase"},
+                {"action": "hide", "field": "study.schedule_drugs"}
+            ]
+        },
+        {
+            "id": "rule_device_worksheet",
+            "conditions": [
+                {
+                    "field": "study.drugs_biologics_devices",
+                    "operator": "contains",
+                    "value": "devices"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.device_worksheet_notice"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.device_worksheet_notice"}
+            ]
+        },
+        {
+            "id": "rule_fda_regulations",
+            "conditions": [
+                {
+                    "field": "study.fda_regulations_apply",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.ind_number"},
+                {"action": "show", "field": "study.ide_number"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.ind_number"},
+                {"action": "hide", "field": "study.ide_number"}
+            ]
+        },
+        {
+            "id": "rule_phase_other",
+            "conditions": [
+                {
+                    "field": "study.phase",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.phase_other"},
+                {"action": "require", "field": "study.phase_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.phase_other"},
+                {"action": "optional", "field": "study.phase_other"}
+            ]
+        },
+        {
+            "id": "rule_schedule_drugs",
+            "conditions": [
+                {
+                    "field": "study.schedule_drugs",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.schedule_drugs_approval"},
+                {"action": "require", "field": "study.schedule_drugs_approval"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.schedule_drugs_approval"},
+                {"action": "optional", "field": "study.schedule_drugs_approval"}
+            ]
+        },
+        {
+            "id": "rule_student_project",
+            "conditions": [
+                {
+                    "field": "study.is_student_project",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.student_name"},
+                {"action": "show", "field": "study.student_program"},
+                {"action": "require", "field": "study.student_name"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.student_name"},
+                {"action": "hide", "field": "study.student_program"},
+                {"action": "optional", "field": "study.student_name"}
+            ]
+        },
+        {
+            "id": "rule_ionizing_radiation",
+            "conditions": [
+                {
+                    "field": "study.ionizing_radiation",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.radiation_direct_benefit"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.radiation_direct_benefit"}
+            ]
+        },
+        {
+            "id": "rule_radiation_benefit",
+            "conditions": [
+                {
+                    "field": "study.radiation_direct_benefit",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.radiation_routine"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.radiation_routine"}
+            ]
+        },
+        {
+            "id": "rule_radiation_routine",
+            "conditions": [
+                {
+                    "field": "study.radiation_routine",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.radiation_greater_dose"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.radiation_greater_dose"}
+            ]
+        },
+        {
+            "id": "rule_recruitment_source_other",
+            "conditions": [
+                {
+                    "field": "recruitment.source",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "recruitment.source_other"},
+                {"action": "require", "field": "recruitment.source_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "recruitment.source_other"},
+                {"action": "optional", "field": "recruitment.source_other"}
+            ]
+        },
+        {
+            "id": "rule_electronic_recruitment",
+            "conditions": [
+                {
+                    "field": "recruitment.electronic_used",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "recruitment.electronic_description"},
+                {"action": "require", "field": "recruitment.electronic_description"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "recruitment.electronic_description"},
+                {"action": "optional", "field": "recruitment.electronic_description"}
+            ]
+        },
+        {
+            "id": "rule_children_risk",
+            "conditions": [
+                {
+                    "field": "population.vulnerable",
+                    "operator": "contains",
+                    "value": "minors"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "methods.risk_level_children"},
+                {"action": "require", "field": "methods.risk_level_children"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "methods.risk_level_children"},
+                {"action": "optional", "field": "methods.risk_level_children"}
+            ]
+        },
+        {
+            "id": "rule_electronic_collection",
+            "conditions": [
+                {
+                    "field": "confidentiality.electronic_collection",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.electronic_protections"},
+                {"action": "show", "field": "confidentiality.electronic_unable_reason"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.electronic_protections"},
+                {"action": "hide", "field": "confidentiality.electronic_unable_reason"}
+            ]
+        },
+        {
+            "id": "rule_electronic_transmittal",
+            "conditions": [
+                {
+                    "field": "confidentiality.electronic_transmittal",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.electronic_transmittal_methods"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.electronic_transmittal_methods"}
+            ]
+        },
+        {
+            "id": "rule_electronic_transmittal_other",
+            "conditions": [
+                {
+                    "field": "confidentiality.electronic_transmittal_methods",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.electronic_transmittal_other"},
+                {"action": "require", "field": "confidentiality.electronic_transmittal_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.electronic_transmittal_other"},
+                {"action": "optional", "field": "confidentiality.electronic_transmittal_other"}
+            ]
+        },
+        {
+            "id": "rule_hardcopy_stored",
+            "conditions": [
+                {
+                    "field": "confidentiality.hardcopy_stored",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.hardcopy_storage"},
+                {"action": "require", "field": "confidentiality.hardcopy_storage"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.hardcopy_storage"},
+                {"action": "optional", "field": "confidentiality.hardcopy_storage"}
+            ]
+        },
+        {
+            "id": "rule_hardcopy_transmittal",
+            "conditions": [
+                {
+                    "field": "confidentiality.hardcopy_transmittal",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.hardcopy_transmittal_methods"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.hardcopy_transmittal_methods"}
+            ]
+        },
+        {
+            "id": "rule_hardcopy_transmittal_other",
+            "conditions": [
+                {
+                    "field": "confidentiality.hardcopy_transmittal_methods",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.hardcopy_transmittal_other"},
+                {"action": "require", "field": "confidentiality.hardcopy_transmittal_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.hardcopy_transmittal_other"},
+                {"action": "optional", "field": "confidentiality.hardcopy_transmittal_other"}
+            ]
+        },
+        {
+            "id": "rule_health_info",
+            "conditions": [
+                {
+                    "field": "confidentiality.collecting_health_info",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.phi_shared"},
+                {"action": "require", "field": "confidentiality.phi_shared"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.phi_shared"},
+                {"action": "optional", "field": "confidentiality.phi_shared"}
+            ]
+        },
+        {
+            "id": "rule_phi_shared",
+            "conditions": [
+                {
+                    "field": "confidentiality.phi_shared",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "confidentiality.phi_shared_with"},
+                {"action": "show", "field": "confidentiality.phi_shared_format"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "confidentiality.phi_shared_with"},
+                {"action": "hide", "field": "confidentiality.phi_shared_format"}
+            ]
+        }
+    ]
+}

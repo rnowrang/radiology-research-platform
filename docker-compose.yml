@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: radiology-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-radiology}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-radiology_secret}
+      POSTGRES_DB: ${DB_NAME:-radiology_research}
+    ports:
+      - "${DB_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/seeds.sql:/docker-entrypoint-initdb.d/02_seeds.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-radiology} -d ${DB_NAME:-radiology_research}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - radiology-network
+
+  # Node.js Gateway Service
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.dev
+    container_name: radiology-gateway
+    ports:
+      - "${GATEWAY_PORT:-3001}:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgres://${DB_USER:-radiology}:${DB_PASSWORD:-radiology_secret}@db:5432/${DB_NAME:-radiology_research}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      FORMS_SERVICE_URL: http://forms-service:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
+    volumes:
+      - ./gateway/src:/app/src
+      - ./gateway/package.json:/app/package.json
+      - ./gateway/tsconfig.json:/app/tsconfig.json
+      - ./storage:/app/storage
+      - gateway_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev
+    networks:
+      - radiology-network
+
+  # Python FastAPI Forms Service
+  forms-service:
+    build:
+      context: ./forms-service
+      dockerfile: Dockerfile.dev
+    container_name: radiology-forms
+    ports:
+      - "${FORMS_PORT:-8001}:8000"
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-radiology}:${DB_PASSWORD:-radiology_secret}@db:5432/${DB_NAME:-radiology_research}
+      SECRET_KEY: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
+      GATEWAY_URL: http://gateway:3000
+      STORAGE_PATH: /app/storage
+      TEMPLATE_DIR: /app/storage/templates
+      GENERATED_DIR: /app/storage/generated
+      LIBREOFFICE_PATH: /usr/bin/soffice
+      DEBUG: "true"
+    volumes:
+      - ./forms-service/app:/app/app
+      - ./forms-service/alembic:/app/alembic
+      - ./forms-service/alembic.ini:/app/alembic.ini
+      - ./storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - radiology-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: radiology-frontend
+    ports:
+      - "${FRONTEND_PORT:-5174}:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/components.json:/app/components.json
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - gateway
+    command: npm run dev -- --host
+    networks:
+      - radiology-network
+
+networks:
+  radiology-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  gateway_node_modules:
+  frontend_node_modules:

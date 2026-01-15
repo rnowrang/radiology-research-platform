@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.pnp
+.pnp.js
+.venv/
+venv/
+env/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Generated files
+storage/generated/*
+!storage/generated/.gitkeep
+
+# Uploaded files (keep directory structure)
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# SSL certificates (sensitive)
+nginx/ssl/*
+!nginx/ssl/.gitkeep
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# TypeScript
+*.tsbuildinfo
+
+# Temporary files
+tmp/
+temp/

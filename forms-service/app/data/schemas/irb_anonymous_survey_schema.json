@@ -1,0 +1,1611 @@
+{
+    "sections": [
+        {
+            "id": "sec_personnel",
+            "title": "I. Study Personnel",
+            "order": 0,
+            "collapsible": true,
+            "description": "All study personnel must have all human subject education and conflict of interest training completed prior to IRB approval"
+        },
+        {
+            "id": "sec_study_info",
+            "title": "II. Study Information",
+            "order": 1,
+            "collapsible": true
+        },
+        {
+            "id": "sec_study_summary",
+            "title": "II. Study Summary",
+            "order": 2,
+            "collapsible": true
+        },
+        {
+            "id": "sec_risks_benefits",
+            "title": "III. Study Risks & Benefits",
+            "order": 3,
+            "collapsible": true
+        },
+        {
+            "id": "sec_subjects",
+            "title": "IV. Description of Subjects",
+            "order": 4,
+            "collapsible": true
+        },
+        {
+            "id": "sec_contact_source",
+            "title": "V. Source of Contact Information",
+            "order": 5,
+            "collapsible": true
+        },
+        {
+            "id": "sec_confidentiality",
+            "title": "VI. Protection of Confidentiality/Anonymity",
+            "order": 6,
+            "collapsible": true
+        },
+        {
+            "id": "sec_consent",
+            "title": "VII. Consent",
+            "order": 7,
+            "collapsible": true
+        },
+        {
+            "id": "sec_signatures",
+            "title": "VIII. Supporting Signatures",
+            "order": 8,
+            "collapsible": true,
+            "description": "Signatures will be collected separately"
+        }
+    ],
+    "fields": [
+        {
+            "id": "personnel.pi_name",
+            "type": "text",
+            "label": "Principal Investigator (name, degrees)",
+            "section_id": "sec_personnel",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 0
+            }
+        },
+        {
+            "id": "personnel.pi_dept",
+            "type": "text",
+            "label": "Department/Section",
+            "section_id": "sec_personnel",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "personnel.pi_ext",
+            "type": "text",
+            "label": "Extension",
+            "section_id": "sec_personnel",
+            "order": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 3
+            }
+        },
+        {
+            "id": "personnel.pi_email",
+            "type": "email",
+            "label": "E-Mail",
+            "section_id": "sec_personnel",
+            "order": 3,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 1,
+                "column_index": 4
+            }
+        },
+        {
+            "id": "personnel.other_staff",
+            "type": "repeatable",
+            "label": "Other Study Staff Personnel",
+            "section_id": "sec_personnel",
+            "order": 4,
+            "anchor": {
+                "type": "table",
+                "table_index": 1,
+                "start_row": 3
+            },
+            "repeatable_config": {
+                "min_rows": 0,
+                "max_rows": 5,
+                "add_button_text": "Add Staff Member",
+                "columns": [
+                    {
+                        "id": "name",
+                        "label": "Name, Degrees",
+                        "type": "text",
+                        "width": "25%"
+                    },
+                    {
+                        "id": "dept",
+                        "label": "Dept./Section",
+                        "type": "text",
+                        "width": "20%"
+                    },
+                    {
+                        "id": "ext",
+                        "label": "Ext.",
+                        "type": "text",
+                        "width": "10%"
+                    },
+                    {
+                        "id": "email",
+                        "label": "E-Mail",
+                        "type": "email",
+                        "width": "25%"
+                    },
+                    {
+                        "id": "role",
+                        "label": "Role",
+                        "type": "text",
+                        "width": "20%"
+                    }
+                ],
+                "column_mapping": [
+                    0,
+                    1,
+                    3,
+                    4,
+                    7
+                ]
+            }
+        },
+        {
+            "id": "personnel.has_alt_contact",
+            "type": "radio",
+            "label": "Is there a preferred study contact different from PI?",
+            "section_id": "sec_personnel",
+            "order": 5,
+            "options": [
+                {
+                    "value": "no",
+                    "label": "No"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ],
+            "default": "no"
+        },
+        {
+            "id": "personnel.contact_name",
+            "type": "text",
+            "label": "Preferred Study Contact Name",
+            "section_id": "sec_personnel",
+            "order": 6,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 9,
+                "column_index": 0
+            },
+            "visible": false
+        },
+        {
+            "id": "personnel.contact_ext",
+            "type": "text",
+            "label": "Contact Extension",
+            "section_id": "sec_personnel",
+            "order": 7,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 9,
+                "column_index": 1
+            },
+            "visible": false
+        },
+        {
+            "id": "personnel.contact_email",
+            "type": "email",
+            "label": "Contact E-Mail",
+            "section_id": "sec_personnel",
+            "order": 8,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 1,
+                "row_index": 9,
+                "column_index": 2
+            },
+            "visible": false
+        },
+        {
+            "id": "study.title",
+            "type": "text",
+            "label": "Title of Protocol",
+            "section_id": "sec_study_info",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "TITLE OF PROTOCOL"
+            }
+        },
+        {
+            "id": "study.start_date",
+            "type": "date",
+            "label": "Project Start Date",
+            "section_id": "sec_study_info",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "PROJECT START DATE"
+            }
+        },
+        {
+            "id": "study.funding_source",
+            "type": "radio",
+            "label": "Funding Source",
+            "section_id": "sec_study_info",
+            "order": 2,
+            "required": true,
+            "options": [
+                {
+                    "value": "intramural",
+                    "label": "Intramural"
+                },
+                {
+                    "value": "extramural",
+                    "label": "Extramural"
+                },
+                {
+                    "value": "none",
+                    "label": "None/Unfunded"
+                }
+            ]
+        },
+        {
+            "id": "study.funding_intramural",
+            "type": "text",
+            "label": "If intramural, what department or fund?",
+            "section_id": "sec_study_info",
+            "order": 3,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "If intramural, what department"
+            },
+            "visible": false
+        },
+        {
+            "id": "study.funding_extramural",
+            "type": "text",
+            "label": "If extramural, what is the name of the sponsor?",
+            "section_id": "sec_study_info",
+            "order": 4,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "If extramural, what is the name"
+            },
+            "visible": false
+        },
+        {
+            "id": "summary.research_question",
+            "type": "textarea",
+            "label": "Research question or hypothesis",
+            "section_id": "sec_study_summary",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Research question or hypothesis"
+            }
+        },
+        {
+            "id": "summary.rationale",
+            "type": "textarea",
+            "label": "Rationale for the proposed study (with key citations if applicable)",
+            "section_id": "sec_study_summary",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Rationale for the proposed study"
+            }
+        },
+        {
+            "id": "risks.survey_topics",
+            "type": "checkbox",
+            "label": "Does the survey contain questions relating to any of the following? (check all that apply)",
+            "section_id": "sec_risks_benefits",
+            "order": 0,
+            "options": [
+                {
+                    "value": "mental_health",
+                    "label": "Mental health"
+                },
+                {
+                    "value": "substance_abuse",
+                    "label": "Substance abuse"
+                },
+                {
+                    "value": "psychotherapy",
+                    "label": "Outpatient psychotherapy"
+                },
+                {
+                    "value": "suicide",
+                    "label": "Suicide or self-destructive behavior"
+                },
+                {
+                    "value": "phi",
+                    "label": "Private health information"
+                }
+            ]
+        },
+        {
+            "id": "risks.risk_mitigation",
+            "type": "textarea",
+            "label": "Describe how you will assure that any potential risk (emotional, legal, social, etc.) is minimized",
+            "section_id": "sec_risks_benefits",
+            "order": 1,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "If any of the above are checked, describe"
+            },
+            "visible": false
+        },
+        {
+            "id": "risks.has_subject_benefits",
+            "type": "radio",
+            "label": "Are there expected benefits to subjects?",
+            "section_id": "sec_risks_benefits",
+            "order": 2,
+            "options": [
+                {
+                    "value": "none",
+                    "label": "None"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ]
+        },
+        {
+            "id": "risks.benefits_subjects",
+            "type": "textarea",
+            "label": "Describe expected benefits to subjects",
+            "section_id": "sec_risks_benefits",
+            "order": 3,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "State the expected benefits to the subjects"
+            },
+            "visible": false
+        },
+        {
+            "id": "risks.benefits_society",
+            "type": "textarea",
+            "label": "State the expected benefits to society (e.g. your profession, your field of study, future patients or populations)",
+            "section_id": "sec_risks_benefits",
+            "order": 4,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "State the expected benefits to society"
+            }
+        },
+        {
+            "id": "subjects.employees",
+            "type": "text",
+            "label": "Employees - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 0,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 1,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.healthy",
+            "type": "text",
+            "label": "Healthy subjects - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 1,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 2,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.students",
+            "type": "text",
+            "label": "Students - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 3,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.patients",
+            "type": "text",
+            "label": "Patients - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 3,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 4,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.prisoners",
+            "type": "text",
+            "label": "Prisoners - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 4,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 5,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.other_type",
+            "type": "text",
+            "label": "Other subject type (specify)",
+            "section_id": "sec_subjects",
+            "order": 5
+        },
+        {
+            "id": "subjects.other_count",
+            "type": "text",
+            "label": "Other - # Subjects",
+            "section_id": "sec_subjects",
+            "order": 6,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 2,
+                "row_index": 6,
+                "column_index": 1
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.total",
+            "type": "text",
+            "label": "Total # of Subjects",
+            "section_id": "sec_subjects",
+            "order": 7,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "TOTAL"
+            },
+            "input_type": "number"
+        },
+        {
+            "id": "subjects.statistical_justification",
+            "type": "textarea",
+            "label": "Statistical Justification - How was this number derived/calculated?",
+            "section_id": "sec_subjects",
+            "order": 8,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Statistical Justification"
+            }
+        },
+        {
+            "id": "subjects.inclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for inclusion of subjects",
+            "section_id": "sec_subjects",
+            "order": 9,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for inclusion of subjects"
+            }
+        },
+        {
+            "id": "subjects.exclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for exclusion of subjects (other than those opposite the inclusion criteria)",
+            "section_id": "sec_subjects",
+            "order": 10,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for exclusion of subjects"
+            }
+        },
+        {
+            "id": "contact.distribution_method",
+            "type": "checkbox",
+            "label": "How will survey be distributed?",
+            "section_id": "sec_contact_source",
+            "order": 0,
+            "required": true,
+            "options": [
+                {
+                    "value": "in_person_investigator",
+                    "label": "In person by investigator"
+                },
+                {
+                    "value": "in_person_other",
+                    "label": "In person by individual on behalf of investigator"
+                },
+                {
+                    "value": "mail",
+                    "label": "By mail with cover letter"
+                },
+                {
+                    "value": "electronic",
+                    "label": "By email using electronic survey software (e.g., Qualtrics, Survey Monkey)"
+                },
+                {
+                    "value": "website",
+                    "label": "Posted on website or similar social media"
+                },
+                {
+                    "value": "other",
+                    "label": "Other"
+                }
+            ]
+        },
+        {
+            "id": "contact.in_person_other_desc",
+            "type": "text",
+            "label": "Describe who will distribute on behalf of investigator",
+            "section_id": "sec_contact_source",
+            "order": 1,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "In person by individual on behalf of investigator; describe"
+            },
+            "visible": false
+        },
+        {
+            "id": "contact.website_desc",
+            "type": "text",
+            "label": "Describe website or social media platform",
+            "section_id": "sec_contact_source",
+            "order": 2,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Posted on website or similar social media; describe"
+            },
+            "visible": false
+        },
+        {
+            "id": "contact.other_specify",
+            "type": "text",
+            "label": "Other distribution method - specify",
+            "section_id": "sec_contact_source",
+            "order": 3,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_index": 58
+            },
+            "visible": false
+        },
+        {
+            "id": "contact.distribution_list",
+            "type": "radio",
+            "label": "Will a distribution list be obtained or created?",
+            "section_id": "sec_contact_source",
+            "order": 4,
+            "options": [
+                {
+                    "value": "none",
+                    "label": "No, none required"
+                },
+                {
+                    "value": "lluh_entity",
+                    "label": "LLUH entity (e.g. LLU/LLUMC) - investigators' patients, students, employees"
+                },
+                {
+                    "value": "lluh_dept",
+                    "label": "LLUH department (not represented by investigator in Section I)"
+                },
+                {
+                    "value": "non_lluh",
+                    "label": "Non-LLUH entity"
+                },
+                {
+                    "value": "prior_research",
+                    "label": "Prior research list of participants or research database"
+                },
+                {
+                    "value": "other",
+                    "label": "Other"
+                }
+            ]
+        },
+        {
+            "id": "contact.dept_name",
+            "type": "text",
+            "label": "Department name",
+            "section_id": "sec_contact_source",
+            "order": 5,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Department name:"
+            },
+            "visible": false
+        },
+        {
+            "id": "contact.non_lluh_entity",
+            "type": "text",
+            "label": "Non-LLUH entity - specify",
+            "section_id": "sec_contact_source",
+            "order": 6,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Non-LLUH entity - specify"
+            },
+            "visible": false
+        },
+        {
+            "id": "contact.prior_research_irb",
+            "type": "text",
+            "label": "Prior research IRB #",
+            "section_id": "sec_contact_source",
+            "order": 7,
+            "visible": false
+        },
+        {
+            "id": "contact.list_other_specify",
+            "type": "text",
+            "label": "Other distribution list source - specify",
+            "section_id": "sec_contact_source",
+            "order": 8,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_index": 67
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.identifiable",
+            "type": "radio",
+            "label": "Will the investigator be able to identify the subjects by name or other identifiable information at any point?",
+            "section_id": "sec_confidentiality",
+            "order": 0,
+            "required": true,
+            "options": [
+                {
+                    "value": "no",
+                    "label": "No"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ]
+        },
+        {
+            "id": "confidentiality.identifiable_explain",
+            "type": "textarea",
+            "label": "Explain how subjects may be identified",
+            "section_id": "sec_confidentiality",
+            "order": 1,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Will the investigator be able to identify the subjects"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.contact_format",
+            "type": "checkbox",
+            "label": "What is format of contact information?",
+            "section_id": "sec_confidentiality",
+            "order": 2,
+            "options": [
+                {
+                    "value": "email",
+                    "label": "Email addresses"
+                },
+                {
+                    "value": "mailing",
+                    "label": "Mailing list"
+                },
+                {
+                    "value": "personal_investigator",
+                    "label": "Personal encounter by investigator"
+                },
+                {
+                    "value": "personal_rep",
+                    "label": "Representative of investigator makes personal encounter"
+                },
+                {
+                    "value": "other",
+                    "label": "Other"
+                }
+            ]
+        },
+        {
+            "id": "confidentiality.contact_other_desc",
+            "type": "text",
+            "label": "Other contact format - describe",
+            "section_id": "sec_confidentiality",
+            "order": 3,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Other; describe:"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.has_special_conditions",
+            "type": "radio",
+            "label": "Will results from more than one survey need to be linked for a given subject?",
+            "section_id": "sec_confidentiality",
+            "order": 4,
+            "options": [
+                {
+                    "value": "no",
+                    "label": "No"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ]
+        },
+        {
+            "id": "confidentiality.special_conditions",
+            "type": "textarea",
+            "label": "Describe how surveys will be linked while maintaining anonymity",
+            "section_id": "sec_confidentiality",
+            "order": 5,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Special conditions"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.incentive_type",
+            "type": "radio",
+            "label": "Will participants be given an incentive?",
+            "section_id": "sec_confidentiality",
+            "order": 6,
+            "options": [
+                {
+                    "value": "none",
+                    "label": "None"
+                },
+                {
+                    "value": "gift",
+                    "label": "Gift"
+                },
+                {
+                    "value": "financial",
+                    "label": "Financial"
+                }
+            ]
+        },
+        {
+            "id": "confidentiality.gift_desc",
+            "type": "text",
+            "label": "Gift description and value",
+            "section_id": "sec_confidentiality",
+            "order": 7,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Gift; describe, including value"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.financial_amount",
+            "type": "text",
+            "label": "Financial incentive amount ($)",
+            "section_id": "sec_confidentiality",
+            "order": 8,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Financial; amount"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.financial_method",
+            "type": "checkbox",
+            "label": "Payment method",
+            "section_id": "sec_confidentiality",
+            "order": 9,
+            "options": [
+                {
+                    "value": "cash",
+                    "label": "Cash"
+                },
+                {
+                    "value": "check",
+                    "label": "Check"
+                },
+                {
+                    "value": "gift_card",
+                    "label": "Gift card"
+                }
+            ],
+            "visible": false
+        },
+        {
+            "id": "confidentiality.gift_card_desc",
+            "type": "text",
+            "label": "Gift card description",
+            "section_id": "sec_confidentiality",
+            "order": 10,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Gift card; describe"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.incentive_distribution",
+            "type": "textarea",
+            "label": "How will incentives be distributed without associating contact information and survey responses?",
+            "section_id": "sec_confidentiality",
+            "order": 11,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "How will incentives be distributed"
+            },
+            "visible": false
+        },
+        {
+            "id": "confidentiality.has_health_questions",
+            "type": "radio",
+            "label": "Does survey include any questions regarding individual's health?",
+            "section_id": "sec_confidentiality",
+            "order": 12,
+            "options": [
+                {
+                    "value": "no",
+                    "label": "No"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ]
+        },
+        {
+            "id": "confidentiality.health_questions_desc",
+            "type": "textarea",
+            "label": "Describe health-related questions",
+            "section_id": "sec_confidentiality",
+            "order": 13,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Does survey include any questions regarding individual"
+            },
+            "visible": false
+        },
+        {
+            "id": "consent.method",
+            "type": "checkbox",
+            "label": "Consent Method (check all that apply)",
+            "section_id": "sec_consent",
+            "order": 0,
+            "required": true,
+            "options": [
+                {
+                    "value": "verbal",
+                    "label": "Verbal (attach text of verbal script as Appendix)"
+                },
+                {
+                    "value": "cover_letter",
+                    "label": "Cover letter on departmental stationery (attach draft)"
+                },
+                {
+                    "value": "electronic_preface",
+                    "label": "Cover information as preface to electronic survey (attach draft)"
+                }
+            ]
+        },
+        {
+            "id": "consent.involves_children",
+            "type": "radio",
+            "label": "Does this study involve children (under 18)?",
+            "section_id": "sec_consent",
+            "order": 1,
+            "options": [
+                {
+                    "value": "no",
+                    "label": "No"
+                },
+                {
+                    "value": "yes",
+                    "label": "Yes"
+                }
+            ]
+        },
+        {
+            "id": "consent.parental_permission",
+            "type": "textarea",
+            "label": "Describe in detail how parental permission will be obtained, assent obtained from minors, and how you will verify age",
+            "section_id": "sec_consent",
+            "order": 2,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Parental permission, for children"
+            },
+            "visible": false
+        }
+    ],
+    "rules": [
+        {
+            "id": "rule_alt_contact",
+            "conditions": [
+                {
+                    "field": "personnel.has_alt_contact",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "personnel.contact_name"
+                },
+                {
+                    "action": "show",
+                    "field": "personnel.contact_ext"
+                },
+                {
+                    "action": "show",
+                    "field": "personnel.contact_email"
+                },
+                {
+                    "action": "require",
+                    "field": "personnel.contact_name"
+                },
+                {
+                    "action": "require",
+                    "field": "personnel.contact_email"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "personnel.contact_name"
+                },
+                {
+                    "action": "hide",
+                    "field": "personnel.contact_ext"
+                },
+                {
+                    "action": "hide",
+                    "field": "personnel.contact_email"
+                },
+                {
+                    "action": "optional",
+                    "field": "personnel.contact_name"
+                },
+                {
+                    "action": "optional",
+                    "field": "personnel.contact_email"
+                }
+            ]
+        },
+        {
+            "id": "rule_funding_intramural",
+            "conditions": [
+                {
+                    "field": "study.funding_source",
+                    "operator": "equals",
+                    "value": "intramural"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "study.funding_intramural"
+                },
+                {
+                    "action": "require",
+                    "field": "study.funding_intramural"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "study.funding_intramural"
+                },
+                {
+                    "action": "optional",
+                    "field": "study.funding_intramural"
+                }
+            ]
+        },
+        {
+            "id": "rule_funding_extramural",
+            "conditions": [
+                {
+                    "field": "study.funding_source",
+                    "operator": "equals",
+                    "value": "extramural"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "study.funding_extramural"
+                },
+                {
+                    "action": "require",
+                    "field": "study.funding_extramural"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "study.funding_extramural"
+                },
+                {
+                    "action": "optional",
+                    "field": "study.funding_extramural"
+                }
+            ]
+        },
+        {
+            "id": "rule_risk_topics",
+            "conditions": [
+                {
+                    "field": "risks.survey_topics",
+                    "operator": "not_empty"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "risks.risk_mitigation"
+                },
+                {
+                    "action": "require",
+                    "field": "risks.risk_mitigation"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "risks.risk_mitigation"
+                },
+                {
+                    "action": "optional",
+                    "field": "risks.risk_mitigation"
+                }
+            ]
+        },
+        {
+            "id": "rule_subject_benefits",
+            "conditions": [
+                {
+                    "field": "risks.has_subject_benefits",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "risks.benefits_subjects"
+                },
+                {
+                    "action": "require",
+                    "field": "risks.benefits_subjects"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "risks.benefits_subjects"
+                },
+                {
+                    "action": "optional",
+                    "field": "risks.benefits_subjects"
+                }
+            ]
+        },
+        {
+            "id": "rule_dist_in_person_other",
+            "conditions": [
+                {
+                    "field": "contact.distribution_method",
+                    "operator": "contains",
+                    "value": "in_person_other"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.in_person_other_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.in_person_other_desc"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.in_person_other_desc"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.in_person_other_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_dist_website",
+            "conditions": [
+                {
+                    "field": "contact.distribution_method",
+                    "operator": "contains",
+                    "value": "website"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.website_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.website_desc"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.website_desc"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.website_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_dist_other",
+            "conditions": [
+                {
+                    "field": "contact.distribution_method",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.other_specify"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.other_specify"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.other_specify"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.other_specify"
+                }
+            ]
+        },
+        {
+            "id": "rule_list_lluh_dept",
+            "conditions": [
+                {
+                    "field": "contact.distribution_list",
+                    "operator": "equals",
+                    "value": "lluh_dept"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.dept_name"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.dept_name"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.dept_name"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.dept_name"
+                }
+            ]
+        },
+        {
+            "id": "rule_list_non_lluh",
+            "conditions": [
+                {
+                    "field": "contact.distribution_list",
+                    "operator": "equals",
+                    "value": "non_lluh"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.non_lluh_entity"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.non_lluh_entity"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.non_lluh_entity"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.non_lluh_entity"
+                }
+            ]
+        },
+        {
+            "id": "rule_list_prior_research",
+            "conditions": [
+                {
+                    "field": "contact.distribution_list",
+                    "operator": "equals",
+                    "value": "prior_research"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.prior_research_irb"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.prior_research_irb"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.prior_research_irb"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.prior_research_irb"
+                }
+            ]
+        },
+        {
+            "id": "rule_list_other",
+            "conditions": [
+                {
+                    "field": "contact.distribution_list",
+                    "operator": "equals",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "contact.list_other_specify"
+                },
+                {
+                    "action": "require",
+                    "field": "contact.list_other_specify"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "contact.list_other_specify"
+                },
+                {
+                    "action": "optional",
+                    "field": "contact.list_other_specify"
+                }
+            ]
+        },
+        {
+            "id": "rule_identifiable_yes",
+            "conditions": [
+                {
+                    "field": "confidentiality.identifiable",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.identifiable_explain"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.identifiable_explain"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.identifiable_explain"
+                },
+                {
+                    "action": "optional",
+                    "field": "confidentiality.identifiable_explain"
+                }
+            ]
+        },
+        {
+            "id": "rule_contact_format_other",
+            "conditions": [
+                {
+                    "field": "confidentiality.contact_format",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.contact_other_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.contact_other_desc"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.contact_other_desc"
+                },
+                {
+                    "action": "optional",
+                    "field": "confidentiality.contact_other_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_special_conditions",
+            "conditions": [
+                {
+                    "field": "confidentiality.has_special_conditions",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.special_conditions"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.special_conditions"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.special_conditions"
+                },
+                {
+                    "action": "optional",
+                    "field": "confidentiality.special_conditions"
+                }
+            ]
+        },
+        {
+            "id": "rule_incentive_gift",
+            "conditions": [
+                {
+                    "field": "confidentiality.incentive_type",
+                    "operator": "equals",
+                    "value": "gift"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.gift_desc"
+                },
+                {
+                    "action": "show",
+                    "field": "confidentiality.incentive_distribution"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.gift_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.incentive_distribution"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.gift_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_incentive_financial",
+            "conditions": [
+                {
+                    "field": "confidentiality.incentive_type",
+                    "operator": "equals",
+                    "value": "financial"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.financial_amount"
+                },
+                {
+                    "action": "show",
+                    "field": "confidentiality.financial_method"
+                },
+                {
+                    "action": "show",
+                    "field": "confidentiality.incentive_distribution"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.financial_amount"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.financial_method"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.incentive_distribution"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.financial_amount"
+                },
+                {
+                    "action": "hide",
+                    "field": "confidentiality.financial_method"
+                }
+            ]
+        },
+        {
+            "id": "rule_gift_card",
+            "conditions": [
+                {
+                    "field": "confidentiality.financial_method",
+                    "operator": "contains",
+                    "value": "gift_card"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.gift_card_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.gift_card_desc"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.gift_card_desc"
+                },
+                {
+                    "action": "optional",
+                    "field": "confidentiality.gift_card_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_health_questions",
+            "conditions": [
+                {
+                    "field": "confidentiality.has_health_questions",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "confidentiality.health_questions_desc"
+                },
+                {
+                    "action": "require",
+                    "field": "confidentiality.health_questions_desc"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "confidentiality.health_questions_desc"
+                },
+                {
+                    "action": "optional",
+                    "field": "confidentiality.health_questions_desc"
+                }
+            ]
+        },
+        {
+            "id": "rule_involves_children",
+            "conditions": [
+                {
+                    "field": "consent.involves_children",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {
+                    "action": "show",
+                    "field": "consent.parental_permission"
+                },
+                {
+                    "action": "require",
+                    "field": "consent.parental_permission"
+                }
+            ],
+            "else_actions": [
+                {
+                    "action": "hide",
+                    "field": "consent.parental_permission"
+                },
+                {
+                    "action": "optional",
+                    "field": "consent.parental_permission"
+                }
+            ]
+        }
+    ]
+}

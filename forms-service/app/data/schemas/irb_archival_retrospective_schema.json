@@ -1,0 +1,887 @@
+{
+    "sections": [
+        {
+            "id": "sec_investigator_info",
+            "title": "I. Investigator Information",
+            "order": 0,
+            "collapsible": true,
+            "description": "Information about the principal investigator and study personnel"
+        },
+        {
+            "id": "sec_study_info",
+            "title": "II. Study Information",
+            "order": 1,
+            "collapsible": true
+        },
+        {
+            "id": "sec_data_collection",
+            "title": "III. Description of Data to be Collected",
+            "order": 2,
+            "collapsible": true,
+            "description": "Describe the data to be collected for research purposes"
+        },
+        {
+            "id": "sec_benefits",
+            "title": "IV. Benefits",
+            "order": 3,
+            "collapsible": true
+        },
+        {
+            "id": "sec_risks",
+            "title": "V. Risks",
+            "order": 4,
+            "collapsible": true,
+            "description": "Plan for minimizing potential breach of confidentiality"
+        },
+        {
+            "id": "sec_safeguards",
+            "title": "VI. Safeguards for Data Storage, Transmittal, and Transport",
+            "order": 5,
+            "collapsible": true
+        },
+        {
+            "id": "sec_other_info",
+            "title": "VII. Other Required Information",
+            "order": 6,
+            "collapsible": true
+        },
+        {
+            "id": "sec_signatures",
+            "title": "VIII. Supporting Signatures",
+            "order": 7,
+            "collapsible": true,
+            "description": "Signatures will be collected separately"
+        }
+    ],
+    "fields": [
+        {
+            "id": "investigator.pi_name",
+            "type": "text",
+            "label": "Principal Investigator (name, degrees)",
+            "section_id": "sec_investigator_info",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 0
+            }
+        },
+        {
+            "id": "investigator.pi_dept",
+            "type": "text",
+            "label": "Department/Section",
+            "section_id": "sec_investigator_info",
+            "order": 1,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "investigator.pi_ext",
+            "type": "text",
+            "label": "Extension",
+            "section_id": "sec_investigator_info",
+            "order": 2,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 3
+            }
+        },
+        {
+            "id": "investigator.pi_email",
+            "type": "email",
+            "label": "E-Mail",
+            "section_id": "sec_investigator_info",
+            "order": 3,
+            "required": true,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 4
+            }
+        },
+        {
+            "id": "investigator.pi_faculty_appt",
+            "type": "radio",
+            "label": "Full Time Faculty",
+            "section_id": "sec_investigator_info",
+            "order": 4,
+            "options": [
+                {"value": "yes", "label": "Yes"},
+                {"value": "no", "label": "No"}
+            ],
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 1,
+                "column_index": 7
+            }
+        },
+        {
+            "id": "investigator.other_personnel",
+            "type": "repeatable",
+            "label": "Other Personnel Viewing Identifiable Data",
+            "section_id": "sec_investigator_info",
+            "order": 5,
+            "anchor": {
+                "type": "table",
+                "table_index": 0,
+                "start_row": 3
+            },
+            "repeatable_config": {
+                "min_rows": 0,
+                "max_rows": 5,
+                "add_button_text": "Add Personnel",
+                "columns": [
+                    {"id": "name", "label": "Name, Degrees", "type": "text", "width": "25%"},
+                    {"id": "dept", "label": "Dept./Section", "type": "text", "width": "20%"},
+                    {"id": "ext", "label": "Ext.", "type": "text", "width": "10%"},
+                    {"id": "email", "label": "E-Mail", "type": "email", "width": "25%"},
+                    {"id": "role", "label": "Role on Study", "type": "text", "width": "20%"}
+                ],
+                "column_mapping": [0, 1, 3, 4, 7]
+            }
+        },
+        {
+            "id": "investigator.has_alt_contact",
+            "type": "radio",
+            "label": "Is there a preferred study contact different from PI?",
+            "section_id": "sec_investigator_info",
+            "order": 6,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ],
+            "default": "no"
+        },
+        {
+            "id": "investigator.contact_name",
+            "type": "text",
+            "label": "Preferred Study Contact (if additional to PI)",
+            "section_id": "sec_investigator_info",
+            "order": 7,
+            "visible": false,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 8,
+                "column_index": 0
+            }
+        },
+        {
+            "id": "investigator.contact_ext",
+            "type": "text",
+            "label": "Contact Extension",
+            "section_id": "sec_investigator_info",
+            "order": 8,
+            "visible": false,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 8,
+                "column_index": 1
+            }
+        },
+        {
+            "id": "investigator.contact_email",
+            "type": "email",
+            "label": "Contact E-Mail",
+            "section_id": "sec_investigator_info",
+            "order": 9,
+            "visible": false,
+            "anchor": {
+                "type": "table_cell",
+                "table_index": 0,
+                "row_index": 8,
+                "column_index": 2
+            }
+        },
+        {
+            "id": "study.title",
+            "type": "textarea",
+            "label": "Title of Protocol",
+            "section_id": "sec_study_info",
+            "order": 0,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "TITLE OF PROTOCOL"
+            }
+        },
+        {
+            "id": "study.start_date",
+            "type": "date",
+            "label": "Project Start Date",
+            "section_id": "sec_study_info",
+            "order": 1,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "PROJECT START DATE"
+            }
+        },
+        {
+            "id": "study.funding_source",
+            "type": "radio",
+            "label": "Funding Source",
+            "section_id": "sec_study_info",
+            "order": 2,
+            "required": true,
+            "options": [
+                {"value": "none", "label": "None"},
+                {"value": "intramural", "label": "Intramural"},
+                {"value": "extramural", "label": "Extramural"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "FUNDING SOURCE"
+            }
+        },
+        {
+            "id": "study.intramural_dept",
+            "type": "text",
+            "label": "If intramural, what department or fund?",
+            "section_id": "sec_study_info",
+            "order": 3,
+            "visible": false,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "intramural, what department"
+            }
+        },
+        {
+            "id": "study.extramural_sponsor",
+            "type": "text",
+            "label": "If extramural, what is the name of the sponsor?",
+            "section_id": "sec_study_info",
+            "order": 4,
+            "visible": false,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "extramural, what is the name"
+            }
+        },
+        {
+            "id": "data.medical_records",
+            "type": "radio",
+            "label": "Medical records from LLEAP (existing data, not prospective)",
+            "section_id": "sec_data_collection",
+            "order": 0,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Medical records from LLEAP"
+            }
+        },
+        {
+            "id": "data.date_range_from",
+            "type": "date",
+            "label": "Date Range From",
+            "section_id": "sec_data_collection",
+            "order": 1,
+            "visible": false
+        },
+        {
+            "id": "data.date_range_to",
+            "type": "date",
+            "label": "Date Range To",
+            "section_id": "sec_data_collection",
+            "order": 2,
+            "visible": false
+        },
+        {
+            "id": "data.other_archived",
+            "type": "textarea",
+            "label": "Other Archived Data - Describe",
+            "section_id": "sec_data_collection",
+            "order": 3,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Other archived data"
+            }
+        },
+        {
+            "id": "data.subject_types",
+            "type": "repeatable",
+            "label": "Subject Types and Numbers",
+            "section_id": "sec_data_collection",
+            "order": 4,
+            "anchor": {
+                "type": "table",
+                "table_index": 1,
+                "start_row": 1
+            },
+            "repeatable_config": {
+                "min_rows": 1,
+                "max_rows": 6,
+                "add_button_text": "Add Subject Type",
+                "columns": [
+                    {"id": "type", "label": "Type of Subject(s)", "type": "text", "width": "60%"},
+                    {"id": "number", "label": "Number of Records", "type": "text", "width": "40%"}
+                ],
+                "column_mapping": [0, 1]
+            }
+        },
+        {
+            "id": "data.inclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for inclusion of subject data",
+            "section_id": "sec_data_collection",
+            "order": 5,
+            "required": true,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for inclusion"
+            }
+        },
+        {
+            "id": "data.exclusion_criteria",
+            "type": "textarea",
+            "label": "Criteria for exclusion of subject data",
+            "section_id": "sec_data_collection",
+            "order": 6,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Criteria for exclusion"
+            }
+        },
+        {
+            "id": "data.source",
+            "type": "radio",
+            "label": "Source of Data",
+            "section_id": "sec_data_collection",
+            "order": 7,
+            "required": true,
+            "options": [
+                {"value": "lluh_entity", "label": "LLUH entity - data from investigators' patients, students, employees"},
+                {"value": "lluh_department", "label": "LLUH department (not represented by investigator)"},
+                {"value": "non_lluh", "label": "Non-LLUH entity (letter of agreement required)"},
+                {"value": "other", "label": "Other"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "SOURCE OF DATA"
+            }
+        },
+        {
+            "id": "data.department_name",
+            "type": "text",
+            "label": "Department Name",
+            "section_id": "sec_data_collection",
+            "order": 8,
+            "visible": false,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Department name"
+            }
+        },
+        {
+            "id": "data.non_lluh_entity",
+            "type": "text",
+            "label": "Non-LLUH Entity - Specify",
+            "section_id": "sec_data_collection",
+            "order": 9,
+            "visible": false
+        },
+        {
+            "id": "data.source_other",
+            "type": "textarea",
+            "label": "Other Source - Specify",
+            "section_id": "sec_data_collection",
+            "order": 10,
+            "visible": false
+        },
+        {
+            "id": "benefits.description",
+            "type": "textarea",
+            "label": "Expected Benefits",
+            "section_id": "sec_benefits",
+            "order": 0,
+            "required": true,
+            "placeholder": "Describe the expected benefits of this research",
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "BENEFITS"
+            }
+        },
+        {
+            "id": "risks.identifiers_recorded",
+            "type": "radio",
+            "label": "Will subject-related identifiers be recorded?",
+            "section_id": "sec_risks",
+            "order": 0,
+            "required": true,
+            "options": [
+                {"value": "no", "label": "No, subject-related identifiers will not be recorded"},
+                {"value": "yes", "label": "Yes, subject-related identifiers will be recorded"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "identifiers be recorded"
+            }
+        },
+        {
+            "id": "risks.identifiers_destruction",
+            "type": "radio",
+            "label": "When will identifiers be destroyed?",
+            "section_id": "sec_risks",
+            "order": 1,
+            "visible": false,
+            "options": [
+                {"value": "after_analysis", "label": "After completion of data analysis"},
+                {"value": "retained", "label": "Identifiers will be retained indefinitely"},
+                {"value": "other", "label": "Other"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "destroyed at the earliest"
+            }
+        },
+        {
+            "id": "risks.retention_reason",
+            "type": "textarea",
+            "label": "Reason for retaining identifiers indefinitely",
+            "section_id": "sec_risks",
+            "order": 2,
+            "visible": false
+        },
+        {
+            "id": "risks.identifiers_list",
+            "type": "checkbox",
+            "label": "What identifiers will be recorded?",
+            "section_id": "sec_risks",
+            "order": 3,
+            "visible": false,
+            "options": [
+                {"value": "names", "label": "Names"},
+                {"value": "ssn", "label": "Social security number"},
+                {"value": "email", "label": "E-mail addresses"},
+                {"value": "phone", "label": "Phone numbers"},
+                {"value": "address", "label": "Address"},
+                {"value": "dob", "label": "Date of birth"},
+                {"value": "mrn", "label": "Medical record number"},
+                {"value": "other", "label": "Other identifiers"}
+            ],
+            "anchor": {
+                "type": "table",
+                "table_index": 3
+            }
+        },
+        {
+            "id": "risks.code_method",
+            "type": "radio",
+            "label": "Method for creating a code/key",
+            "section_id": "sec_risks",
+            "order": 4,
+            "visible": false,
+            "options": [
+                {"value": "random", "label": "Random - The code/key is not derived from any identifiers"},
+                {"value": "linking", "label": "Linking - The code/key is derived from one or more identifiers"},
+                {"value": "none", "label": "No code/key will be used"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "general method for creating"
+            }
+        },
+        {
+            "id": "risks.no_code_explanation",
+            "type": "textarea",
+            "label": "If no code, explain need for recording identifiers",
+            "section_id": "sec_risks",
+            "order": 5,
+            "visible": false
+        },
+        {
+            "id": "safeguards.code_storage",
+            "type": "textarea",
+            "label": "Where will the code with identifiers be stored securely?",
+            "section_id": "sec_safeguards",
+            "order": 0,
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "code with identifiers will be stored"
+            }
+        },
+        {
+            "id": "safeguards.storage_method",
+            "type": "checkbox",
+            "label": "How will you store the research data?",
+            "section_id": "sec_safeguards",
+            "order": 1,
+            "options": [
+                {"value": "locked_suite", "label": "Locked suite"},
+                {"value": "locked_office", "label": "Locked office"},
+                {"value": "locked_cabinet", "label": "Locked file cabinet"},
+                {"value": "electronic", "label": "Electronically with password protection"},
+                {"value": "other", "label": "Other"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "store the research data"
+            }
+        },
+        {
+            "id": "safeguards.storage_other",
+            "type": "text",
+            "label": "Other storage method - specify",
+            "section_id": "sec_safeguards",
+            "order": 2,
+            "visible": false
+        },
+        {
+            "id": "safeguards.transmittal_method",
+            "type": "checkbox",
+            "label": "How will you transmit or transport research data?",
+            "section_id": "sec_safeguards",
+            "order": 3,
+            "options": [
+                {"value": "fax", "label": "Fax with confidentiality cover sheet"},
+                {"value": "courier", "label": "Courier in sealed envelope"},
+                {"value": "hand_delivery", "label": "Hand-delivery in sealed envelope"},
+                {"value": "mail", "label": "U.S. Mail or Express Mail"},
+                {"value": "vehicle", "label": "Vehicle (data not left unattended)"},
+                {"value": "email_llu", "label": "LLU/LLUMC email system"},
+                {"value": "shredded", "label": "Hardcopy no longer needed will be shredded"},
+                {"value": "other", "label": "Other"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "transmit or transport"
+            }
+        },
+        {
+            "id": "safeguards.transmittal_other",
+            "type": "text",
+            "label": "Other transmittal method - specify",
+            "section_id": "sec_safeguards",
+            "order": 4,
+            "visible": false
+        },
+        {
+            "id": "other.phs_submission",
+            "type": "radio",
+            "label": "Is the study being submitted to Public Health Service for sponsorship?",
+            "section_id": "sec_other_info",
+            "order": 0,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "Public Health Service"
+            }
+        },
+        {
+            "id": "other.student_project",
+            "type": "radio",
+            "label": "Is this a student project?",
+            "section_id": "sec_other_info",
+            "order": 1,
+            "options": [
+                {"value": "no", "label": "No"},
+                {"value": "yes", "label": "Yes"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "student project"
+            }
+        },
+        {
+            "id": "signatures.pi_declaration",
+            "type": "checkbox",
+            "label": "I certify that all information provided is accurate and complete",
+            "section_id": "sec_signatures",
+            "order": 0,
+            "required": true,
+            "options": [
+                {"value": "certified", "label": "I certify that all information provided is accurate and complete"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "DECLARATION BY PRINCIPAL"
+            }
+        },
+        {
+            "id": "signatures.faculty_sponsor_cert",
+            "type": "checkbox",
+            "label": "As faculty sponsor, I certify oversight of this student project",
+            "section_id": "sec_signatures",
+            "order": 1,
+            "visible": false,
+            "options": [
+                {"value": "certified", "label": "As faculty sponsor, I certify oversight of this student project"}
+            ],
+            "anchor": {
+                "type": "paragraph",
+                "paragraph_contains": "faculty sponsor of a student"
+            }
+        }
+    ],
+    "rules": [
+        {
+            "id": "rule_alt_contact",
+            "conditions": [
+                {
+                    "field": "investigator.has_alt_contact",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "investigator.contact_name"},
+                {"action": "show", "field": "investigator.contact_ext"},
+                {"action": "show", "field": "investigator.contact_email"},
+                {"action": "require", "field": "investigator.contact_name"},
+                {"action": "require", "field": "investigator.contact_email"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "investigator.contact_name"},
+                {"action": "hide", "field": "investigator.contact_ext"},
+                {"action": "hide", "field": "investigator.contact_email"},
+                {"action": "optional", "field": "investigator.contact_name"},
+                {"action": "optional", "field": "investigator.contact_email"}
+            ]
+        },
+        {
+            "id": "rule_funding_intramural",
+            "conditions": [
+                {
+                    "field": "study.funding_source",
+                    "operator": "equals",
+                    "value": "intramural"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.intramural_dept"},
+                {"action": "require", "field": "study.intramural_dept"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.intramural_dept"},
+                {"action": "optional", "field": "study.intramural_dept"}
+            ]
+        },
+        {
+            "id": "rule_funding_extramural",
+            "conditions": [
+                {
+                    "field": "study.funding_source",
+                    "operator": "equals",
+                    "value": "extramural"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "study.extramural_sponsor"},
+                {"action": "require", "field": "study.extramural_sponsor"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "study.extramural_sponsor"},
+                {"action": "optional", "field": "study.extramural_sponsor"}
+            ]
+        },
+        {
+            "id": "rule_medical_records",
+            "conditions": [
+                {
+                    "field": "data.medical_records",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "data.date_range_from"},
+                {"action": "show", "field": "data.date_range_to"},
+                {"action": "require", "field": "data.date_range_from"},
+                {"action": "require", "field": "data.date_range_to"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "data.date_range_from"},
+                {"action": "hide", "field": "data.date_range_to"},
+                {"action": "optional", "field": "data.date_range_from"},
+                {"action": "optional", "field": "data.date_range_to"}
+            ]
+        },
+        {
+            "id": "rule_source_lluh_dept",
+            "conditions": [
+                {
+                    "field": "data.source",
+                    "operator": "equals",
+                    "value": "lluh_department"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "data.department_name"},
+                {"action": "require", "field": "data.department_name"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "data.department_name"},
+                {"action": "optional", "field": "data.department_name"}
+            ]
+        },
+        {
+            "id": "rule_source_non_lluh",
+            "conditions": [
+                {
+                    "field": "data.source",
+                    "operator": "equals",
+                    "value": "non_lluh"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "data.non_lluh_entity"},
+                {"action": "require", "field": "data.non_lluh_entity"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "data.non_lluh_entity"},
+                {"action": "optional", "field": "data.non_lluh_entity"}
+            ]
+        },
+        {
+            "id": "rule_source_other",
+            "conditions": [
+                {
+                    "field": "data.source",
+                    "operator": "equals",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "data.source_other"},
+                {"action": "require", "field": "data.source_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "data.source_other"},
+                {"action": "optional", "field": "data.source_other"}
+            ]
+        },
+        {
+            "id": "rule_identifiers_yes",
+            "conditions": [
+                {
+                    "field": "risks.identifiers_recorded",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "risks.identifiers_destruction"},
+                {"action": "show", "field": "risks.identifiers_list"},
+                {"action": "show", "field": "risks.code_method"},
+                {"action": "require", "field": "risks.identifiers_destruction"},
+                {"action": "require", "field": "risks.identifiers_list"},
+                {"action": "require", "field": "risks.code_method"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "risks.identifiers_destruction"},
+                {"action": "hide", "field": "risks.identifiers_list"},
+                {"action": "hide", "field": "risks.code_method"},
+                {"action": "optional", "field": "risks.identifiers_destruction"},
+                {"action": "optional", "field": "risks.identifiers_list"},
+                {"action": "optional", "field": "risks.code_method"}
+            ]
+        },
+        {
+            "id": "rule_identifiers_retained",
+            "conditions": [
+                {
+                    "field": "risks.identifiers_destruction",
+                    "operator": "equals",
+                    "value": "retained"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "risks.retention_reason"},
+                {"action": "require", "field": "risks.retention_reason"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "risks.retention_reason"},
+                {"action": "optional", "field": "risks.retention_reason"}
+            ]
+        },
+        {
+            "id": "rule_no_code",
+            "conditions": [
+                {
+                    "field": "risks.code_method",
+                    "operator": "equals",
+                    "value": "none"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "risks.no_code_explanation"},
+                {"action": "require", "field": "risks.no_code_explanation"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "risks.no_code_explanation"},
+                {"action": "optional", "field": "risks.no_code_explanation"}
+            ]
+        },
+        {
+            "id": "rule_storage_other",
+            "conditions": [
+                {
+                    "field": "safeguards.storage_method",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "safeguards.storage_other"},
+                {"action": "require", "field": "safeguards.storage_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "safeguards.storage_other"},
+                {"action": "optional", "field": "safeguards.storage_other"}
+            ]
+        },
+        {
+            "id": "rule_transmittal_other",
+            "conditions": [
+                {
+                    "field": "safeguards.transmittal_method",
+                    "operator": "contains",
+                    "value": "other"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "safeguards.transmittal_other"},
+                {"action": "require", "field": "safeguards.transmittal_other"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "safeguards.transmittal_other"},
+                {"action": "optional", "field": "safeguards.transmittal_other"}
+            ]
+        },
+        {
+            "id": "rule_student_project",
+            "conditions": [
+                {
+                    "field": "other.student_project",
+                    "operator": "equals",
+                    "value": "yes"
+                }
+            ],
+            "then_actions": [
+                {"action": "show", "field": "signatures.faculty_sponsor_cert"},
+                {"action": "require", "field": "signatures.faculty_sponsor_cert"}
+            ],
+            "else_actions": [
+                {"action": "hide", "field": "signatures.faculty_sponsor_cert"},
+                {"action": "optional", "field": "signatures.faculty_sponsor_cert"}
+            ]
+        }
+    ]
+}
