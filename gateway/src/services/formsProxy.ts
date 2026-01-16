@@ -655,7 +655,7 @@ export const formsProxy = {
   // ==========================================================================
 
   getTaskDefinitions: async (activeOnly: boolean = true): Promise<AxiosResponse> => {
-    return formsClient.get('/api/admin/task-definitions', {
+    return formsClient.get('/api/task-definitions', {
       params: { active_only: activeOnly },
     });
   },
@@ -669,7 +669,7 @@ export const formsProxy = {
     display_order?: number;
     is_active?: boolean;
   }): Promise<AxiosResponse> => {
-    return formsClient.post('/api/admin/task-definitions', data);
+    return formsClient.post('/api/task-definitions', data);
   },
 
   updateTaskDefinition: async (
@@ -684,11 +684,11 @@ export const formsProxy = {
       is_active?: boolean;
     }
   ): Promise<AxiosResponse> => {
-    return formsClient.put(`/api/admin/task-definitions/${definitionId}`, data);
+    return formsClient.put(`/api/task-definitions/${definitionId}`, data);
   },
 
   deleteTaskDefinition: async (definitionId: number): Promise<AxiosResponse> => {
-    return formsClient.delete(`/api/admin/task-definitions/${definitionId}`);
+    return formsClient.delete(`/api/task-definitions/${definitionId}`);
   },
 
   // ==========================================================================
@@ -696,11 +696,11 @@ export const formsProxy = {
   // ==========================================================================
 
   getProjectTypeMappings: async (): Promise<AxiosResponse> => {
-    return formsClient.get('/api/admin/project-type-mappings');
+    return formsClient.get('/api/task-definitions/mappings/all');
   },
 
   getProjectTypeMappingsByType: async (projectType: string): Promise<AxiosResponse> => {
-    return formsClient.get(`/api/admin/project-type-mappings/${projectType}`);
+    return formsClient.get(`/api/task-definitions/mappings/${projectType}`);
   },
 
   createProjectTypeMapping: async (data: {
@@ -709,11 +709,11 @@ export const formsProxy = {
     is_required?: boolean;
     display_order?: number;
   }): Promise<AxiosResponse> => {
-    return formsClient.post('/api/admin/project-type-mappings', data);
+    return formsClient.post('/api/task-definitions/mappings', data);
   },
 
   deleteProjectTypeMapping: async (mappingId: number): Promise<AxiosResponse> => {
-    return formsClient.delete(`/api/admin/project-type-mappings/${mappingId}`);
+    return formsClient.delete(`/api/task-definitions/mappings/${mappingId}`);
   },
 
   // ==========================================================================

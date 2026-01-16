@@ -128,13 +128,14 @@ const taskTypes = [
   { value: 'approval_required', label: 'Approval Required' },
 ];
 
-// Project types
+// Project types - must match database values
 const projectTypes = [
   { value: 'retrospective', label: 'Retrospective Study' },
   { value: 'prospective', label: 'Prospective Study' },
   { value: 'clinical_trial', label: 'Clinical Trial' },
-  { value: 'observational', label: 'Observational Study' },
-  { value: 'longitudinal', label: 'Longitudinal Study' },
+  { value: 'quality_improvement', label: 'Quality Improvement' },
+  { value: 'educational_research', label: 'Educational Research' },
+  { value: 'other', label: 'Other' },
 ];
 
 const taskTypeLabels: Record<string, string> = {
