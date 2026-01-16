@@ -103,29 +103,54 @@ def create_project(
     if not pi_id:
         raise HTTPException(status_code=400, detail="Principal investigator ID required")
 
-    project = Project(
-        title=project_data.title,
-        description=project_data.description,
-        project_type=project_data.project_type,
-        department=project_data.department,
-        principal_investigator_id=pi_id,
-        start_date=project_data.start_date,
-        end_date=project_data.end_date,
-        is_public=project_data.is_public,
-        status="draft",
-    )
-    db.add(project)
-    db.commit()
-    db.refresh(project)
+    # Check if project with provided ID already exists (gateway sync case)
+    existing_project = None
+    if project_data.id:
+        existing_project = db.query(Project).filter(Project.id == project_data.id).first()
 
-    # Auto-create tasks based on project type
+    if existing_project:
+        # Project already exists - update it and ensure tasks exist
+        project = existing_project
+        project.title = project_data.title
+        project.description = project_data.description
+        project.project_type = project_data.project_type
+        project.department = project_data.department
+        project.start_date = project_data.start_date
+        project.end_date = project_data.end_date
+        project.is_public = project_data.is_public
+        db.commit()
+        db.refresh(project)
+    else:
+        # Create new project
+        project_kwargs = {
+            "title": project_data.title,
+            "description": project_data.description,
+            "project_type": project_data.project_type,
+            "department": project_data.department,
+            "principal_investigator_id": pi_id,
+            "start_date": project_data.start_date,
+            "end_date": project_data.end_date,
+            "is_public": project_data.is_public,
+            "status": "draft",
+        }
+        if project_data.id:
+            project_kwargs["id"] = project_data.id
+
+        project = Project(**project_kwargs)
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+
+    # Auto-create tasks based on project type (only if no tasks exist yet)
     if project.project_type:
-        task_def_service.create_project_tasks(
-            db=db,
-            project_id=project.id,
-            project_type=project.project_type,
-            owner_id=pi_id,
-        )
+        existing_tasks = db.query(Task).filter(Task.project_id == project.id).first()
+        if not existing_tasks:
+            task_def_service.create_project_tasks(
+                db=db,
+                project_id=project.id,
+                project_type=project.project_type,
+                owner_id=pi_id,
+            )
 
     return ProjectResponse(
         id=project.id,

@@ -12,6 +12,7 @@ from app.routers.tasks import router as tasks_router
 from app.routers.locks import router as locks_router
 from app.routers.amendments import router as amendments_router
 from app.routers.task_definitions import router as task_definitions_router
+from app.routers.audit import router as audit_router
 
 __all__ = [
     "templates_router",
@@ -26,4 +27,5 @@ __all__ = [
     "locks_router",
     "amendments_router",
     "task_definitions_router",
+    "audit_router",
 ]

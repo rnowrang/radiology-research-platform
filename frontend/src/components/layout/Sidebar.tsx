@@ -10,6 +10,10 @@ import {
   FileSearch,
   ChevronLeft,
   ChevronRight,
+  GitBranch,
+  Workflow,
+  BarChart3,
+  Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -53,19 +57,44 @@ const mainNavItems = [
 
 const adminNavItems = [
   {
+    title: 'Dashboard',
+    href: '/admin',
+    icon: LayoutDashboard,
+  },
+  {
     title: 'Users',
     href: '/admin/users',
     icon: Users,
   },
   {
-    title: 'Templates',
-    href: '/admin/templates',
-    icon: FileSearch,
+    title: 'Audit Logs',
+    href: '/admin/audit',
+    icon: FileText,
   },
   {
-    title: 'Settings',
-    href: '/admin/settings',
-    icon: Settings,
+    title: 'Review Stages',
+    href: '/admin/review-stages',
+    icon: GitBranch,
+  },
+  {
+    title: 'Workflow',
+    href: '/admin/workflow-config',
+    icon: Workflow,
+  },
+  {
+    title: 'Task Review',
+    href: '/admin/task-review',
+    icon: CheckSquare,
+  },
+  {
+    title: 'Reports',
+    href: '/admin/reports',
+    icon: BarChart3,
+  },
+  {
+    title: 'Email',
+    href: '/admin/email',
+    icon: Mail,
   },
 ];
 

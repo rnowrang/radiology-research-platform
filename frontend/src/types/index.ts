@@ -227,27 +227,27 @@ export type ReviewStatus =
 
 export interface CommentThread {
   id: number;
-  formInstanceId: number;
-  fieldId?: string;
-  sectionId?: string;
-  isResolved: boolean;
-  resolvedAt?: string;
-  resolvedById?: string;
+  form_instance_id: number;
+  field_id?: string;
+  section_id?: string;
+  is_resolved: boolean;
+  resolved_at?: string;
+  resolved_by_id?: string;
   comments: Comment[];
-  createdAt: string;
+  created_at: string;
 }
 
 export interface Comment {
   id: number;
-  threadId: number;
-  parentCommentId?: number;
-  authorId: string;
-  author?: User;
+  thread_id: number;
+  parent_comment_id?: number;
+  author_id: string;
+  author_name?: string;
   content: string;
-  isEdited: boolean;
-  isDeleted: boolean;
-  createdAt: string;
-  updatedAt: string;
+  is_edited: boolean;
+  mentions?: string[];
+  created_at: string;
+  updated_at: string;
 }
 
 // Task types

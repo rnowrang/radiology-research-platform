@@ -22,9 +22,17 @@ export const projectController = {
       const projectsWithCounts = await Promise.all(
         projects.map(async (project) => {
           const collaborators = await projectQueries.getCollaborators(project.id);
+          let formCount = 0;
+          try {
+            const formsResponse = await formsProxy.getFormsByProject(project.id);
+            formCount = formsResponse.data?.length || 0;
+          } catch {
+            // If forms-service is unavailable, default to 0
+            formCount = 0;
+          }
           return {
             ...project,
-            form_count: 0, // Would need to query forms service for this
+            form_count: formCount,
             collaborator_count: collaborators.length,
           };
         })
@@ -92,6 +100,24 @@ export const projectController = {
         end_date,
         is_public,
       });
+
+      // Sync to forms-service for auto-task creation
+      try {
+        await formsProxy.createProject({
+          id: project.id,
+          title: project.title,
+          description: project.description,
+          project_type: project.project_type,
+          department: project.department,
+          principal_investigator_id: project.principal_investigator_id,
+          start_date: project.start_date?.toISOString().split('T')[0],
+          end_date: project.end_date?.toISOString().split('T')[0],
+          is_public: project.is_public,
+        });
+      } catch (error) {
+        // Log but don't fail - forms-service sync is not critical
+        console.error('Failed to sync project to forms-service:', error);
+      }
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.CREATE,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { LoginPage } from '@/pages/auth/LoginPage';
@@ -60,6 +60,22 @@ function App() {
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/forgot-password"
+        element={
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="text-center space-y-4">
+              <h1 className="text-2xl font-bold">Forgot Password</h1>
+              <p className="text-muted-foreground">
+                Password reset functionality coming soon.
+              </p>
+              <Link to="/login" className="text-primary hover:underline">
+                Back to Login
+              </Link>
+            </div>
+          </div>
+        }
+      />
 
       {/* Protected routes */}
       <Route

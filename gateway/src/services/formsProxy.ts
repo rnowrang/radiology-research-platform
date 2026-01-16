@@ -270,6 +270,25 @@ export const formsProxy = {
     return formsClient.get('/health');
   },
 
+  // Project sync
+  createProject: async (projectData: {
+    id: string;
+    title: string;
+    description?: string;
+    project_type?: string;
+    department?: string;
+    principal_investigator_id: string;
+    start_date?: string;
+    end_date?: string;
+    is_public?: boolean;
+  }): Promise<AxiosResponse> => {
+    return formsClient.post('/api/projects', projectData);
+  },
+
+  getFormsByProject: async (projectId: string): Promise<AxiosResponse> => {
+    return formsClient.get('/api/forms', { params: { project_id: projectId } });
+  },
+
   // Editing Locks
   acquireLock: async (
     formId: number,

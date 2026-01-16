@@ -17,6 +17,7 @@ from app.routers import (
     locks_router,
     amendments_router,
     task_definitions_router,
+    audit_router,
 )
 
 settings = get_settings()
@@ -51,6 +52,7 @@ app.include_router(tasks_router)
 app.include_router(locks_router)
 app.include_router(amendments_router)
 app.include_router(task_definitions_router)
+app.include_router(audit_router)
 
 
 @app.on_event("startup")

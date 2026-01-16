@@ -40,6 +40,7 @@ class ProjectBase(BaseModel):
 
 class ProjectCreate(ProjectBase):
     """Schema for creating a project."""
+    id: Optional[UUID] = None  # Optional ID from gateway for syncing
     principal_investigator_id: Optional[UUID] = None  # Will be set from auth context if not provided
 
 
