@@ -779,6 +779,25 @@ export const formsProxy = {
     return formsClient.get(`/api/projects/${projectId}/task-progress`);
   },
 
+  createProjectTask: async (
+    projectId: string,
+    data: {
+      task_definition_id?: number;
+      title?: string;
+      description?: string;
+      task_type?: string;
+      assigned_to_id?: string;
+      due_date?: string;
+      priority?: string;
+      is_required?: boolean;
+    },
+    userId?: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/projects/${projectId}/tasks`, data, {
+      headers: userId ? { 'X-User-Id': userId } : {},
+    });
+  },
+
   // ==========================================================================
   // Auto-Complete Upload Task
   // ==========================================================================

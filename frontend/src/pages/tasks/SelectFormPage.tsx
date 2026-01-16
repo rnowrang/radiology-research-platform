@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ChevronLeft, FileText, Loader2 } from 'lucide-react';
@@ -70,6 +71,13 @@ export function SelectFormPage() {
 
   const templates: Template[] = templatesResponse?.data?.data || templatesResponse?.data || [];
   const task = taskResponse?.data?.data || taskResponse?.data;
+
+  // If task already has a form, redirect to it
+  useEffect(() => {
+    if (task?.form_instance_id) {
+      navigate(`/forms/${task.form_instance_id}`, { replace: true });
+    }
+  }, [task, navigate]);
 
   // Filter to only show published templates
   const publishedTemplates = templates.filter((t) => t.is_published !== false);

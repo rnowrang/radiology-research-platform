@@ -32,5 +32,6 @@ router.get('/:id/activity', asyncHandler(activityController.getProjectActivity))
 // Task routes
 router.get('/:projectId/tasks', asyncHandler(taskController.getProjectTasks));
 router.get('/:projectId/task-progress', asyncHandler(taskController.getProjectTaskProgress));
+router.post('/:projectId/tasks', asyncHandler(projectController.createProjectTask));
 
 export default router;

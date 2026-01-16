@@ -46,36 +46,45 @@ def list_tasks(
     assigned_to: Optional[UUID] = Query(None, description="Filter by assignee"),
     project_id: Optional[UUID] = Query(None, description="Filter by project"),
     form_instance_id: Optional[int] = Query(None, description="Filter by form"),
-    include_all_project_tasks: bool = Query(False, description="Include tasks from projects where user is PI or collaborator"),
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
 ):
-    """List tasks with optional filters."""
+    """List tasks with optional filters.
+
+    Visibility rules:
+    - Assigned tasks: only visible to the assignee
+    - Unassigned tasks: visible to all project members (PI + collaborators)
+    - Task creator always sees their own tasks
+    """
     query = db.query(Task)
 
-    # Filter to tasks assigned to user or created by user
+    # Apply visibility rules based on user
     if user_id:
-        query = query.filter(
-            (Task.assigned_to_id == user_id) |
-            (Task.created_by_id == user_id)
-        )
-
-    # Include tasks from projects where user is PI or collaborator
-    if include_all_project_tasks and user_id:
-        # Get projects where user is PI
-        user_project_ids = db.query(Project.id).filter(
+        # Get project IDs where user is PI
+        pi_project_ids = db.query(Project.id).filter(
             Project.principal_investigator_id == user_id
-        ).all()
-        # Get projects where user is collaborator
+        ).subquery()
+
+        # Get project IDs where user is collaborator
         collab_project_ids = db.query(ProjectCollaborator.project_id).filter(
             ProjectCollaborator.user_id == user_id
-        ).all()
-        all_project_ids = [p.id for p in user_project_ids] + [p.project_id for p in collab_project_ids]
+        ).subquery()
 
-        if all_project_ids:
-            query = query.union(
-                db.query(Task).filter(Task.project_id.in_(all_project_ids))
+        # Task visibility rules:
+        # 1. User is the assignee
+        # 2. Task is unassigned AND user is project member (PI or collaborator)
+        # 3. User created the task
+        query = query.filter(
+            (Task.assigned_to_id == user_id) |  # Assigned to me
+            (Task.created_by_id == user_id) |   # I created it
+            (
+                (Task.assigned_to_id == None) &  # Unassigned task
+                (
+                    Task.project_id.in_(pi_project_ids) |  # I'm PI
+                    Task.project_id.in_(collab_project_ids)  # I'm collaborator
+                )
             )
+        )
 
     if status:
         query = query.filter(Task.status == status)

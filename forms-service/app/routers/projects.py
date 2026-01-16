@@ -18,7 +18,9 @@ from app.schemas.project import (
     ProjectCollaboratorCreate,
     ProjectCollaboratorResponse,
 )
+from app.schemas.task import TaskCreateForProject, TaskResponse
 from app.schemas.task_definition import ProjectTaskProgress
+from app.models.task_definition import TaskDefinition
 from app.services import task_definition as task_def_service
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -31,6 +33,11 @@ def get_user_id(x_user_id: Optional[str] = Header(None)) -> Optional[UUID]:
     return None
 
 
+def get_user_role(x_user_role: Optional[str] = Header(None)) -> Optional[str]:
+    """Extract user role from header."""
+    return x_user_role
+
+
 # =============================================================================
 # Project CRUD
 # =============================================================================
@@ -41,6 +48,7 @@ def list_projects(
     principal_investigator_id: Optional[UUID] = Query(None, description="Filter by PI"),
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """List all projects the user has access to."""
     query = db.query(Project)
@@ -51,8 +59,8 @@ def list_projects(
     if principal_investigator_id:
         query = query.filter(Project.principal_investigator_id == principal_investigator_id)
 
-    # If user_id is provided, filter to projects they own or collaborate on
-    if user_id:
+    # Admin users can see all projects; others only see projects they own, collaborate on, or are public
+    if user_role != "admin" and user_id:
         collaborator_project_ids = db.query(ProjectCollaborator.project_id).filter(
             ProjectCollaborator.user_id == user_id
         ).subquery()
@@ -217,15 +225,16 @@ def update_project(
     project_update: ProjectUpdate,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """Update a project."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Check ownership (only PI can update)
-    if user_id and project.principal_investigator_id != user_id:
-        raise HTTPException(status_code=403, detail="Only the principal investigator can update this project")
+    # Check ownership (PI or admin can update)
+    if user_id and project.principal_investigator_id != user_id and user_role != "admin":
+        raise HTTPException(status_code=403, detail="Only the principal investigator or admin can update this project")
 
     update_data = project_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -270,15 +279,16 @@ def delete_project(
     project_id: UUID,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """Delete a project."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Check ownership
-    if user_id and project.principal_investigator_id != user_id:
-        raise HTTPException(status_code=403, detail="Only the principal investigator can delete this project")
+    # Check ownership (PI or admin can delete)
+    if user_id and project.principal_investigator_id != user_id and user_role != "admin":
+        raise HTTPException(status_code=403, detail="Only the principal investigator or admin can delete this project")
 
     # Check if project has forms
     form_count = db.query(func.count(FormInstance.id)).filter(
@@ -329,15 +339,16 @@ def add_collaborator(
     collaborator_data: ProjectCollaboratorCreate,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """Add a collaborator to a project."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Check ownership
-    if user_id and project.principal_investigator_id != user_id:
-        raise HTTPException(status_code=403, detail="Only the principal investigator can add collaborators")
+    # Check ownership (PI or admin can add collaborators)
+    if user_id and project.principal_investigator_id != user_id and user_role != "admin":
+        raise HTTPException(status_code=403, detail="Only the principal investigator or admin can add collaborators")
 
     # Check if already a collaborator
     existing = db.query(ProjectCollaborator).filter(
@@ -372,15 +383,16 @@ def remove_collaborator(
     collaborator_id: UUID,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """Remove a collaborator from a project."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Check ownership
-    if user_id and project.principal_investigator_id != user_id:
-        raise HTTPException(status_code=403, detail="Only the principal investigator can remove collaborators")
+    # Check ownership (PI or admin can remove collaborators)
+    if user_id and project.principal_investigator_id != user_id and user_role != "admin":
+        raise HTTPException(status_code=403, detail="Only the principal investigator or admin can remove collaborators")
 
     collaborator = db.query(ProjectCollaborator).filter(
         ProjectCollaborator.id == collaborator_id,
@@ -481,6 +493,107 @@ def list_project_tasks(
         }
         for task in tasks
     ]
+
+
+@router.post("/{project_id}/tasks", response_model=TaskResponse, status_code=201)
+def create_project_task(
+    project_id: UUID,
+    task_data: TaskCreateForProject,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """
+    Manually create a task for a project.
+
+    Can either:
+    - Use an existing task definition (provide task_definition_id)
+    - Create an ad-hoc custom task (provide title and task_type)
+    """
+    # Validate user_id is provided
+    if not user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Determine title, description, and task_type based on input
+    title = task_data.title
+    description = task_data.description
+    task_type = task_data.task_type
+
+    if task_data.task_definition_id:
+        # Fetch the task definition
+        task_definition = db.query(TaskDefinition).filter(
+            TaskDefinition.id == task_data.task_definition_id
+        ).first()
+
+        if not task_definition:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task definition with id {task_data.task_definition_id} not found"
+            )
+
+        # Use definition values (can be overridden by provided values)
+        title = title or task_definition.name
+        description = description or task_definition.description
+        task_type = task_type or task_definition.task_type
+    else:
+        # No task definition - require title and task_type
+        if not title:
+            raise HTTPException(
+                status_code=400,
+                detail="title is required when task_definition_id is not provided"
+            )
+        if not task_type:
+            raise HTTPException(
+                status_code=400,
+                detail="task_type is required when task_definition_id is not provided"
+            )
+
+    # Create the task
+    task = Task(
+        project_id=project_id,
+        created_by_id=user_id,
+        task_definition_id=task_data.task_definition_id,
+        title=title,
+        description=description,
+        task_type=task_type,
+        assigned_to_id=task_data.assigned_to_id,
+        due_date=task_data.due_date,
+        priority=task_data.priority,
+        is_required=task_data.is_required,
+        status="pending",
+    )
+
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return TaskResponse(
+        id=task.id,
+        project_id=task.project_id,
+        form_instance_id=task.form_instance_id,
+        assigned_to_id=task.assigned_to_id,
+        created_by_id=task.created_by_id,
+        task_definition_id=task.task_definition_id,
+        title=task.title,
+        description=task.description,
+        task_type=task.task_type,
+        status=task.status,
+        priority=task.priority,
+        due_date=task.due_date,
+        is_required=task.is_required,
+        completed_at=task.completed_at,
+        submitted_at=task.submitted_at,
+        reviewed_at=task.reviewed_at,
+        reviewed_by_id=task.reviewed_by_id,
+        reviewer_comments=task.reviewer_comments,
+        revision_count=task.revision_count or 0,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
 
 
 @router.get("/{project_id}/task-progress", response_model=ProjectTaskProgress)

@@ -130,6 +130,22 @@ class PendingReviewItem(BaseModel):
 
 
 # =============================================================================
+# Manual Task Creation for Projects
+# =============================================================================
+
+class TaskCreateForProject(BaseModel):
+    """Schema for creating a task manually for a project."""
+    task_definition_id: Optional[int] = None  # If using a definition
+    title: Optional[str] = Field(None, min_length=1, max_length=500)  # Required if no task_definition_id
+    description: Optional[str] = None
+    task_type: Optional[str] = Field(None, pattern="^(document_upload|form_completion|review|approval|approval_required|general)$")  # Required if no task_definition_id
+    assigned_to_id: Optional[UUID] = None
+    due_date: Optional[date] = None
+    priority: str = Field(default="medium", pattern="^(low|medium|high|urgent)$")
+    is_required: bool = True
+
+
+# =============================================================================
 # Create Form for Task
 # =============================================================================
 

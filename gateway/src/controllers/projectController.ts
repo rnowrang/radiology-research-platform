@@ -2,8 +2,8 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { projectQueries } from '../database/queries/projectQueries.js';
 import { logAudit } from '../middleware/audit.js';
-import { AUDIT_ACTIONS } from '../config/constants.js';
-import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
+import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { formsProxy } from '../services/formsProxy.js';
 
 export const projectController = {
@@ -15,8 +15,18 @@ export const projectController = {
       const department = req.query.department as string | undefined;
       const search = req.query.search as string | undefined;
 
-      // Get projects for the current user (either as PI or collaborator)
-      const { projects, total } = await projectQueries.findByUserId(req.user!.id, page, limit);
+      // Admins can see all projects, other users only see their own
+      let projects;
+      let total;
+      if (req.user!.role === 'admin') {
+        const result = await projectQueries.findAll(page, limit, { status, department, search });
+        projects = result.projects;
+        total = result.total;
+      } else {
+        const result = await projectQueries.findByUserId(req.user!.id, page, limit);
+        projects = result.projects;
+        total = result.total;
+      }
 
       // Also count forms and collaborators for each project
       const projectsWithCounts = await Promise.all(
@@ -309,6 +319,68 @@ export const projectController = {
       res.json({
         success: true,
         data: result.data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Manually create a task for a project
+   * POST /api/projects/:projectId/tasks
+   * Admin only
+   */
+  createProjectTask: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+
+      // Admin only
+      if (req.user?.role !== USER_ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators can manually create project tasks');
+      }
+
+      const {
+        task_definition_id,
+        title,
+        description,
+        task_type,
+        assigned_to_id,
+        due_date,
+        priority,
+        is_required,
+      } = req.body;
+
+      const result = await formsProxy.createProjectTask(
+        projectId,
+        {
+          task_definition_id,
+          title,
+          description,
+          task_type,
+          assigned_to_id,
+          due_date,
+          priority,
+          is_required,
+        },
+        req.user?.id
+      );
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: 'project_task',
+        resourceId: projectId,
+        details: {
+          task_definition_id,
+          title,
+          task_type,
+          assigned_to_id,
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        data: result.data,
+        message: 'Task created successfully',
       });
     } catch (error) {
       next(error);

@@ -46,12 +46,13 @@ INSERT INTO project_collaborators (project_id, user_id, role) VALUES
 -- SAMPLE TEMPLATES (will be populated by seed script with actual schemas)
 -- =============================================================================
 
--- These are placeholder templates - actual schemas will be loaded from JSON files
-INSERT INTO templates (name, description, version, original_file_name, schema, is_active, is_published) VALUES
-('IRB Application - Standard', 'Standard IRB application for research studies involving drugs, biologics, devices, or greater than minimal risk procedures.', '1.0', 'irb-application-standard.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
-('IRB Application for Minimal Risk Studies', 'Application for minimal risk research studies including surveys, interviews, and observational studies.', '1.0', 'irb-application-minimal-risk.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
-('IRB Application for Anonymous Survey', 'Application for research involving anonymous surveys with minimal risk.', '1.0', 'irb-anonymous-survey.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
-('IRB Application for Archival/Retrospective Research', 'Application for research using existing archived or retrospective data.', '1.0', 'irb-archival-retrospective.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true);
+-- These are placeholder templates - actual schemas will be loaded by scripts/load-schemas.sh
+-- IMPORTANT: original_file_path must point to actual DOCX files in /app/storage/templates/
+INSERT INTO templates (name, description, version, original_file_name, original_file_path, schema, is_active, is_published) VALUES
+('IRB Application - Standard', 'Standard IRB application for research studies involving drugs, biologics, devices, or greater than minimal risk procedures.', '1.0', 'irb-application-standard 1_21_2019 (1).docx', '/app/storage/templates/irb-application-standard 1_21_2019 (1).docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
+('IRB Application for Minimal Risk Studies', 'Application for minimal risk research studies including surveys, interviews, and observational studies.', '1.0', 'irb-application-minimal-risk 11.1.2024 (1).docx', '/app/storage/templates/irb-application-minimal-risk 11.1.2024 (1).docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
+('IRB Application for Anonymous Survey', 'Application for research involving anonymous surveys with minimal risk.', '1.0', 'IRB application for anonymous survey 9.9.25_0.docx', '/app/storage/templates/IRB application for anonymous survey 9.9.25_0.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true),
+('IRB Application for Archival/Retrospective Research', 'Application for research using existing archived or retrospective data.', '1.0', 'irb-application-archival-retrospective 6_6_25.docx', '/app/storage/templates/irb-application-archival-retrospective 6_6_25.docx', '{"sections": [], "fields": [], "rules": []}'::jsonb, true, true);
 
 -- =============================================================================
 -- TASK DEFINITIONS

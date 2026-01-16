@@ -17,6 +17,7 @@ import {
   Eye,
   ExternalLink,
   File,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -47,6 +48,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/useToast';
 import { api } from '@/lib/api';
+import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
 
 // Types
 interface SubmittedTask {
@@ -145,6 +147,9 @@ export function TaskReviewPage() {
   const [selectedTask, setSelectedTask] = useState<SubmittedTask | null>(null);
   const [reviewComments, setReviewComments] = useState('');
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'revision' | null>(null);
+
+  // Assign task dialog state
+  const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
 
   // Fetch submitted tasks
   const { data: tasksData, isLoading } = useQuery({
@@ -276,6 +281,10 @@ export function TaskReviewPage() {
             Review and approve submitted tasks
           </p>
         </div>
+        <Button onClick={() => setShowAssignTaskDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Assign Task to Project
+        </Button>
       </div>
 
       {/* Filters */}
@@ -664,6 +673,16 @@ export function TaskReviewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Task to Project Dialog */}
+      <AssignTaskDialog
+        open={showAssignTaskDialog}
+        onOpenChange={setShowAssignTaskDialog}
+        showProjectSelector={true}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+        }}
+      />
     </div>
   );
 }

@@ -68,6 +68,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
 import { projectsApi, formsApi, api } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
+import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
 
 interface ProjectResponse {
   id: string;
@@ -117,18 +118,21 @@ interface ProjectTask {
   revision_count: number;
   reviewer_comments?: string;
   created_at: string;
+  form_instance_id?: number;
 }
 
 interface TaskProgress {
-  total: number;
-  completed: number;
-  pending: number;
-  in_progress: number;
-  submitted: number;
-  approved: number;
-  required_total: number;
-  required_completed: number;
-  progress_percentage: number;
+  project_id: string;
+  total_tasks: number;
+  completed_tasks: number;
+  pending_tasks: number;
+  in_progress_tasks: number;
+  submitted_tasks: number;
+  approved_tasks: number;
+  rejected_tasks: number;
+  revision_required_tasks: number;
+  completion_percentage: number;
+  tasks: any[];
 }
 
 interface CustomTaskFormData {
@@ -207,9 +211,10 @@ export function ProjectDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState('forms');
+  const [activeTab, setActiveTab] = useState('tasks');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
   const [newTask, setNewTask] = useState<CustomTaskFormData>({
     title: '',
     description: '',
@@ -379,15 +384,17 @@ export function ProjectDetailPage() {
   const canManageTasks = isOwner || isAdmin;
   const projectTasks = tasks || [];
   const progress = taskProgress || {
-    total: 0,
-    completed: 0,
-    pending: 0,
-    in_progress: 0,
-    submitted: 0,
-    approved: 0,
-    required_total: 0,
-    required_completed: 0,
-    progress_percentage: 0,
+    project_id: '',
+    total_tasks: 0,
+    completed_tasks: 0,
+    pending_tasks: 0,
+    in_progress_tasks: 0,
+    submitted_tasks: 0,
+    approved_tasks: 0,
+    rejected_tasks: 0,
+    revision_required_tasks: 0,
+    completion_percentage: 0,
+    tasks: [],
   };
 
   const handleCreateTask = () => {
@@ -396,6 +403,27 @@ export function ProjectDetailPage() {
       return;
     }
     createTaskMutation.mutate(newTask);
+  };
+
+  const handleTaskClick = (task: ProjectTask) => {
+    // Don't navigate if task is completed/approved
+    if (['completed', 'approved'].includes(task.status)) {
+      if (task.form_instance_id) {
+        navigate(`/forms/${task.form_instance_id}`);
+      }
+      return;
+    }
+
+    if (task.task_type === 'form_completion') {
+      if (task.form_instance_id) {
+        navigate(`/forms/${task.form_instance_id}`);
+      } else {
+        navigate(`/tasks/${task.id}/select-form`);
+      }
+    } else {
+      // For document_upload and other types, go to task detail
+      navigate(`/tasks/${task.id}`);
+    }
   };
 
   if (projectLoading) {
@@ -542,10 +570,10 @@ export function ProjectDetailPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="forms">Forms ({projectForms.length})</TabsTrigger>
           <TabsTrigger value="tasks">
             Tasks ({projectTasks.length})
           </TabsTrigger>
+          <TabsTrigger value="forms">Forms ({projectForms.length})</TabsTrigger>
           <TabsTrigger value="collaborators">
             Collaborators ({project.collaborators.length})
           </TabsTrigger>
@@ -630,28 +658,28 @@ export function ProjectDetailPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Task Progress</CardTitle>
                     <span className="text-sm text-muted-foreground">
-                      {progress.completed + progress.approved} of {progress.total} complete
+                      {progress.completed_tasks + progress.approved_tasks} of {progress.total_tasks} complete
                     </span>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Progress value={progress.progress_percentage} className="h-2" />
+                  <Progress value={progress.completion_percentage} className="h-2" />
                   <div className="flex gap-4 mt-3 text-sm">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-gray-300" />
-                      Pending: {progress.pending}
+                      Pending: {progress.pending_tasks}
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      In Progress: {progress.in_progress}
+                      In Progress: {progress.in_progress_tasks}
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      Submitted: {progress.submitted}
+                      Submitted: {progress.submitted_tasks}
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-green-500" />
-                      Completed: {progress.completed + progress.approved}
+                      Completed: {progress.completed_tasks + progress.approved_tasks}
                     </span>
                   </div>
                 </CardContent>
@@ -665,12 +693,20 @@ export function ProjectDetailPage() {
                   <CardTitle>Project Tasks</CardTitle>
                   <CardDescription>Tasks and requirements for this project</CardDescription>
                 </div>
-                {canManageTasks && (
-                  <Button onClick={() => setShowCreateTaskDialog(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Custom Task
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <Button variant="outline" onClick={() => setShowAssignTaskDialog(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Assign Task
+                    </Button>
+                  )}
+                  {canManageTasks && (
+                    <Button onClick={() => setShowCreateTaskDialog(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Custom Task
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {tasksLoading ? (
@@ -697,9 +733,10 @@ export function ProjectDetailPage() {
                       return (
                         <div
                           key={task.id}
-                          className={`flex items-center gap-4 p-4 border rounded-lg ${
+                          className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors ${
                             isOverdue ? 'border-destructive bg-destructive/5' : ''
                           }`}
+                          onClick={() => handleTaskClick(task)}
                         >
                           <Checkbox
                             checked={['completed', 'approved'].includes(task.status)}
@@ -708,6 +745,7 @@ export function ProjectDetailPage() {
                                 completeTaskMutation.mutate(task.id);
                               }
                             }}
+                            onClick={(e) => e.stopPropagation()}
                             disabled={['completed', 'approved', 'submitted'].includes(task.status)}
                           />
                           <div className="flex-1 min-w-0">
@@ -766,7 +804,10 @@ export function ProjectDetailPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => submitTaskMutation.mutate(task.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  submitTaskMutation.mutate(task.id);
+                                }}
                                 disabled={submitTaskMutation.isPending}
                               >
                                 Submit
@@ -776,10 +817,13 @@ export function ProjectDetailPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateTaskMutation.mutate({
-                                  taskId: task.id,
-                                  data: { status: 'in_progress' },
-                                })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateTaskMutation.mutate({
+                                    taskId: task.id,
+                                    data: { status: 'in_progress' },
+                                  });
+                                }}
                                 disabled={updateTaskMutation.isPending}
                               >
                                 Start
@@ -789,10 +833,13 @@ export function ProjectDetailPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateTaskMutation.mutate({
-                                  taskId: task.id,
-                                  data: { status: 'in_progress' },
-                                })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateTaskMutation.mutate({
+                                    taskId: task.id,
+                                    data: { status: 'in_progress' },
+                                  });
+                                }}
                                 disabled={updateTaskMutation.isPending}
                               >
                                 Revise
@@ -1064,6 +1111,17 @@ export function ProjectDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Task Dialog (Admin only) */}
+      <AssignTaskDialog
+        open={showAssignTaskDialog}
+        onOpenChange={setShowAssignTaskDialog}
+        projectId={id}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+          queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+        }}
+      />
     </div>
   );
 }
