@@ -127,3 +127,24 @@ class PendingReviewItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# Create Form for Task
+# =============================================================================
+
+class CreateFormForTaskRequest(BaseModel):
+    """Schema for creating a form instance for a task."""
+    template_id: int = Field(..., description="ID of the template to use for the form")
+
+
+class CreateFormForTaskResponse(BaseModel):
+    """Schema for the response after creating a form for a task."""
+    success: bool = True
+    message: str
+    task_id: int
+    form_instance_id: int
+    task_status: str
+
+    class Config:
+        from_attributes = True

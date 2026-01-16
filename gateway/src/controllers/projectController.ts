@@ -4,6 +4,7 @@ import { projectQueries } from '../database/queries/projectQueries.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS } from '../config/constants.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { formsProxy } from '../services/formsProxy.js';
 
 export const projectController = {
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -259,6 +260,29 @@ export const projectController = {
       res.json({
         success: true,
         message: 'Collaborator removed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get task definitions for a project type preview
+   * GET /api/project-types/:projectType/tasks
+   * Any authenticated user can access this endpoint
+   */
+  getTasksForProjectType: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectType } = req.params;
+
+      if (!projectType) {
+        throw new ValidationError('Project type is required');
+      }
+
+      const result = await formsProxy.getTasksForProjectType(projectType);
+      res.json({
+        success: true,
+        data: result.data,
       });
     } catch (error) {
       next(error);

@@ -187,3 +187,22 @@ def list_available_project_types(
     """List all project types that have task mappings configured."""
     mappings = db.query(ProjectTypeTaskMapping.project_type).distinct().all()
     return sorted([m[0] for m in mappings])
+
+
+# =============================================================================
+# Task Preview for Project Type (Public - Authenticated Users)
+# =============================================================================
+
+@router.get("/project-types/{project_type}/tasks", response_model=List[ProjectTypeTaskMappingListResponse])
+def get_tasks_for_project_type_preview(
+    project_type: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get task definitions for a project type (for preview during project creation).
+
+    This endpoint is available to any authenticated user, not just admins.
+    Returns task definitions mapped to this project type with:
+    - name, description, task_type, is_required, display_order
+    """
+    return task_def_service.get_project_type_mappings(db, project_type)

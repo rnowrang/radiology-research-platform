@@ -7,13 +7,18 @@ import { AUDIT_ACTIONS } from '../config/constants.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { formsProxy } from './formsProxy.js';
 
 // File categories
 export const FILE_CATEGORIES = {
   PROPOSAL: 'proposal',
-  IRB_DOCUMENT: 'irb_document',
-  CONSENT_FORM: 'consent_form',
+  ABSTRACT: 'abstract',
   PROTOCOL: 'protocol',
+  CONSENT_FORM: 'consent_form',
+  CITI_CERTIFICATE: 'citi_certificate',
+  FUNDING: 'funding',
+  DATA_MANAGEMENT: 'data_management',
+  IRB_DOCUMENT: 'irb_document',
   DATA: 'data',
   RESULT: 'result',
   OTHER: 'other',
@@ -162,6 +167,22 @@ export const fileService = {
       }
 
       logger.info(`File uploaded: ${savedFile.id} (${file.originalname})`);
+
+      // Auto-complete upload task if file is associated with a project and has a category
+      if (options.projectId && options.category) {
+        try {
+          const autoCompleteResult = await formsProxy.autoCompleteUploadTask(
+            options.projectId,
+            options.category
+          );
+          if (autoCompleteResult.data?.success) {
+            logger.info(`Auto-completed upload task for project ${options.projectId}, category ${options.category}: ${autoCompleteResult.data.task_title}`);
+          }
+        } catch (autoCompleteError) {
+          // Log but don't fail the upload - this is a non-critical operation
+          logger.warn(`Failed to auto-complete upload task for project ${options.projectId}, category ${options.category}:`, autoCompleteError);
+        }
+      }
 
       return fileWithUploader!;
     } catch (error) {

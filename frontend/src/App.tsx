@@ -16,6 +16,7 @@ import { ProjectsPage } from '@/pages/projects/ProjectsPage';
 import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
 import { CreateProjectPage } from '@/pages/projects/CreateProjectPage';
 import { TasksPage } from '@/pages/tasks/TasksPage';
+import { SelectFormPage } from '@/pages/tasks/SelectFormPage';
 import { ProfilePage } from '@/pages/profile/ProfilePage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { AuditLogsPage } from '@/pages/admin/AuditLogsPage';
@@ -173,8 +174,9 @@ function App() {
           }
         />
 
-        {/* Tasks route */}
+        {/* Tasks routes */}
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/tasks/:taskId/select-form" element={<SelectFormPage />} />
 
         {/* Search route */}
         <Route path="/search" element={<SearchResultsPage />} />

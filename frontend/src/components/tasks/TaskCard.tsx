@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
   User,
@@ -14,6 +15,7 @@ import {
   Send,
   Edit,
   MessageSquare,
+  PenLine,
 } from 'lucide-react';
 import {
   Card,
@@ -67,6 +69,7 @@ export interface TaskCardData {
   submittedAt?: string;
   reviewedAt?: string;
   revisionCount?: number;
+  formInstanceId?: number;
 }
 
 export interface TaskCardProps {
@@ -128,6 +131,7 @@ export function TaskCard({
   onResubmit,
   className,
 }: TaskCardProps) {
+  const navigate = useNavigate();
   const [showFeedback, setShowFeedback] = useState(false);
 
   const config = statusConfig[task.status] || statusConfig.pending;
@@ -142,6 +146,12 @@ export function TaskCard({
   const canRevise = task.status === 'rejected' || task.status === 'revision_required';
   const canResubmit = task.status === 'rejected' || task.status === 'revision_required';
   const hasFeedback = !!task.reviewerComments;
+
+  // Form completion task logic
+  const isFormCompletionTask = task.taskType === 'form_completion';
+  const hasForm = !!task.formInstanceId;
+  const canStartForm = isFormCompletionTask && !hasForm && canStart;
+  const canContinueForm = isFormCompletionTask && hasForm && canStart;
 
   if (compact) {
     return (
@@ -293,8 +303,29 @@ export function TaskCard({
 
       <CardFooter className="pt-0">
         <div className="flex flex-wrap gap-2 w-full">
-          {/* Actions based on status */}
-          {canStart && onStart && (
+          {/* Form completion task actions */}
+          {canStartForm && (
+            <Button
+              size="sm"
+              onClick={() => navigate(`/tasks/${task.id}/select-form`)}
+            >
+              <PenLine className="h-4 w-4 mr-1" />
+              Start Form
+            </Button>
+          )}
+
+          {canContinueForm && (
+            <Button
+              size="sm"
+              onClick={() => navigate(`/forms/${task.formInstanceId}`)}
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              Continue Form
+            </Button>
+          )}
+
+          {/* Actions based on status (for non-form-completion tasks) */}
+          {canStart && onStart && !isFormCompletionTask && (
             <Button size="sm" variant="outline" onClick={() => onStart(task.id)}>
               <Play className="h-4 w-4 mr-1" />
               Start

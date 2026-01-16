@@ -47,4 +47,11 @@ router.post('/:taskId/reject', taskController.rejectTask);
 // POST /api/tasks/:taskId/request-revision - Request revision (admin/reviewer only)
 router.post('/:taskId/request-revision', taskController.requestRevision);
 
+// =============================================================================
+// Create Form for Task
+// =============================================================================
+
+// POST /api/tasks/:taskId/create-form - Create a form instance for a form_completion task
+router.post('/:taskId/create-form', taskController.createFormForTask);
+
 export default router;

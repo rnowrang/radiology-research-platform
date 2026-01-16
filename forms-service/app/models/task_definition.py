@@ -18,12 +18,15 @@ class TaskDefinition(Base):
     default_required = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
+    template_id = Column(Integer, ForeignKey("templates.id"), nullable=True)  # For form_completion tasks
+    file_category = Column(String(50), nullable=True)  # For document_upload tasks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     project_type_mappings = relationship("ProjectTypeTaskMapping", back_populates="task_definition", cascade="all, delete-orphan")
     tasks = relationship("Task", backref="task_definition")
+    template = relationship("Template")
 
 
 class ProjectTypeTaskMapping(Base):

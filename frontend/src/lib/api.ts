@@ -81,6 +81,8 @@ export const projectsApi = {
   getCollaborators: (id: string) => api.get(`/projects/${id}/collaborators`),
   addCollaborator: (id: string, data: any) =>
     api.post(`/projects/${id}/collaborators`, data),
+  getTasksForProjectType: (projectType: string) =>
+    api.get(`/project-types/${projectType}/tasks`),
 };
 
 export const templatesApi = {
@@ -212,6 +214,8 @@ export const tasksApi = {
   getProjectTasks: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
   getProjectTaskProgress: (projectId: string) =>
     api.get(`/projects/${projectId}/task-progress`),
+  createFormForTask: (taskId: number, templateId: number) =>
+    api.post(`/tasks/${taskId}/create-form`, { template_id: templateId }),
 };
 
 // Task Definitions API (admin)

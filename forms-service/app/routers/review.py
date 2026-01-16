@@ -25,6 +25,7 @@ from app.schemas.review import (
     ReturnToDraftRequest,
 )
 from app.services.mention import MentionService
+from app.services.task import sync_task_status_from_form
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
@@ -145,6 +146,9 @@ def submit_for_review(
     db.commit()
     db.refresh(action)
 
+    # Sync linked task status (form in_review -> task submitted)
+    sync_task_status_from_form(db, form_id, form.status)
+
     return action
 
 
@@ -180,6 +184,9 @@ def request_changes(
     db.add(action)
     db.commit()
     db.refresh(action)
+
+    # Sync linked task status (form needs_changes -> task revision_required)
+    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 
@@ -218,6 +225,9 @@ def approve_form(
     db.commit()
     db.refresh(action)
 
+    # Sync linked task status (form approved -> task completed)
+    sync_task_status_from_form(db, form_id, form.status)
+
     return action
 
 
@@ -254,6 +264,9 @@ def reject_form(
     db.commit()
     db.refresh(action)
 
+    # Sync linked task status (form rejected -> task rejected)
+    sync_task_status_from_form(db, form_id, form.status)
+
     return action
 
 
@@ -285,6 +298,9 @@ def return_to_draft(
     db.add(action)
     db.commit()
     db.refresh(action)
+
+    # Sync linked task status (form draft -> task in_progress)
+    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 

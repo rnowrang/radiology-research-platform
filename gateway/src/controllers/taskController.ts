@@ -269,6 +269,49 @@ export const taskController = {
       next(error);
     }
   },
+
+  // ==========================================================================
+  // Create Form for Task
+  // ==========================================================================
+
+  /**
+   * Create a form instance for a form_completion task
+   * POST /api/tasks/:taskId/create-form
+   *
+   * This endpoint:
+   * - Validates the task exists and is of type 'form_completion'
+   * - Validates the task doesn't already have a form instance linked
+   * - Creates a new form instance with the selected template
+   * - Links the form instance to the task
+   * - Sets the task status to 'in_progress'
+   * - Returns the form_instance_id for redirect
+   */
+  createFormForTask: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { taskId } = req.params;
+      const { template_id } = req.body;
+
+      if (!template_id) {
+        throw new ValidationError('template_id is required');
+      }
+
+      const response = await formsProxy.createFormForTask(taskId, template_id, req.user!.id);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: 'form_for_task',
+        resourceId: taskId,
+        details: {
+          template_id,
+          form_instance_id: response.data?.form_instance_id,
+        },
+      });
+
+      res.json(response.data);
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default taskController;

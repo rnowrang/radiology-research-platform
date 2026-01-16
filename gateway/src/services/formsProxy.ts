@@ -759,6 +759,86 @@ export const formsProxy = {
   getProjectTaskProgress: async (projectId: string): Promise<AxiosResponse> => {
     return formsClient.get(`/api/projects/${projectId}/task-progress`);
   },
+
+  // ==========================================================================
+  // Auto-Complete Upload Task
+  // ==========================================================================
+
+  /**
+   * Auto-complete a document_upload task when a matching file is uploaded.
+   *
+   * File Category Mapping:
+   * - proposal -> Upload Research Proposal
+   * - abstract -> Upload Study Abstract
+   * - protocol -> Upload Study Protocol
+   * - consent_form -> Upload Consent Form
+   * - citi_certificate -> Upload CITI Training Certificate
+   * - funding -> Upload Funding Documentation
+   * - data_management -> Upload Data Management Plan
+   */
+  autoCompleteUploadTask: async (
+    projectId: string,
+    fileCategory: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post('/api/tasks/auto-complete-upload', null, {
+      params: {
+        project_id: projectId,
+        file_category: fileCategory,
+      },
+    });
+  },
+
+  // ==========================================================================
+  // Sync Task Status from Form
+  // ==========================================================================
+
+  /**
+   * Sync task status when form status changes.
+   * Called after form submit/approve/reject/request-changes actions.
+   */
+  syncTaskStatusFromForm: async (
+    formInstanceId: number,
+    newFormStatus: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post('/api/tasks/sync-from-form', null, {
+      params: {
+        form_instance_id: formInstanceId,
+        new_form_status: newFormStatus,
+      },
+    });
+  },
+
+  // ==========================================================================
+  // Task Preview for Project Type (Public - Authenticated Users)
+  // ==========================================================================
+
+  /**
+   * Get task definitions for a project type preview
+   * Used during project creation to show what tasks will be created
+   */
+  getTasksForProjectType: async (projectType: string): Promise<AxiosResponse> => {
+    return formsClient.get(`/api/task-definitions/project-types/${projectType}/tasks`);
+  },
+
+  // ==========================================================================
+  // Create Form for Task
+  // ==========================================================================
+
+  /**
+   * Create a form instance for a form_completion task
+   * Links the new form to the task and sets task status to in_progress
+   */
+  createFormForTask: async (
+    taskId: string,
+    templateId: number,
+    userId: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/create-form`, {
+      template_id: templateId,
+    }, {
+      headers: { 'X-User-ID': userId },
+    });
+  },
 };
 
 export default formsProxy;

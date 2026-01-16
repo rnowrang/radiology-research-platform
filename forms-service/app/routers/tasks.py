@@ -20,7 +20,10 @@ from app.schemas.task import (
     TaskRejectRequest,
     TaskRevisionRequest,
     PendingReviewItem,
+    CreateFormForTaskRequest,
+    CreateFormForTaskResponse,
 )
+from app.services.task import create_form_for_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -536,3 +539,134 @@ def list_pending_review_tasks(
         ))
 
     return result
+
+
+# =============================================================================
+# Create Form for Task
+# =============================================================================
+
+@router.post("/{task_id}/create-form", response_model=CreateFormForTaskResponse)
+def create_form_for_task_endpoint(
+    task_id: int,
+    data: CreateFormForTaskRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """
+    Create a form instance for a form_completion task.
+
+    This endpoint:
+    - Validates the task exists and is of type 'form_completion'
+    - Validates the task doesn't already have a form instance linked
+    - Creates a new form instance with the selected template
+    - Links the form instance to the task
+    - Sets the task status to 'in_progress'
+    - Returns the form_instance_id for redirect
+
+    Request Body:
+        template_id: int - ID of the template to use for the form
+
+    Returns:
+        CreateFormForTaskResponse with task_id, form_instance_id, and task_status
+    """
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    result = create_form_for_task(db, task_id, data.template_id, user_id)
+
+    return CreateFormForTaskResponse(
+        success=result["success"],
+        message=result["message"],
+        task_id=result["task_id"],
+        form_instance_id=result["form_instance_id"],
+        task_status=result["task_status"],
+    )
+
+
+# =============================================================================
+# Auto-Complete Upload Task
+# =============================================================================
+
+from app.services.task import auto_complete_upload_task, sync_task_status_from_form
+
+
+@router.post("/auto-complete-upload")
+def auto_complete_upload_task_endpoint(
+    project_id: UUID = Query(..., description="Project ID"),
+    file_category: str = Query(..., description="File category (proposal, abstract, protocol, etc.)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Auto-complete a document_upload task when a matching file is uploaded.
+
+    This endpoint is called by the gateway after a file is successfully uploaded.
+    It finds the matching task by file_category and marks it as completed.
+
+    File Category Mapping:
+    - proposal -> Upload Research Proposal
+    - abstract -> Upload Study Abstract
+    - protocol -> Upload Study Protocol
+    - consent_form -> Upload Consent Form
+    - citi_certificate -> Upload CITI Training Certificate
+    - funding -> Upload Funding Documentation
+    - data_management -> Upload Data Management Plan
+    """
+    task = auto_complete_upload_task(db, project_id, file_category)
+
+    if task:
+        return {
+            "success": True,
+            "message": f"Task '{task.title}' auto-completed",
+            "task_id": task.id,
+            "task_title": task.title,
+            "task_status": task.status,
+        }
+    else:
+        return {
+            "success": False,
+            "message": "No matching task found to auto-complete",
+            "task_id": None,
+        }
+
+
+# =============================================================================
+# Sync Task Status from Form
+# =============================================================================
+
+@router.post("/sync-from-form")
+def sync_task_status_from_form_endpoint(
+    form_instance_id: int = Query(..., description="Form instance ID"),
+    new_form_status: str = Query(..., description="New form status"),
+    db: Session = Depends(get_db),
+):
+    """
+    Sync task status when the linked form's status changes.
+
+    This endpoint is called by review actions (submit, approve, reject, request-changes).
+    It finds the task linked to the form instance and updates its status.
+
+    Form Status to Task Status Mapping:
+    - draft -> in_progress
+    - submitted -> submitted
+    - in_review -> submitted
+    - approved -> completed
+    - rejected -> rejected
+    - needs_changes -> revision_required
+    """
+    task = sync_task_status_from_form(db, form_instance_id, new_form_status)
+
+    if task:
+        return {
+            "success": True,
+            "message": f"Task '{task.title}' synced to status '{task.status}'",
+            "task_id": task.id,
+            "task_title": task.title,
+            "task_status": task.status,
+            "form_status": new_form_status,
+        }
+    else:
+        return {
+            "success": False,
+            "message": "No task found linked to this form instance",
+            "task_id": None,
+        }

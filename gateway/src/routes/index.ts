@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from './auth.js';
 import formsRoutes from './forms.js';
 import projectRoutes from './projects.js';
+import projectTypesRoutes from './project-types.js';
 import taskRoutes from './tasks.js';
 import usersRoutes from './users.js';
 import notificationRoutes from './notifications.js';
@@ -31,6 +32,7 @@ router.get('/health', (req, res) => {
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/projects', projectRoutes);
+router.use('/project-types', projectTypesRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/admin/users', usersRoutes);
 router.use('/admin/reports', reportsRoutes);

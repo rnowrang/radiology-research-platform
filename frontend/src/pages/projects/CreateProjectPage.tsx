@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ChevronLeft, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,6 +43,15 @@ interface ProjectFormData {
   end_date: string;
 }
 
+interface TaskDefinition {
+  id: number;
+  name: string;
+  description?: string;
+  task_type: 'document_upload' | 'form_completion' | 'approval_required';
+  is_required: boolean;
+  display_order: number;
+}
+
 export function CreateProjectPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -55,6 +65,28 @@ export function CreateProjectPage() {
     start_date: '',
     end_date: '',
   });
+
+  const [previewTasks, setPreviewTasks] = useState<TaskDefinition[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
+  // Fetch tasks when project type changes
+  useEffect(() => {
+    if (formData.project_type) {
+      setLoadingTasks(true);
+      projectsApi.getTasksForProjectType(formData.project_type)
+        .then((res) => {
+          setPreviewTasks(res.data?.data || res.data || []);
+        })
+        .catch(() => {
+          setPreviewTasks([]);
+        })
+        .finally(() => {
+          setLoadingTasks(false);
+        });
+    } else {
+      setPreviewTasks([]);
+    }
+  }, [formData.project_type]);
 
   const createMutation = useMutation({
     mutationFn: async (data: ProjectFormData) => {
@@ -178,6 +210,36 @@ export function CreateProjectPage() {
                 />
               </div>
             </div>
+
+            {/* Task Preview Section */}
+            {loadingTasks && (
+              <div className="mt-4 p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                </div>
+              </div>
+            )}
+            {!loadingTasks && previewTasks.length > 0 && (
+              <div className="mt-4 p-4 border rounded-lg bg-muted/50">
+                <h4 className="font-medium mb-2">Tasks that will be created:</h4>
+                <ul className="space-y-2">
+                  {previewTasks.map((task) => (
+                    <li key={task.id} className="flex items-center gap-2">
+                      <Badge variant={task.task_type === 'form_completion' ? 'default' : 'secondary'}>
+                        {task.task_type === 'form_completion'
+                          ? 'Form Completion'
+                          : task.task_type === 'document_upload'
+                          ? 'Document Upload'
+                          : 'Approval Required'}
+                      </Badge>
+                      <span>{task.name}</span>
+                      {task.is_required && <Badge variant="outline">Required</Badge>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
