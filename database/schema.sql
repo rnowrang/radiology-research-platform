@@ -367,6 +367,45 @@ CREATE INDEX idx_files_category ON files(category);
 CREATE INDEX idx_files_is_deleted ON files(is_deleted);
 
 -- =============================================================================
+-- TASK DEFINITIONS
+-- =============================================================================
+
+CREATE TABLE task_definitions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    task_type VARCHAR(50) NOT NULL CHECK (task_type IN ('document_upload', 'form_completion', 'approval_required')),
+    template_id INTEGER REFERENCES templates(id),
+    file_category VARCHAR(50),
+    auto_submit BOOLEAN DEFAULT false,
+    default_required BOOLEAN DEFAULT true,
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_task_definitions_active ON task_definitions(is_active);
+CREATE INDEX idx_task_definitions_type ON task_definitions(task_type);
+
+-- =============================================================================
+-- PROJECT TYPE TASK MAPPINGS
+-- =============================================================================
+
+CREATE TABLE project_type_task_mappings (
+    id SERIAL PRIMARY KEY,
+    project_type VARCHAR(100) NOT NULL,
+    task_definition_id INTEGER NOT NULL REFERENCES task_definitions(id) ON DELETE CASCADE,
+    is_required BOOLEAN DEFAULT true,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(project_type, task_definition_id)
+);
+
+CREATE INDEX idx_project_type_mappings_type ON project_type_task_mappings(project_type);
+CREATE INDEX idx_project_type_mappings_definition ON project_type_task_mappings(task_definition_id);
+
+-- =============================================================================
 -- TASKS
 -- =============================================================================
 
@@ -374,15 +413,22 @@ CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     project_id UUID REFERENCES projects(id),
     form_instance_id INTEGER REFERENCES form_instances(id),
+    task_definition_id INTEGER REFERENCES task_definitions(id),
     assigned_to_id UUID REFERENCES users(id),
     created_by_id UUID NOT NULL REFERENCES users(id),
     title VARCHAR(500) NOT NULL,
     description TEXT,
-    task_type VARCHAR(100) CHECK (task_type IN ('document_upload', 'form_completion', 'review', 'approval', 'general')),
-    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'blocked', 'cancelled')),
+    task_type VARCHAR(100) CHECK (task_type IN ('document_upload', 'form_completion', 'approval_required', 'review', 'approval', 'general')),
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'completed', 'blocked', 'cancelled')),
     priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     due_date DATE,
     completed_at TIMESTAMP WITH TIME ZONE,
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    reviewed_by_id UUID REFERENCES users(id),
+    reviewer_comments TEXT,
+    revision_count INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -392,6 +438,8 @@ CREATE INDEX idx_tasks_form ON tasks(form_instance_id);
 CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to_id);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX idx_tasks_definition ON tasks(task_definition_id);
+CREATE INDEX idx_tasks_reviewed_by ON tasks(reviewed_by_id);
 
 -- =============================================================================
 -- NOTIFICATIONS
