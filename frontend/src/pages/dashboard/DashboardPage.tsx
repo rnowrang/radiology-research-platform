@@ -7,6 +7,7 @@ import {
   Clock,
   Plus,
   ArrowRight,
+  CheckSquare,
 } from 'lucide-react';
 import {
   Card,
@@ -34,6 +35,7 @@ export function DashboardPage() {
   });
   const [recentForms, setRecentForms] = useState<FormInstance[]>([]);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,7 +73,8 @@ export function DashboardPage() {
         });
 
         setRecentForms(forms.slice(0, 5));
-        setRecentTasks(tasks.filter((t) => t.status !== 'completed').slice(0, 5));
+        setRecentTasks(tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').slice(0, 5));
+        setRecentProjects(projects.slice(0, 5));
       } catch (error) {
         console.error('Failed to load dashboard:', error);
       } finally {
@@ -111,9 +114,9 @@ export function DashboardPage() {
           </p>
         </div>
         <Button asChild>
-          <Link to="/forms/new">
+          <Link to="/projects/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Form
+            New Project
           </Link>
         </Button>
       </div>
@@ -169,62 +172,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Recent Forms</CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/forms">
-                  View all
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-            <CardDescription>Your most recently updated forms</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentForms.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-                <p className="text-muted-foreground">No forms yet</p>
-                <Button asChild className="mt-4">
-                  <Link to="/forms/new">Create your first form</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentForms.map((form) => (
-                  <div
-                    key={form.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
-                    <div className="flex-1">
-                      <Link
-                        to={`/forms/${form.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {form.title}
-                      </Link>
-                      <div className="mt-1 flex items-center gap-2">
-                        {getStatusBadge(form.status)}
-                        <span className="text-xs text-muted-foreground">
-                          v{form.currentVersionNumber}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="w-24">
-                      <div className="mb-1 text-right text-xs text-muted-foreground">
-                        {form.completionPercentage}%
-                      </div>
-                      <Progress value={form.completionPercentage} className="h-1" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+        {/* Pending Tasks - First */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -241,7 +189,7 @@ export function DashboardPage() {
           <CardContent>
             {recentTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <ClipboardCheck className="mb-4 h-12 w-12 text-muted-foreground" />
+                <CheckSquare className="mb-4 h-12 w-12 text-muted-foreground" />
                 <p className="text-muted-foreground">No pending tasks</p>
               </div>
             ) : (
@@ -251,18 +199,26 @@ export function DashboardPage() {
                     key={task.id}
                     className="flex items-start justify-between rounded-lg border p-3"
                   >
-                    <div>
-                      <p className="font-medium">{task.title}</p>
+                    <div className="flex-1">
+                      <Link
+                        to={`/tasks`}
+                        className="font-medium hover:underline"
+                      >
+                        {task.title}
+                      </Link>
                       {task.description && (
                         <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
                           {task.description}
                         </p>
                       )}
-                      {task.dueDate && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </p>
-                      )}
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge variant="secondary">{task.task_type?.replace('_', ' ')}</Badge>
+                        {task.dueDate && (
+                          <span className="text-xs text-muted-foreground">
+                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Badge
                       variant={
@@ -275,6 +231,57 @@ export function DashboardPage() {
                     >
                       {task.priority}
                     </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Projects - Second */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Projects</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/projects">
+                  View all
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+            <CardDescription>Your research projects</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentProjects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <FolderKanban className="mb-4 h-12 w-12 text-muted-foreground" />
+                <p className="text-muted-foreground">No projects yet</p>
+                <Button asChild className="mt-4">
+                  <Link to="/projects/new">Create your first project</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div className="flex-1">
+                      <Link
+                        to={`/projects/${project.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {project.title}
+                      </Link>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge variant="outline">{project.project_type?.replace('_', ' ') || 'No type'}</Badge>
+                        <Badge variant={project.status === 'active' ? 'success' : 'secondary'}>
+                          {project.status}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
