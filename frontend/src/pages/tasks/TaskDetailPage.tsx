@@ -853,7 +853,7 @@ export function TaskDetailPage() {
                         }}
                         onDelete={
                           (task.status === 'in_progress' || task.status === 'revision_required') && isOwner
-                            ? () => deleteFileMutation.mutate(file.id.toString())
+                            ? () => deleteFileMutation.mutate(file.id)
                             : undefined
                         }
                       />

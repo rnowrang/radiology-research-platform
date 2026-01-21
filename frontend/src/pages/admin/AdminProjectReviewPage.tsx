@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   ChevronLeft,
   CheckCircle,
@@ -282,7 +282,6 @@ export function AdminProjectReviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // State
   const [activeTab, setActiveTab] = useState('overview');
@@ -291,7 +290,7 @@ export function AdminProjectReviewPage() {
   const [reviewNotes, setReviewNotes] = useState('');
 
   // File preview state
-  const [previewFile, setPreviewFile] = useState<{ id: number; filename: string; mime_type: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ id: string; filename: string; mime_type: string } | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // File delete state
@@ -311,6 +310,7 @@ export function AdminProjectReviewPage() {
     isLoading,
     isError,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['projectReviewSummary', projectId],
     queryFn: async () => {
@@ -319,17 +319,18 @@ export function AdminProjectReviewPage() {
       return response.data.data as ProjectReviewSummary;
     },
     enabled: !!projectId,
+    refetchOnWindowFocus: true,
   });
 
   // Mutations
   const approveMutation = useMutation({
     mutationFn: (notes?: string) => projectReviewApi.approve(projectId!, notes),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+    onSuccess: async () => {
       setReviewDialogOpen(false);
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Project approved successfully' });
+      await refetch();
     },
     onError: (err: any) => {
       toast({
@@ -342,12 +343,12 @@ export function AdminProjectReviewPage() {
 
   const rejectMutation = useMutation({
     mutationFn: (notes: string) => projectReviewApi.reject(projectId!, notes),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+    onSuccess: async () => {
       setReviewDialogOpen(false);
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Project rejected' });
+      await refetch();
     },
     onError: (err: any) => {
       toast({
@@ -360,12 +361,12 @@ export function AdminProjectReviewPage() {
 
   const requestChangesMutation = useMutation({
     mutationFn: (notes: string) => projectReviewApi.requestChanges(projectId!, notes),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+    onSuccess: async () => {
       setReviewDialogOpen(false);
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Changes requested' });
+      await refetch();
     },
     onError: (err: any) => {
       toast({
@@ -379,10 +380,10 @@ export function AdminProjectReviewPage() {
   // Delete file mutation
   const deleteFileMutation = useMutation({
     mutationFn: (fileId: string) => filesApi.delete(fileId),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'File deleted' });
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       setFileToDelete(null);
+      await refetch();
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Failed to delete file' });
@@ -392,9 +393,9 @@ export function AdminProjectReviewPage() {
   // Approve task mutation
   const approveTaskFromFileMutation = useMutation({
     mutationFn: (taskId: number) => tasksApi.approve(taskId),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'Task approved' });
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      await refetch();
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Failed to approve task' });
@@ -405,11 +406,11 @@ export function AdminProjectReviewPage() {
   const rejectTaskFromFileMutation = useMutation({
     mutationFn: ({ taskId, notes }: { taskId: number; notes: string }) =>
       tasksApi.reject(taskId, notes),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'Task rejected' });
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
+      await refetch();
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Failed to reject task' });
@@ -420,11 +421,11 @@ export function AdminProjectReviewPage() {
   const requestRevisionFromFileMutation = useMutation({
     mutationFn: ({ taskId, notes }: { taskId: number; notes: string }) =>
       tasksApi.requestRevision(taskId, notes),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'Revision requested' });
-      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
+      await refetch();
     },
     onError: () => {
       toast({ variant: 'destructive', title: 'Failed to request revision' });
@@ -882,7 +883,7 @@ export function AdminProjectReviewPage() {
                           size="icon"
                           onClick={() => {
                             setPreviewFile({
-                              id: parseInt(file.id, 10),
+                              id: file.id,
                               filename: file.original_file_name,
                               mime_type: file.mime_type,
                             });

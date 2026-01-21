@@ -14,7 +14,7 @@ import { filesApi } from '@/lib/api';
  * File information structure for FilePreviewModal
  */
 export interface FilePreviewModalFile {
-  id: number;
+  id: string;
   filename: string;
   mime_type: string;
 }
@@ -31,21 +31,21 @@ export interface FilePreviewModalProps {
 /**
  * Check if the MIME type is for a PDF file
  */
-function isPdf(mimeType: string): boolean {
+function isPdf(mimeType?: string): boolean {
   return mimeType === 'application/pdf';
 }
 
 /**
  * Check if the MIME type is for an image
  */
-function isImage(mimeType: string): boolean {
-  return mimeType.startsWith('image/');
+function isImage(mimeType?: string): boolean {
+  return mimeType?.startsWith('image/') ?? false;
 }
 
 /**
  * Check if the MIME type is for a Word document
  */
-function isWordDocument(mimeType: string): boolean {
+function isWordDocument(mimeType?: string): boolean {
   return (
     mimeType === 'application/msword' ||
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -78,7 +78,7 @@ export function FilePreviewModal({
       setError(null);
       setBlobUrl(null);
 
-      filesApi.download(file.id.toString())
+      filesApi.download(file.id)
         .then((response) => {
           const blob = new Blob([response.data], { type: file.mime_type });
           const url = URL.createObjectURL(blob);

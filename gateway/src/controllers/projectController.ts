@@ -759,10 +759,15 @@ export const projectController = {
           })),
           files: files.map((f) => ({
             id: f.id,
-            filename: f.original_file_name,
+            original_file_name: f.original_file_name,
             file_size: f.file_size,
-            uploaded_at: f.created_at,
+            mime_type: f.mime_type,
+            category: f.category || 'other',
+            created_at: f.created_at,
             uploaded_by_name: f.uploaded_by_name || '',
+            task_id: f.task_id || null,
+            task_status: f.task_status || null,
+            task_title: f.task_title || null,
           })),
           progress: {
             tasks_completed: completedTasks,

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
  * File information structure for FileCard
  */
 export interface FileCardFile {
-  id: number;
+  id: string;
   filename: string;
   original_filename: string;
   file_size: number;

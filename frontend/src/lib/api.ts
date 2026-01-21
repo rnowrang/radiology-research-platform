@@ -450,7 +450,7 @@ export const filesApi = {
   listFormFiles: (formId: number, params?: { page?: number; limit?: number }) =>
     api.get<{ success: boolean; data: FileMetadata[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/forms/${formId}/files`, { params }),
   getTaskFiles: (taskId: number) => api.get(`/files/task/${taskId}`),
-  getPreviewUrl: (fileId: number) => `${API_BASE_URL}/files/${fileId}/preview`,
+  getPreviewUrl: (fileId: string) => `${API_BASE_URL}/files/${fileId}/preview`,
 };
 
 // Search types
