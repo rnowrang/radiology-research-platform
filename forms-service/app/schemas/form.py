@@ -16,6 +16,7 @@ class FieldChange(BaseModel):
 
 class FormDataUpdate(BaseModel):
     """Schema for updating form data."""
+    section_id: Optional[str] = None
     changes: List[FieldChange]
     user_id: UUID
 

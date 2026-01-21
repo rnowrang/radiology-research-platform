@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Save,
@@ -261,63 +261,108 @@ export function FormEditorPage() {
     return newHidden;
   }, [schema, formData, getNestedValue]);
 
-  // Debounced save
-  const saveFormData = useCallback(async (fieldId: string, value: any, label?: string) => {
-    if (!form) return;
+  // Build field-to-section map from template schema
+  const fieldToSectionMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    form?.template?.schema?.sections?.forEach((section: any) => {
+      section.fields?.forEach((field: any) => {
+        map[field.id] = field.section_id || section.id;
+      });
+    });
+    return map;
+  }, [form?.template?.schema]);
 
-    setSaving(true);
+  // Pending changes by section + independent timers
+  const [pendingChanges, setPendingChanges] = useState<Map<string, any[]>>(new Map());
+  const sectionTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const pendingChangesRef = useRef(pendingChanges);
+
+  useEffect(() => {
+    pendingChangesRef.current = pendingChanges;
+  }, [pendingChanges]);
+
+  const getSectionFromFieldId = useCallback((fieldId: string): string => {
+    return fieldToSectionMap[fieldId] || 'sec_other';
+  }, [fieldToSectionMap]);
+
+  const saveSectionChanges = useCallback(async (sectionId: string) => {
+    const changes = pendingChangesRef.current.get(sectionId);
+    if (!changes || changes.length === 0) return;
+
     try {
-      await formsApi.updateData(form.id, {
-        changes: [{
-          field_id: fieldId,
-          field_label: label || fieldId,
-          old_value: formData[fieldId],
-          new_value: value,
-        }],
-        user_id: form.ownerId,
+      setSaving(true);
+      await formsApi.updateData(form!.id, {
+        section_id: sectionId,
+        changes: changes,
+        user_id: form!.ownerId,
+      });
+      setPendingChanges(prev => {
+        const updated = new Map(prev);
+        updated.delete(sectionId);
+        return updated;
       });
       setLastSaved(new Date());
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to save changes',
-      });
+      toast({ variant: 'destructive', title: 'Failed to save' });
     } finally {
       setSaving(false);
     }
-  }, [form, formData, toast]);
-
-  // Debounce timer ref
-  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  }, [form?.id, form?.ownerId, toast]);
 
   const handleFieldChange = useCallback((fieldId: string, value: any, label?: string) => {
-    setFormData((prev) => {
-      // Handle nested keys (e.g., "personnel.has_alt_contact")
+    // Update local state immediately
+    setFormData(prev => {
       const keys = fieldId.split('.');
-      if (keys.length === 1) {
-        return { ...prev, [fieldId]: value };
-      } else {
-        const newData = { ...prev };
-        let parent: any = newData;
-        for (let i = 0; i < keys.length - 1; i++) {
-          if (!parent[keys[i]]) {
-            parent[keys[i]] = {};
-          }
-          parent = parent[keys[i]];
-        }
-        parent[keys[keys.length - 1]] = value;
-        return newData;
+      if (keys.length === 1) return { ...prev, [fieldId]: value };
+      const newData = { ...prev };
+      let parent: any = newData;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!parent[keys[i]]) parent[keys[i]] = {};
+        parent = parent[keys[i]];
       }
+      parent[keys[keys.length - 1]] = value;
+      return newData;
     });
 
-    // Debounced save
-    if (saveTimer) clearTimeout(saveTimer);
-    const newTimer = setTimeout(() => {
-      saveFormData(fieldId, value, label);
-    }, 1000);
-    setSaveTimer(newTimer);
-  }, [saveTimer, saveFormData]);
+    const sectionId = getSectionFromFieldId(fieldId);
+
+    // Add to pending changes for this section
+    setPendingChanges(prev => {
+      const updated = new Map(prev);
+      const sectionChanges = [...(updated.get(sectionId) || [])];
+      const existingIdx = sectionChanges.findIndex(c => c.field_id === fieldId);
+      const change = {
+        field_id: fieldId,
+        field_label: label || fieldId,
+        old_value: getNestedValue(formData, fieldId),
+        new_value: value,
+      };
+      if (existingIdx >= 0) sectionChanges[existingIdx] = change;
+      else sectionChanges.push(change);
+      updated.set(sectionId, sectionChanges);
+      return updated;
+    });
+
+    // Reset timer for THIS section only
+    const existingTimer = sectionTimers.current.get(sectionId);
+    if (existingTimer) clearTimeout(existingTimer);
+    const newTimer = setTimeout(() => saveSectionChanges(sectionId), 1000);
+    sectionTimers.current.set(sectionId, newTimer);
+  }, [getSectionFromFieldId, saveSectionChanges, formData, getNestedValue]);
+
+  // Auto-save on unmount/navigation
+  useEffect(() => {
+    const saveAllPending = () => {
+      pendingChangesRef.current.forEach((_, sectionId) => {
+        saveSectionChanges(sectionId);
+      });
+    };
+    window.addEventListener('beforeunload', saveAllPending);
+    return () => {
+      window.removeEventListener('beforeunload', saveAllPending);
+      saveAllPending();
+    };
+  }, [saveSectionChanges]);
 
   const handleSubmitForReview = async () => {
     if (!form) return;

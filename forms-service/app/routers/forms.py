@@ -296,6 +296,7 @@ async def update_form_data(
         field_change = FieldChange(
             form_instance_id=form_id,
             user_id=data_update.user_id,
+            section_id=data_update.section_id,
             field_id=change.field_id,
             field_label=change.field_label,
             old_value=change.old_value,

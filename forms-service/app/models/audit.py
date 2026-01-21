@@ -16,6 +16,7 @@ class FieldChange(Base):
     version_id = Column(Integer, ForeignKey("form_versions.id"), nullable=True)
     user_id = Column(UUID(as_uuid=True), nullable=False)
     field_id = Column(String(255), nullable=False)
+    section_id = Column(String(100), nullable=True)
     field_label = Column(String(500), nullable=True)
     old_value = Column(JSONB, nullable=True)
     new_value = Column(JSONB, nullable=True)
