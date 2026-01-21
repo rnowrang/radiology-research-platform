@@ -56,8 +56,10 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/useToast';
-import { api } from '@/lib/api';
+import { api, filesApi } from '@/lib/api';
 import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
+import { FileCard, type FileCardFile } from '@/components/files/FileCard';
+import { FilePreviewModal, type FilePreviewModalFile } from '@/components/files/FilePreviewModal';
 
 // Types
 interface SubmittedTask {
@@ -160,6 +162,10 @@ export function TaskReviewPage() {
   // Assign task dialog state
   const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
 
+  // File preview state
+  const [previewFile, setPreviewFile] = useState<FilePreviewModalFile | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   // Group by project state
   const [groupByProject, setGroupByProject] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -178,6 +184,18 @@ export function TaskReviewPage() {
 
   const tasks: SubmittedTask[] = tasksData?.data || [];
   const pagination = tasksData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
+
+  // Fetch task files for document_upload tasks
+  const { data: taskFilesData } = useQuery({
+    queryKey: ['taskFiles', selectedTask?.id],
+    queryFn: async () => {
+      const response = await filesApi.getTaskFiles(selectedTask!.id);
+      return response.data.data;
+    },
+    enabled: !!selectedTask?.id && selectedTask?.task_type === 'document_upload',
+  });
+
+  const taskFiles: FileCardFile[] = taskFilesData || [];
 
   // Group tasks by project when groupByProject is enabled
   interface ProjectGroup {
@@ -817,6 +835,35 @@ export function TaskReviewPage() {
                   </div>
                 )}
 
+                {/* Uploaded document preview for document_upload tasks */}
+                {selectedTask.task_type === 'document_upload' && (
+                  <div>
+                    <Separator className="my-4" />
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Uploaded Document
+                    </h4>
+                    {taskFiles && taskFiles.length > 0 ? (
+                      <FileCard
+                        file={taskFiles[0]}
+                        onPreview={() => {
+                          setPreviewFile({
+                            id: taskFiles[0].id,
+                            filename: taskFiles[0].original_filename,
+                            mime_type: taskFiles[0].mime_type,
+                          });
+                          setIsPreviewOpen(true);
+                        }}
+                        onDownload={() => {
+                          window.open(filesApi.getPreviewUrl(taskFiles[0].id), '_blank');
+                        }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No document uploaded</p>
+                    )}
+                  </div>
+                )}
+
                 <Separator className="my-4" />
 
                 {/* Review Comments */}
@@ -918,6 +965,16 @@ export function TaskReviewPage() {
         showProjectSelector={true}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+        }}
+      />
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFile(null);
         }}
       />
     </div>

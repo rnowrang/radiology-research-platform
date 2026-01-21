@@ -4,6 +4,8 @@ import { formsProxy } from '../services/formsProxy.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, ForbiddenError } from '../utils/errors.js';
+import { notificationService } from '../services/notificationService.js';
+import { logger } from '../utils/logger.js';
 
 export const formsController = {
   // Templates
@@ -196,6 +198,10 @@ export const formsController = {
         throw new ValidationError('Notes are required when requesting changes');
       }
 
+      // Get form details before requesting changes for notification
+      const formResponse = await formsProxy.getForm(formId, req.user!.id);
+      const formData = formResponse.data;
+
       const response = await formsProxy.requestChanges(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
@@ -204,6 +210,18 @@ export const formsController = {
         resourceId: formId.toString(),
         details: { action: 'request_changes' },
       });
+
+      // Send notification to form owner
+      if (formData?.owner_id) {
+        notificationService.notifyReviewDecision(
+          formId,
+          formData.title || `Form #${formId}`,
+          formData.owner_id,
+          'changes_requested',
+          req.user!.fullName,
+          notes
+        ).catch((err) => logger.warn('Failed to send changes requested notification', err));
+      }
 
       res.json({ success: true, data: response.data });
     } catch (error) {
@@ -220,6 +238,10 @@ export const formsController = {
       const formId = parseInt(req.params.formId, 10);
       const { notes } = req.body;
 
+      // Get form details before approval for notification
+      const formResponse = await formsProxy.getForm(formId, req.user!.id);
+      const formData = formResponse.data;
+
       const response = await formsProxy.approveForm(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
@@ -227,6 +249,18 @@ export const formsController = {
         resourceType: 'form',
         resourceId: formId.toString(),
       });
+
+      // Send notification to form owner
+      if (formData?.owner_id) {
+        notificationService.notifyReviewDecision(
+          formId,
+          formData.title || `Form #${formId}`,
+          formData.owner_id,
+          'approved',
+          req.user!.fullName,
+          notes
+        ).catch((err) => logger.warn('Failed to send form approval notification', err));
+      }
 
       res.json({ success: true, data: response.data });
     } catch (error) {
@@ -247,6 +281,10 @@ export const formsController = {
         throw new ValidationError('Notes are required when rejecting a form');
       }
 
+      // Get form details before rejection for notification
+      const formResponse = await formsProxy.getForm(formId, req.user!.id);
+      const formData = formResponse.data;
+
       const response = await formsProxy.rejectForm(formId, req.user!.id, req.user!.role, notes);
 
       await logAudit(req, {
@@ -254,6 +292,18 @@ export const formsController = {
         resourceType: 'form',
         resourceId: formId.toString(),
       });
+
+      // Send notification to form owner
+      if (formData?.owner_id) {
+        notificationService.notifyReviewDecision(
+          formId,
+          formData.title || `Form #${formId}`,
+          formData.owner_id,
+          'rejected',
+          req.user!.fullName,
+          notes
+        ).catch((err) => logger.warn('Failed to send form rejection notification', err));
+      }
 
       res.json({ success: true, data: response.data });
     } catch (error) {

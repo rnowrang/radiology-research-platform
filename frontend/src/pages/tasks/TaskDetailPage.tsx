@@ -54,6 +54,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
 import { tasksApi, filesApi } from '@/lib/api';
@@ -217,6 +218,11 @@ export function TaskDetailPage() {
     onSuccess: () => {
       toast({ title: 'Task started' });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -233,6 +239,11 @@ export function TaskDetailPage() {
       toast({ title: 'Task submitted for review' });
       setShowSubmitDialog(false);
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -249,6 +260,11 @@ export function TaskDetailPage() {
       toast({ title: 'Task approved' });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -267,6 +283,11 @@ export function TaskDetailPage() {
       setReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -285,6 +306,11 @@ export function TaskDetailPage() {
       setReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -300,27 +326,17 @@ export function TaskDetailPage() {
     onSuccess: () => {
       toast({ title: 'Task reopened for revision' });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
         variant: 'destructive',
         title: 'Error',
         description: error.response?.data?.error || 'Failed to revise task',
-      });
-    },
-  });
-
-  const markCompleteMutation = useMutation({
-    mutationFn: () => tasksApi.markComplete(parseInt(taskId!)),
-    onSuccess: () => {
-      toast({ title: 'Task marked as complete' });
-      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to mark task as complete',
       });
     },
   });
@@ -481,7 +497,7 @@ export function TaskDetailPage() {
             </Button>
           )}
 
-          {canSubmit && !isFormCompletionTask && (
+          {canSubmit && !isFormCompletionTask && !isDocumentUploadTask && (
             <Button
               onClick={() => setShowSubmitDialog(true)}
               disabled={submitTaskMutation.isPending}
@@ -747,12 +763,47 @@ export function TaskDetailPage() {
                   Document Upload
                 </CardTitle>
                 <CardDescription>
-                  Upload required documents for this task
+                  {task.status === 'submitted'
+                    ? 'Your document is awaiting review'
+                    : task.status === 'approved'
+                    ? 'Your document has been approved'
+                    : 'Upload required documents for this task'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Upload Dropzone - Always visible for document_upload tasks that allow uploads */}
-                {(task.status === 'pending' || task.status === 'in_progress' || task.status === 'revision_required') && (
+                {/* Revision Required Alert */}
+                {task.status === 'revision_required' && task.reviewer_comments && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Revision Required</AlertTitle>
+                    <AlertDescription>{task.reviewer_comments}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Submitted Status Alert */}
+                {task.status === 'submitted' && (
+                  <Alert variant="warning" className="mb-4">
+                    <Clock className="h-4 w-4" />
+                    <AlertTitle>Awaiting Review</AlertTitle>
+                    <AlertDescription>
+                      Your document has been submitted and is pending review by an administrator.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Approved Status Alert */}
+                {task.status === 'approved' && (
+                  <Alert variant="success" className="mb-4">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Approved</AlertTitle>
+                    <AlertDescription>
+                      Your document has been reviewed and approved.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Upload Dropzone - Show only for in_progress and revision_required statuses */}
+                {(task.status === 'in_progress' || task.status === 'revision_required') && (
                   <UploadDropzone
                     taskId={task.id}
                     projectId={task.project_id}
@@ -760,6 +811,11 @@ export function TaskDetailPage() {
                     onUploadComplete={() => {
                       queryClient.invalidateQueries({ queryKey: ['taskFiles', taskId] });
                       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+                      // Also invalidate project-level queries so ProjectDetailPage updates
+                      if (task?.project_id) {
+                        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+                        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+                      }
                     }}
                     disabled={!isOwner}
                   />
@@ -796,14 +852,14 @@ export function TaskDetailPage() {
                           window.open(filesApi.getPreviewUrl(file.id), '_blank');
                         }}
                         onDelete={
-                          (task.status === 'in_progress' || task.status === 'revision_required')
+                          (task.status === 'in_progress' || task.status === 'revision_required') && isOwner
                             ? () => deleteFileMutation.mutate(file.id.toString())
                             : undefined
                         }
                       />
                     ))}
                   </div>
-                ) : (
+                ) : (task.status === 'in_progress' || task.status === 'revision_required') ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Upload className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium">No documents uploaded</h3>
@@ -811,26 +867,22 @@ export function TaskDetailPage() {
                       Upload the required documents to complete this task
                     </p>
                   </div>
-                )}
+                ) : null}
 
-                {/* Mark as Complete Button - Show when files exist and task is not completed */}
-                {taskFiles && taskFiles.length > 0 &&
-                  task.status !== 'completed' &&
-                  task.status !== 'approved' &&
-                  task.status !== 'submitted' &&
-                  isOwner && (
+                {/* Submit for Review Button - Show only when in_progress with files */}
+                {task.status === 'in_progress' && taskFiles && taskFiles.length > 0 && isOwner && (
                   <div className="pt-4 border-t">
                     <Button
                       className="w-full"
-                      onClick={() => markCompleteMutation.mutate()}
-                      disabled={markCompleteMutation.isPending}
+                      onClick={() => submitTaskMutation.mutate()}
+                      disabled={submitTaskMutation.isPending}
                     >
-                      {markCompleteMutation.isPending ? (
+                      {submitTaskMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <CheckCircle className="mr-2 h-4 w-4" />
+                        <Send className="mr-2 h-4 w-4" />
                       )}
-                      Mark as Complete
+                      Submit for Review
                     </Button>
                   </div>
                 )}

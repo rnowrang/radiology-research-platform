@@ -173,22 +173,7 @@ export const fileService = {
 
       logger.info(`File uploaded: ${savedFile.id} (${file.originalname})`);
 
-      // Auto-complete upload task if file is associated with a project and has a category
-      if (options.projectId && options.category) {
-        try {
-          const autoCompleteResult = await formsProxy.autoCompleteUploadTask(
-            options.projectId,
-            options.category,
-            options.taskId
-          );
-          if (autoCompleteResult.data?.success) {
-            logger.info(`Auto-completed upload task for project ${options.projectId}, category ${options.category}, task_id ${options.taskId}: ${autoCompleteResult.data.task_title}`);
-          }
-        } catch (autoCompleteError) {
-          // Log but don't fail the upload - this is a non-critical operation
-          logger.warn(`Failed to auto-complete upload task for project ${options.projectId}, category ${options.category}, task_id ${options.taskId}:`, autoCompleteError);
-        }
-      }
+      // Note: Auto-complete removed - document upload tasks now require explicit submission and admin review
 
       return fileWithUploader!;
     } catch (error) {
@@ -294,6 +279,49 @@ export const fileService = {
       await fs.mkdir(UPLOADS_PATH, { recursive: true });
       logger.info(`Created uploads directory: ${UPLOADS_PATH}`);
     }
+  },
+
+  /**
+   * Delete all files associated with a task
+   * Used when an admin requests revision on a document upload task
+   */
+  deleteTaskFiles: async (taskId: number): Promise<{ deletedCount: number }> => {
+    try {
+      // Get all files for the task
+      const files = await fileQueries.getFilesByTaskId(taskId);
+
+      if (files.length === 0) {
+        logger.info(`No files to delete for task ${taskId}`);
+        return { deletedCount: 0 };
+      }
+
+      let deletedCount = 0;
+
+      // Soft delete each file
+      for (const file of files) {
+        try {
+          await fileQueries.softDeleteFile(file.id);
+          deletedCount++;
+          logger.info(`Soft deleted file ${file.id} (${file.original_file_name}) for task ${taskId}`);
+        } catch (error) {
+          logger.error(`Failed to delete file ${file.id} for task ${taskId}:`, error);
+          // Continue with other files even if one fails
+        }
+      }
+
+      logger.info(`Deleted ${deletedCount} of ${files.length} files for task ${taskId}`);
+      return { deletedCount };
+    } catch (error) {
+      logger.error(`Failed to delete files for task ${taskId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * List files for a task
+   */
+  listTaskFiles: async (taskId: number): Promise<FileWithUploader[]> => {
+    return fileQueries.getFilesByTaskId(taskId);
   },
 };
 

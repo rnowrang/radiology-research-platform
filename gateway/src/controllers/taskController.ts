@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { formsProxy } from '../services/formsProxy.js';
+import { fileService } from '../services/fileService.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, ForbiddenError } from '../utils/errors.js';
@@ -365,6 +366,9 @@ export const taskController = {
   /**
    * Request revision on a task (admin/reviewer only)
    * POST /api/tasks/:taskId/request-revision
+   *
+   * For document_upload tasks, this also deletes all associated files
+   * so the user can re-upload clean files.
    */
   requestRevision: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -379,21 +383,41 @@ export const taskController = {
         throw new ValidationError('Notes are required when requesting revision');
       }
 
+      // Get task details first to check type and get assigned user
+      const taskResponse = await formsProxy.getTask(taskId, req.user.id);
+      const task = taskResponse.data?.data || taskResponse.data;
+
+      // If document_upload task, clear files first before requesting revision
+      if (task.task_type === 'document_upload') {
+        try {
+          const { deletedCount } = await fileService.deleteTaskFiles(taskId);
+          logger.info(`Deleted ${deletedCount} files for document_upload task ${taskId} before revision request`);
+        } catch (error) {
+          logger.error('Failed to delete task files during revision request:', error);
+          // Continue with revision request even if file deletion fails
+        }
+      }
+
       const response = await formsProxy.requestTaskRevision(taskId, req.user.id, req.user.role, notes);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.UPDATE,
         resourceType: 'task',
         resourceId: req.params.taskId,
-        details: { action: 'request_revision', notes },
+        details: {
+          action: 'request_revision',
+          notes,
+          task_type: task.task_type,
+          files_deleted: task.task_type === 'document_upload',
+        },
       });
 
       // Send notification to the task assignee with revision comments (async, don't block response)
       try {
         const taskData = response.data?.data || response.data;
-        const taskTitle = taskData?.title || 'Task';
-        const projectId = taskData?.project_id;
-        const assignedToId = taskData?.assigned_to_id;
+        const taskTitle = taskData?.title || task.title || 'Task';
+        const projectId = taskData?.project_id || task.project_id;
+        const assignedToId = taskData?.assigned_to_id || task.assigned_to_id;
 
         // Get project title
         let projectTitle = 'Project';

@@ -208,6 +208,20 @@ export function FormViewPage() {
     }
   };
 
+  const handleSubmitForReview = async () => {
+    try {
+      await formsApi.submitForReview(formId);
+      toast({
+        title: 'Submitted for review',
+        description: 'Your form has been resubmitted for review',
+      });
+      queryClient.invalidateQueries({ queryKey: ['form', formId] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
+    } catch {
+      toast({ variant: 'destructive', title: 'Failed to submit form for review' });
+    }
+  };
+
   if (formLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -216,7 +230,7 @@ export function FormViewPage() {
     );
   }
 
-  const form = formData as FormInstance & { data?: { data: Record<string, any> }; template?: { schema: any } };
+  const form = formData as FormInstance & { data?: Record<string, any>; template?: { schema: any } };
   const config = statusConfig[form?.status || 'draft'];
   const StatusIcon = config.icon;
   const comments = commentsData || [];
@@ -276,7 +290,7 @@ export function FormViewPage() {
   // Calculate completion statistics
   const calculateCompletionStats = () => {
     const schema = form?.template?.schema;
-    const formData = form?.data?.data || {};
+    const savedData = form?.data || {};
 
     if (!schema?.sections) return { total: 0, filled: 0, requiredMissing: [], percentage: 0 };
 
@@ -288,7 +302,7 @@ export function FormViewPage() {
       const sectionFields = getSectionFields(section, schema);
       sectionFields.forEach((field: any) => {
         total++;
-        const value = getNestedValue(formData, field.id);
+        const value = getNestedValue(savedData, field.id);
         const hasValue = value !== undefined && value !== null && value !== '';
         if (hasValue) filled++;
         else if (field.required || field.validation?.required) {
@@ -360,6 +374,12 @@ export function FormViewPage() {
             <Button variant="outline" onClick={() => navigate(`/forms/${formId}`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
+            </Button>
+          )}
+          {form?.status === 'needs_changes' && (
+            <Button onClick={handleSubmitForReview}>
+              <Send className="h-4 w-4 mr-2" />
+              Submit for Review
             </Button>
           )}
           <Button variant="outline" onClick={() => setShowPdfPreview(true)}>
@@ -485,7 +505,7 @@ export function FormViewPage() {
                       <h3 className="font-semibold text-lg border-b pb-2">{section.title}</h3>
                       <div className="grid gap-3">
                         {sectionFields.map((field: any) => {
-                          const value = getNestedValue(form?.data?.data, field.id);
+                          const value = getNestedValue(form?.data, field.id);
                           const hasValue = value !== undefined && value !== null && value !== '';
                           const isRequired = field.required || field.validation?.required;
 

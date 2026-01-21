@@ -38,7 +38,7 @@ FORM_TO_TASK_STATUS_MAP = {
     "draft": "in_progress",
     "submitted": "submitted",
     "in_review": "submitted",
-    "approved": "completed",
+    "approved": "approved",
     "rejected": "rejected",
     "needs_changes": "revision_required",
 }
@@ -271,6 +271,9 @@ def sync_task_status_from_form(
     # Set additional timestamps based on the new status
     if new_task_status == "completed":
         task.completed_at = datetime.utcnow()
+    elif new_task_status == "approved":
+        task.completed_at = datetime.utcnow()
+        task.reviewed_at = datetime.utcnow()
     elif new_task_status == "submitted":
         task.submitted_at = datetime.utcnow()
         # Clear previous review data when resubmitting

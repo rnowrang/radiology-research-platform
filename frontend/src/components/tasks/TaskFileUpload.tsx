@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { filesApi, tasksApi } from '@/lib/api';
+import { filesApi } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 
 // File category mapping based on task title
@@ -181,7 +181,7 @@ export function TaskFileUpload({
     setErrorMessage(null);
 
     try {
-      // Step 1: Upload the file
+      // Upload the file
       await filesApi.upload(
         {
           file: selectedFile,
@@ -196,20 +196,11 @@ export function TaskFileUpload({
         }
       );
 
-      // Step 2: Auto-complete the task after successful upload
-      try {
-        await tasksApi.autoCompleteUpload(projectId, fileCategory);
-      } catch (autoCompleteError: any) {
-        // If auto-complete fails, log but don't fail the whole operation
-        // The file was still uploaded successfully
-        console.warn('Auto-complete task failed:', autoCompleteError);
-      }
-
       setUploadState('success');
 
       toast({
         title: 'File uploaded successfully',
-        description: `${selectedFile.name} has been uploaded and the task is complete.`,
+        description: `${selectedFile.name} has been uploaded. Submit the task for review when ready.`,
       });
 
       // Wait a moment to show success state, then close
@@ -309,7 +300,7 @@ export function TaskFileUpload({
       <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
       <p className="font-medium text-green-600">Upload Complete!</p>
       <p className="text-sm text-muted-foreground mt-1">
-        Your file has been uploaded and the task is now complete.
+        Your file has been uploaded. Submit the task for review when ready.
       </p>
     </div>
   );

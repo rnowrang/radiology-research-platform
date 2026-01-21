@@ -225,7 +225,7 @@ def approve_form(
     db.commit()
     db.refresh(action)
 
-    # Sync linked task status (form approved -> task completed)
+    # Sync linked task status (form approved -> task approved)
     sync_task_status_from_form(db, form_id, form.status)
 
     return action
