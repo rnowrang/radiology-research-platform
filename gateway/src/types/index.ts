@@ -35,6 +35,13 @@ export interface Project {
   start_date?: Date;
   end_date?: Date;
   is_public: boolean;
+  // Approval workflow fields
+  submitted_for_approval_at?: Date;
+  approved_at?: Date;
+  approved_by_id?: string;
+  rejected_at?: Date;
+  rejected_by_id?: string;
+  rejection_notes?: string;
   created_at: Date;
   updated_at: Date;
 }

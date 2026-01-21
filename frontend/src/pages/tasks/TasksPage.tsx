@@ -326,11 +326,13 @@ export function TasksPage() {
                 return (
                   <div
                     key={task.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border ${
+                    className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-accent transition-colors ${
                       task.status === 'completed' ? 'opacity-60' : ''
                     } ${isOverdue(task) ? 'border-destructive bg-destructive/5' : ''}`}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
                   >
                     <Checkbox
+                      onClick={(e) => e.stopPropagation()}
                       checked={task.status === 'completed'}
                       onCheckedChange={(checked) => {
                         if (checked) {
@@ -389,12 +391,17 @@ export function TasksPage() {
                     </div>
                     <Badge variant={config.variant}>{config.label}</Badge>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/tasks/${task.id}`)}
+                        >
+                          View Details
+                        </DropdownMenuItem>
                         {task.status === 'pending' && (
                           <DropdownMenuItem
                             onClick={() =>

@@ -20,6 +20,9 @@ export type FormStatus = typeof FORM_STATUS[keyof typeof FORM_STATUS];
 export const PROJECT_STATUS = {
   DRAFT: 'draft',
   ACTIVE: 'active',
+  PENDING_APPROVAL: 'pending_approval',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
   COMPLETED: 'completed',
   ARCHIVED: 'archived',
 } as const;

@@ -22,6 +22,7 @@ import { TaskCard, TaskCardData, TaskWorkflowStatus } from './TaskCard';
 
 export interface TaskChecklistProps {
   tasks: TaskCardData[];
+  projectId?: string;
   title?: string;
   showProgressBar?: boolean;
   defaultView?: 'card' | 'list';
@@ -30,6 +31,7 @@ export interface TaskChecklistProps {
   onTaskView?: (taskId: number) => void;
   onTaskRevise?: (taskId: number) => void;
   onTaskResubmit?: (taskId: number) => void;
+  onUploadComplete?: () => void;
   className?: string;
 }
 
@@ -65,6 +67,7 @@ function getStatusGroup(status: TaskWorkflowStatus): StatusGroup['key'] {
 
 export function TaskChecklist({
   tasks,
+  projectId,
   title = 'Tasks',
   showProgressBar = true,
   defaultView = 'card',
@@ -73,6 +76,7 @@ export function TaskChecklist({
   onTaskView,
   onTaskRevise,
   onTaskResubmit,
+  onUploadComplete,
   className,
 }: TaskChecklistProps) {
   const [viewMode, setViewMode] = useState<'card' | 'list'>(defaultView);
@@ -171,12 +175,14 @@ export function TaskChecklist({
             <TaskCard
               key={task.id}
               task={task}
+              projectId={projectId}
               compact
               onStart={onTaskStart}
               onSubmit={onTaskSubmit}
               onView={onTaskView}
               onRevise={onTaskRevise}
               onResubmit={onTaskResubmit}
+              onUploadComplete={onUploadComplete}
             />
           ))}
         </div>
@@ -189,11 +195,13 @@ export function TaskChecklist({
           <TaskCard
             key={task.id}
             task={task}
+            projectId={projectId}
             onStart={onTaskStart}
             onSubmit={onTaskSubmit}
             onView={onTaskView}
             onRevise={onTaskRevise}
             onResubmit={onTaskResubmit}
+            onUploadComplete={onUploadComplete}
           />
         ))}
       </div>

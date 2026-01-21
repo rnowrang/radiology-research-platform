@@ -18,12 +18,21 @@ class Project(Base):
     project_type = Column(String(100), nullable=True)  # retrospective, prospective, clinical_trial, etc.
     department = Column(String(255), nullable=True)
     principal_investigator_id = Column(UUID(as_uuid=True), nullable=False)
-    status = Column(String(50), default="draft")  # draft, active, completed, archived
+    # Status values: draft, active, pending_approval, approved, rejected, completed, archived
+    status = Column(String(50), default="draft")
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     is_public = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Approval workflow fields
+    submitted_for_approval_at = Column(DateTime(timezone=True), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    approved_by_id = Column(UUID(as_uuid=True), nullable=True)
+    rejected_at = Column(DateTime(timezone=True), nullable=True)
+    rejected_by_id = Column(UUID(as_uuid=True), nullable=True)
+    rejection_notes = Column(Text, nullable=True)
 
     # Relationships
     collaborators = relationship("ProjectCollaborator", back_populates="project", cascade="all, delete-orphan")

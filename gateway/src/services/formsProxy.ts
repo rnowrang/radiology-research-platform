@@ -877,6 +877,60 @@ export const formsProxy = {
       headers: { 'X-User-ID': userId },
     });
   },
+
+  // ==========================================================================
+  // Project Approval Workflow
+  // ==========================================================================
+
+  /**
+   * Submit a project for admin approval
+   * Researcher action - validates all required tasks are complete
+   */
+  submitProjectForApproval: async (
+    projectId: string,
+    userId: string,
+    notes?: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/projects/${projectId}/submit-for-approval`, {
+      notes,
+    }, {
+      headers: { 'X-User-ID': userId },
+    });
+  },
+
+  /**
+   * Approve a project
+   * Admin only action
+   */
+  approveProject: async (
+    projectId: string,
+    userId: string,
+    userRole: string,
+    notes?: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/projects/${projectId}/approve`, {
+      notes,
+    }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
+
+  /**
+   * Reject a project
+   * Admin only action - requires rejection notes
+   */
+  rejectProject: async (
+    projectId: string,
+    userId: string,
+    userRole: string,
+    notes: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/projects/${projectId}/reject`, {
+      notes,
+    }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
 };
 
 export default formsProxy;

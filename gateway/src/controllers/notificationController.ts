@@ -6,15 +6,30 @@ import { logger } from '../utils/logger.js';
 
 export const notificationController = {
   /**
-   * Get notifications for authenticated user (paginated)
+   * Get notifications for authenticated user (paginated with filters)
    */
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
       const page = parseInt(req.query.page as string, 10) || 1;
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
+      const type = req.query.type as string | undefined;
+      const isReadParam = req.query.is_read as string | undefined;
 
-      const result = await notificationQueries.findByUserId(userId, { page, limit });
+      // Parse is_read to boolean if provided
+      let is_read: boolean | undefined;
+      if (isReadParam === 'true') {
+        is_read = true;
+      } else if (isReadParam === 'false') {
+        is_read = false;
+      }
+
+      const result = await notificationQueries.findByUserId(userId, {
+        page,
+        limit,
+        type,
+        is_read,
+      });
 
       res.json({
         success: true,

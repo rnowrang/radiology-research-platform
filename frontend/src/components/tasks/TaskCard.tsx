@@ -16,7 +16,9 @@ import {
   Edit,
   MessageSquare,
   PenLine,
+  FileUp,
 } from 'lucide-react';
+import { TaskFileUpload } from './TaskFileUpload';
 import {
   Card,
   CardContent,
@@ -74,12 +76,14 @@ export interface TaskCardData {
 
 export interface TaskCardProps {
   task: TaskCardData;
+  projectId?: string;
   compact?: boolean;
   onStart?: (taskId: number) => void;
   onSubmit?: (taskId: number) => void;
   onView?: (taskId: number) => void;
   onRevise?: (taskId: number) => void;
   onResubmit?: (taskId: number) => void;
+  onUploadComplete?: () => void;
   className?: string;
 }
 
@@ -123,16 +127,19 @@ function isOverdue(task: TaskCardData): boolean {
 
 export function TaskCard({
   task,
+  projectId,
   compact = false,
   onStart,
   onSubmit,
   onView,
   onRevise,
   onResubmit,
+  onUploadComplete,
   className,
 }: TaskCardProps) {
   const navigate = useNavigate();
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const config = statusConfig[task.status] || statusConfig.pending;
   const StatusIcon = config.icon;
@@ -152,6 +159,10 @@ export function TaskCard({
   const hasForm = !!task.formInstanceId;
   const canStartForm = isFormCompletionTask && !hasForm && canStart;
   const canContinueForm = isFormCompletionTask && hasForm && canStart;
+
+  // Document upload task logic
+  const isDocumentUploadTask = task.taskType === 'document_upload';
+  const canUpload = isDocumentUploadTask && canStart && !!projectId;
 
   if (compact) {
     return (
@@ -324,6 +335,17 @@ export function TaskCard({
             </Button>
           )}
 
+          {/* Document upload task actions */}
+          {canUpload && (
+            <Button
+              size="sm"
+              onClick={() => setShowUploadDialog(true)}
+            >
+              <FileUp className="h-4 w-4 mr-1" />
+              Upload Document
+            </Button>
+          )}
+
           {/* Actions based on status (for non-form-completion tasks) */}
           {canStart && onStart && !isFormCompletionTask && (
             <Button size="sm" variant="outline" onClick={() => onStart(task.id)}>
@@ -367,6 +389,18 @@ export function TaskCard({
           )}
         </div>
       </CardFooter>
+
+      {/* Document Upload Dialog */}
+      {isDocumentUploadTask && projectId && (
+        <TaskFileUpload
+          taskId={task.id}
+          taskTitle={task.title}
+          projectId={projectId}
+          open={showUploadDialog}
+          onOpenChange={setShowUploadDialog}
+          onSuccess={onUploadComplete}
+        />
+      )}
     </Card>
   );
 }

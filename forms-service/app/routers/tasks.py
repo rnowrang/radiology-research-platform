@@ -3,8 +3,8 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.task import Task
@@ -33,6 +33,23 @@ def get_user_id(x_user_id: Optional[str] = Header(None)) -> Optional[UUID]:
     if x_user_id:
         return UUID(x_user_id)
     return None
+
+
+def require_reviewer_role(request: Request) -> str:
+    """
+    Dependency that requires admin or reviewer role.
+
+    Returns the role if valid, raises 403 if not authorized.
+    This provides defense-in-depth for review actions - even if someone
+    bypasses the gateway, they cannot approve/reject without proper role.
+    """
+    role = request.headers.get("X-User-Role", "").lower()
+    if role not in ["admin", "reviewer"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin or reviewer role required"
+        )
+    return role
 
 
 # =============================================================================
@@ -97,24 +114,18 @@ def list_tasks(
     if form_instance_id:
         query = query.filter(Task.form_instance_id == form_instance_id)
 
+    # Use joinedload to eagerly load related project and form_instance in a single query
+    # This prevents N+1 query problem (was doing 2N extra queries before)
+    query = query.options(
+        joinedload(Task.project),
+        joinedload(Task.form_instance)
+    )
+
     tasks = query.order_by(Task.created_at.desc()).all()
 
-    result = []
-    for task in tasks:
-        project_title = None
-        form_title = None
-
-        if task.project_id:
-            project = db.query(Project).filter(Project.id == task.project_id).first()
-            if project:
-                project_title = project.title
-
-        if task.form_instance_id:
-            form = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
-            if form:
-                form_title = form.title
-
-        result.append(TaskListResponse(
+    # Build response using pre-loaded relationships (no additional queries)
+    result = [
+        TaskListResponse(
             id=task.id,
             title=task.title,
             description=task.description,
@@ -123,9 +134,9 @@ def list_tasks(
             priority=task.priority,
             due_date=task.due_date,
             project_id=task.project_id,
-            project_title=project_title,
+            project_title=task.project.title if task.project else None,
             form_instance_id=task.form_instance_id,
-            form_title=form_title,
+            form_title=task.form_instance.title if task.form_instance else None,
             assigned_to_id=task.assigned_to_id,
             created_by_id=task.created_by_id,
             task_definition_id=task.task_definition_id,
@@ -136,7 +147,9 @@ def list_tasks(
             reviewer_comments=task.reviewer_comments,
             revision_count=task.revision_count if task.revision_count is not None else 0,
             created_at=task.created_at,
-        ))
+        )
+        for task in tasks
+    ]
 
     return result
 
@@ -432,10 +445,12 @@ def submit_task_for_review(
 def approve_task(
     task_id: int,
     request: TaskApproveRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    _role: str = Depends(require_reviewer_role),
 ):
-    """Approve a submitted task."""
+    """Approve a submitted task. Requires admin or reviewer role."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID required")
 
@@ -466,10 +481,12 @@ def approve_task(
 def reject_task(
     task_id: int,
     request: TaskRejectRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    _role: str = Depends(require_reviewer_role),
 ):
-    """Reject a submitted task."""
+    """Reject a submitted task. Requires admin or reviewer role."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID required")
 
@@ -499,10 +516,12 @@ def reject_task(
 def request_task_revision(
     task_id: int,
     request: TaskRevisionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    _role: str = Depends(require_reviewer_role),
 ):
-    """Request revision of a submitted task."""
+    """Request revision of a submitted task. Requires admin or reviewer role."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID required")
 
@@ -531,27 +550,26 @@ def request_task_revision(
 
 @router.get("/pending-review/list", response_model=List[PendingReviewItem])
 def list_pending_review_tasks(
+    request: Request,
     project_id: Optional[UUID] = Query(None, description="Filter by project"),
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    _role: str = Depends(require_reviewer_role),
 ):
-    """Get all tasks awaiting review (status = 'submitted')."""
+    """Get all tasks awaiting review (status = 'submitted'). Requires admin or reviewer role."""
     query = db.query(Task).filter(Task.status == "submitted")
 
     if project_id:
         query = query.filter(Task.project_id == project_id)
 
+    # Use joinedload to eagerly load project in a single query (prevents N+1)
+    query = query.options(joinedload(Task.project))
+
     tasks = query.order_by(Task.submitted_at.asc()).all()
 
-    result = []
-    for task in tasks:
-        project_title = None
-        if task.project_id:
-            project = db.query(Project).filter(Project.id == task.project_id).first()
-            if project:
-                project_title = project.title
-
-        result.append(PendingReviewItem(
+    # Build response using pre-loaded relationship (no additional queries)
+    result = [
+        PendingReviewItem(
             id=task.id,
             title=task.title,
             description=task.description,
@@ -559,11 +577,13 @@ def list_pending_review_tasks(
             status=task.status,
             priority=task.priority,
             project_id=task.project_id,
-            project_title=project_title,
+            project_title=task.project.title if task.project else None,
             submitted_at=task.submitted_at,
             created_by_id=task.created_by_id,
             revision_count=task.revision_count if task.revision_count is not None else 0,
-        ))
+        )
+        for task in tasks
+    ]
 
     return result
 

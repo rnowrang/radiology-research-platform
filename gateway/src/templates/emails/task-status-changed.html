@@ -1,0 +1,110 @@
+<h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 16px;" class="text-primary">
+  Task Status Update
+</h2>
+
+<p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px;" class="text-secondary">
+  {{#isSubmitted}}A task has been submitted for your review.{{/isSubmitted}}
+  {{#isApproved}}Great news! Your task has been approved.{{/isApproved}}
+  {{#isRejected}}A decision has been made on your task submission.{{/isRejected}}
+  {{#isRevisionRequested}}Changes have been requested for your task.{{/isRevisionRequested}}
+</p>
+
+<!-- Status Badge -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td align="center">
+      {{#isSubmitted}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; background-color: #dbeafe; color: #1e40af;">
+        {{status}}
+      </div>
+      {{/isSubmitted}}
+      {{#isApproved}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; background-color: #dcfce7; color: #166534;">
+        {{status}}
+      </div>
+      {{/isApproved}}
+      {{#isRejected}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; background-color: #fee2e2; color: #991b1b;">
+        {{status}}
+      </div>
+      {{/isRejected}}
+      {{#isRevisionRequested}}
+      <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; background-color: #fef3c7; color: #92400e;">
+        {{status}}
+      </div>
+      {{/isRevisionRequested}}
+    </td>
+  </tr>
+</table>
+
+<!-- Task Details Card -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 20px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="padding-bottom: 16px;">
+            <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Task</span>
+            <div style="color: #1f2937; font-size: 18px; font-weight: 600; margin-top: 4px;">{{taskTitle}}</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Project</span>
+            <div style="color: #1f2937; font-size: 16px; font-weight: 500; margin-top: 4px;">{{projectTitle}}</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Reviewer Comments -->
+{{#hasComments}}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td>
+      <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;">
+        Reviewer Comments
+      </p>
+      <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; padding: 16px; border-radius: 0 4px 4px 0;">
+        <p style="color: #4b5563; font-size: 14px; line-height: 22px; margin: 0; white-space: pre-wrap;">{{reviewerComments}}</p>
+      </div>
+    </td>
+  </tr>
+</table>
+{{/hasComments}}
+
+<!-- Next Steps -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="background-color: #eff6ff; border-radius: 8px; padding: 20px;">
+      <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 8px;">
+        What's Next?
+      </p>
+      <p style="color: #3730a3; font-size: 14px; line-height: 22px; margin: 0;">
+        {{#isSubmitted}}Please review this task submission and provide your feedback.{{/isSubmitted}}
+        {{#isApproved}}Your task has been approved. You may proceed with the next steps in your research process.{{/isApproved}}
+        {{#isRejected}}Please review the feedback provided and contact the reviewer if you have questions about the decision.{{/isRejected}}
+        {{#isRevisionRequested}}Please review the requested changes and resubmit your task for another review.{{/isRevisionRequested}}
+      </p>
+    </td>
+  </tr>
+</table>
+
+<!-- View Task Button -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 24px;">
+  <tr>
+    <td align="center">
+      <table border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="background-color: #2563eb; border-radius: 6px; text-align: center;">
+            <a href="{{taskLink}}" style="display: inline-block; padding: 12px 24px; color: #ffffff; text-decoration: none; font-weight: 500; font-size: 14px;">
+              View Task
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

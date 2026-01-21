@@ -5,6 +5,8 @@ import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { formsProxy } from '../services/formsProxy.js';
+import { notificationService } from '../services/notificationService.js';
+import { userQueries } from '../database/queries/userQueries.js';
 
 export const projectController = {
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -381,6 +383,190 @@ export const projectController = {
         success: true,
         data: result.data,
         message: 'Task created successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Submit a project for approval
+   * POST /api/projects/:id/submit-for-approval
+   * PI or admin can submit
+   */
+  submitForApproval: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      const project = await projectQueries.findById(id);
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Check permission: only PI or admin can submit
+      const isPI = project.principal_investigator_id === req.user!.id;
+      const isAdmin = req.user!.role === USER_ROLES.ADMIN;
+      if (!isPI && !isAdmin) {
+        throw new ForbiddenError('Only the principal investigator or admin can submit this project for approval');
+      }
+
+      // Call forms-service to validate and update status
+      const result = await formsProxy.submitProjectForApproval(id, req.user!.id, notes);
+
+      // Update local project status
+      await projectQueries.update(id, { status: 'pending_approval' });
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.SUBMIT,
+        resourceType: 'project',
+        resourceId: id,
+        details: { title: project.title, notes },
+      });
+
+      // Notify all admins about new project submission
+      try {
+        const admins = await userQueries.findByRole(USER_ROLES.ADMIN);
+        for (const admin of admins) {
+          if (admin.id !== req.user!.id) {
+            await notificationService.createNotification(
+              admin.id,
+              'approval_request',
+              'Project submitted for approval',
+              `Project "${project.title}" has been submitted for approval`,
+              `/projects/${id}`
+            );
+          }
+        }
+      } catch (notifyError) {
+        // Don't fail the request if notifications fail
+        console.error('Failed to send notifications:', notifyError);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        message: 'Project submitted for approval successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Approve a project
+   * POST /api/projects/:id/approve
+   * Admin only
+   */
+  approveProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      // Admin only
+      if (req.user!.role !== USER_ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators can approve projects');
+      }
+
+      const project = await projectQueries.findById(id);
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Call forms-service to update status
+      const result = await formsProxy.approveProject(id, req.user!.id, req.user!.role, notes);
+
+      // Update local project status
+      await projectQueries.update(id, { status: 'approved' });
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.APPROVE,
+        resourceType: 'project',
+        resourceId: id,
+        details: { title: project.title, notes },
+      });
+
+      // Notify the PI about approval
+      try {
+        const approverName = req.user!.full_name || 'An administrator';
+        await notificationService.createNotification(
+          project.principal_investigator_id,
+          'status_change',
+          'Project approved',
+          `Your project "${project.title}" has been approved by ${approverName}`,
+          `/projects/${id}`
+        );
+      } catch (notifyError) {
+        // Don't fail the request if notifications fail
+        console.error('Failed to send notification:', notifyError);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        message: 'Project approved successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Reject a project
+   * POST /api/projects/:id/reject
+   * Admin only
+   */
+  rejectProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      // Admin only
+      if (req.user!.role !== USER_ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators can reject projects');
+      }
+
+      if (!notes || !notes.trim()) {
+        throw new ValidationError('Rejection notes are required');
+      }
+
+      const project = await projectQueries.findById(id);
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Call forms-service to update status
+      const result = await formsProxy.rejectProject(id, req.user!.id, req.user!.role, notes);
+
+      // Update local project status
+      await projectQueries.update(id, { status: 'rejected' });
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.REJECT,
+        resourceType: 'project',
+        resourceId: id,
+        details: { title: project.title, notes },
+      });
+
+      // Notify the PI about rejection
+      try {
+        const rejecterName = req.user!.full_name || 'An administrator';
+        await notificationService.createNotification(
+          project.principal_investigator_id,
+          'status_change',
+          'Project requires changes',
+          `Your project "${project.title}" has been rejected by ${rejecterName}. Reason: ${notes}`,
+          `/projects/${id}`
+        );
+      } catch (notifyError) {
+        // Don't fail the request if notifications fail
+        console.error('Failed to send notification:', notifyError);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        message: 'Project rejected',
       });
     } catch (error) {
       next(error);

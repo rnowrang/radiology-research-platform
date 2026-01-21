@@ -17,3 +17,8 @@ export {
   type TaskProgressBarProps,
   type TaskProgressStatsProps,
 } from './TaskProgressBar';
+
+export {
+  TaskFileUpload,
+  type TaskFileUploadProps,
+} from './TaskFileUpload';

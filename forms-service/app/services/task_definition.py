@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.task_definition import TaskDefinition, ProjectTypeTaskMapping
 from app.models.task import Task
@@ -300,8 +300,10 @@ def create_project_tasks(
 
 def get_project_task_progress(db: Session, project_id: UUID) -> ProjectTaskProgress:
     """Get task completion progress for a project."""
+    # Use joinedload to eagerly load task_definition in a single query (prevents N+1)
     tasks = (
         db.query(Task)
+        .options(joinedload(Task.task_definition))
         .filter(Task.project_id == project_id)
         .order_by(Task.id)
         .all()
@@ -318,16 +320,9 @@ def get_project_task_progress(db: Session, project_id: UUID) -> ProjectTaskProgr
 
     completion_percentage = (completed / total * 100) if total > 0 else 0.0
 
-    task_items = []
-    for task in tasks:
-        # Get display order from task definition if available
-        display_order = 0
-        if task.task_definition_id:
-            task_def = db.query(TaskDefinition).filter(TaskDefinition.id == task.task_definition_id).first()
-            if task_def:
-                display_order = task_def.display_order
-
-        task_items.append(TaskProgressItem(
+    # Build task items using pre-loaded relationship (no additional queries)
+    task_items = [
+        TaskProgressItem(
             task_id=task.id,
             task_definition_id=task.task_definition_id,
             title=task.title,
@@ -335,12 +330,14 @@ def get_project_task_progress(db: Session, project_id: UUID) -> ProjectTaskProgr
             task_type=task.task_type,
             status=task.status,
             is_required=task.is_required if task.is_required is not None else True,
-            display_order=display_order,
+            display_order=task.task_definition.display_order if task.task_definition else 0,
             submitted_at=task.submitted_at,
             reviewed_at=task.reviewed_at,
             reviewer_comments=task.reviewer_comments,
             revision_count=task.revision_count if task.revision_count is not None else 0,
-        ))
+        )
+        for task in tasks
+    ]
 
     # Sort by display order
     task_items.sort(key=lambda x: x.display_order)

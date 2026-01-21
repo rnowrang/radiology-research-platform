@@ -36,3 +36,4 @@ class Task(Base):
     # Relationships
     project = relationship("Project", backref="tasks")
     form_instance = relationship("FormInstance", backref="tasks")
+    # task_definition relationship is defined in TaskDefinition model with backref="task_definition"

@@ -34,4 +34,9 @@ router.get('/:projectId/tasks', asyncHandler(taskController.getProjectTasks));
 router.get('/:projectId/task-progress', asyncHandler(taskController.getProjectTaskProgress));
 router.post('/:projectId/tasks', asyncHandler(projectController.createProjectTask));
 
+// Project approval workflow routes
+router.post('/:id/submit-for-approval', asyncHandler(projectController.submitForApproval));
+router.post('/:id/approve', asyncHandler(projectController.approveProject));
+router.post('/:id/reject', asyncHandler(projectController.rejectProject));
+
 export default router;

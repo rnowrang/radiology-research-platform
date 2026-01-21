@@ -4,6 +4,10 @@ import { formsProxy } from '../services/formsProxy.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, ForbiddenError } from '../utils/errors.js';
+import { notificationService } from '../services/notificationService.js';
+import { userQueries } from '../database/queries/userQueries.js';
+import { projectQueries } from '../database/queries/projectQueries.js';
+import { logger } from '../utils/logger.js';
 
 export const taskController = {
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -19,7 +23,73 @@ export const taskController = {
     try {
       const taskId = parseInt(req.params.id);
       const response = await formsProxy.getTask(taskId, req.user!.id);
-      res.json(response.data);
+      const taskData = response.data;
+
+      // Enrich task data with user names and project/form titles
+      const enrichedTask = { ...taskData };
+
+      // Get assigned user name
+      if (taskData.assigned_to_id) {
+        try {
+          const assignedUser = await userQueries.findById(taskData.assigned_to_id);
+          if (assignedUser) {
+            enrichedTask.assigned_to_name = assignedUser.full_name;
+          }
+        } catch (err) {
+          logger.warn('Failed to get assigned user name', err);
+        }
+      }
+
+      // Get created by user name
+      if (taskData.created_by_id) {
+        try {
+          const createdByUser = await userQueries.findById(taskData.created_by_id);
+          if (createdByUser) {
+            enrichedTask.created_by_name = createdByUser.full_name;
+          }
+        } catch (err) {
+          logger.warn('Failed to get created by user name', err);
+        }
+      }
+
+      // Get reviewed by user name
+      if (taskData.reviewed_by_id) {
+        try {
+          const reviewedByUser = await userQueries.findById(taskData.reviewed_by_id);
+          if (reviewedByUser) {
+            enrichedTask.reviewed_by_name = reviewedByUser.full_name;
+          }
+        } catch (err) {
+          logger.warn('Failed to get reviewed by user name', err);
+        }
+      }
+
+      // Get project title
+      if (taskData.project_id) {
+        try {
+          const project = await projectQueries.findById(taskData.project_id);
+          if (project) {
+            enrichedTask.project_title = project.title;
+          }
+        } catch (err) {
+          logger.warn('Failed to get project title', err);
+        }
+      }
+
+      // Get form title (from forms service response which already includes it)
+      // If not present, we could fetch it, but the forms service should provide it
+      if (taskData.form_instance_id && !taskData.form_title) {
+        try {
+          const formResponse = await formsProxy.getForm(taskData.form_instance_id, req.user!.id);
+          if (formResponse.data?.title) {
+            enrichedTask.form_title = formResponse.data.title;
+          }
+        } catch (err) {
+          logger.warn('Failed to get form title', err);
+        }
+      }
+
+      res.json({ success: true, data: enrichedTask });
     } catch (error) {
       next(error);
     }
@@ -123,6 +193,45 @@ export const taskController = {
         details: { action: 'submit_for_review', notes },
       });
 
+      // Send notifications to admins and reviewers (async, don't block response)
+      try {
+        const taskData = response.data?.data || response.data;
+        const taskTitle = taskData?.title || 'Task';
+        const projectId = taskData?.project_id;
+
+        // Get project title
+        let projectTitle = 'Project';
+        if (projectId) {
+          const project = await projectQueries.findById(projectId);
+          if (project) {
+            projectTitle = project.title;
+          }
+        }
+
+        // Get all admins and reviewers to notify
+        const { users: adminsAndReviewers } = await userQueries.findAllUsers(
+          { is_active: true },
+          { page: 1, limit: 1000 }
+        );
+        const notifyUserIds = adminsAndReviewers
+          .filter((u) => u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.REVIEWER)
+          .map((u) => u.id);
+
+        if (notifyUserIds.length > 0) {
+          notificationService.notifyTaskStatusChanged(
+            taskId,
+            taskTitle,
+            projectTitle,
+            'submitted',
+            req.user!.id,
+            notifyUserIds,
+            notes
+          ).catch((err) => logger.warn('Failed to send task submission notifications', err));
+        }
+      } catch (notifyError) {
+        logger.warn('Failed to send task submission notifications', notifyError);
+      }
+
       res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
@@ -150,6 +259,38 @@ export const taskController = {
         resourceId: req.params.taskId,
         details: { action: 'approve', notes },
       });
+
+      // Send notification to the task assignee (async, don't block response)
+      try {
+        const taskData = response.data?.data || response.data;
+        const taskTitle = taskData?.title || 'Task';
+        const projectId = taskData?.project_id;
+        const assignedToId = taskData?.assigned_to_id;
+
+        // Get project title
+        let projectTitle = 'Project';
+        if (projectId) {
+          const project = await projectQueries.findById(projectId);
+          if (project) {
+            projectTitle = project.title;
+          }
+        }
+
+        // Notify the assignee if there is one
+        if (assignedToId) {
+          notificationService.notifyTaskStatusChanged(
+            taskId,
+            taskTitle,
+            projectTitle,
+            'approved',
+            req.user.id,
+            [assignedToId],
+            notes
+          ).catch((err) => logger.warn('Failed to send task approval notification', err));
+        }
+      } catch (notifyError) {
+        logger.warn('Failed to send task approval notification', notifyError);
+      }
 
       res.json({ success: true, data: response.data });
     } catch (error) {
@@ -183,6 +324,38 @@ export const taskController = {
         details: { action: 'reject', notes },
       });
 
+      // Send notification to the task assignee with rejection reason (async, don't block response)
+      try {
+        const taskData = response.data?.data || response.data;
+        const taskTitle = taskData?.title || 'Task';
+        const projectId = taskData?.project_id;
+        const assignedToId = taskData?.assigned_to_id;
+
+        // Get project title
+        let projectTitle = 'Project';
+        if (projectId) {
+          const project = await projectQueries.findById(projectId);
+          if (project) {
+            projectTitle = project.title;
+          }
+        }
+
+        // Notify the assignee if there is one (include rejection reason)
+        if (assignedToId) {
+          notificationService.notifyTaskStatusChanged(
+            taskId,
+            taskTitle,
+            projectTitle,
+            'rejected',
+            req.user.id,
+            [assignedToId],
+            notes // Include rejection reason as reviewer comments
+          ).catch((err) => logger.warn('Failed to send task rejection notification', err));
+        }
+      } catch (notifyError) {
+        logger.warn('Failed to send task rejection notification', notifyError);
+      }
+
       res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
@@ -214,6 +387,38 @@ export const taskController = {
         resourceId: req.params.taskId,
         details: { action: 'request_revision', notes },
       });
+
+      // Send notification to the task assignee with revision comments (async, don't block response)
+      try {
+        const taskData = response.data?.data || response.data;
+        const taskTitle = taskData?.title || 'Task';
+        const projectId = taskData?.project_id;
+        const assignedToId = taskData?.assigned_to_id;
+
+        // Get project title
+        let projectTitle = 'Project';
+        if (projectId) {
+          const project = await projectQueries.findById(projectId);
+          if (project) {
+            projectTitle = project.title;
+          }
+        }
+
+        // Notify the assignee if there is one (include revision comments)
+        if (assignedToId) {
+          notificationService.notifyTaskStatusChanged(
+            taskId,
+            taskTitle,
+            projectTitle,
+            'revision_requested',
+            req.user.id,
+            [assignedToId],
+            notes // Include revision comments
+          ).catch((err) => logger.warn('Failed to send task revision request notification', err));
+        }
+      } catch (notifyError) {
+        logger.warn('Failed to send task revision request notification', notifyError);
+      }
 
       res.json({ success: true, data: response.data });
     } catch (error) {

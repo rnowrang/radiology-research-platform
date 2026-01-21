@@ -14,6 +14,11 @@ export interface PaginationParams {
   limit?: number;
 }
 
+export interface NotificationFilterParams extends PaginationParams {
+  type?: string;
+  is_read?: boolean;
+}
+
 export interface PaginatedResult<T> {
   data: T[];
   pagination: {
@@ -27,26 +32,45 @@ export interface PaginatedResult<T> {
 export const notificationQueries = {
   findByUserId: async (
     userId: string,
-    pagination: PaginationParams = {}
+    filters: NotificationFilterParams = {}
   ): Promise<PaginatedResult<Notification>> => {
-    const { page = 1, limit = 20 } = pagination;
+    const { page = 1, limit = 20, type, is_read } = filters;
     const offset = (page - 1) * limit;
 
-    // Get total count
+    // Build dynamic WHERE clause
+    const conditions: string[] = ['user_id = $1'];
+    const params: unknown[] = [userId];
+    let paramIndex = 2;
+
+    if (type) {
+      conditions.push(`type = $${paramIndex}`);
+      params.push(type);
+      paramIndex++;
+    }
+
+    if (is_read !== undefined) {
+      conditions.push(`is_read = $${paramIndex}`);
+      params.push(is_read);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Get total count with filters
     const countResult = await query<{ count: string }>(
-      `SELECT COUNT(*) as count FROM notifications WHERE user_id = $1`,
-      [userId]
+      `SELECT COUNT(*) as count FROM notifications WHERE ${whereClause}`,
+      params
     );
     const total = parseInt(countResult.rows[0]?.count || '0', 10);
 
-    // Get paginated results
+    // Get paginated results with filters
     const result = await query<Notification>(
       `SELECT id, user_id, type, title, message, link, is_read, created_at
        FROM notifications
-       WHERE user_id = $1
+       WHERE ${whereClause}
        ORDER BY created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [userId, limit, offset]
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
     );
 
     return {

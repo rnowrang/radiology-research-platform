@@ -61,10 +61,17 @@ CREATE TABLE projects (
     project_type VARCHAR(100),
     department VARCHAR(255),
     principal_investigator_id UUID NOT NULL REFERENCES users(id),
-    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'archived')),
+    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'pending_approval', 'approved', 'rejected', 'completed', 'archived')),
     start_date DATE,
     end_date DATE,
     is_public BOOLEAN DEFAULT false,
+    -- Approval workflow fields
+    submitted_for_approval_at TIMESTAMP WITH TIME ZONE,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_by_id UUID REFERENCES users(id),
+    rejected_at TIMESTAMP WITH TIME ZONE,
+    rejected_by_id UUID REFERENCES users(id),
+    rejection_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

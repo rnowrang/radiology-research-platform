@@ -9,8 +9,10 @@ from fastapi import HTTPException
 
 from app.models.task import Task
 from app.models.task_definition import TaskDefinition
+from app.models.project import Project
 from app.models.form import FormInstance, FormData
 from app.models.template import Template
+from app.schemas.task import TaskCreateForProject
 
 
 # =============================================================================
@@ -341,3 +343,93 @@ def create_form_for_task(
         "form_instance_id": form_instance.id,
         "task_status": task.status,
     }
+
+
+# =============================================================================
+# Create Task for Project
+# =============================================================================
+
+def create_task_for_project(
+    db: Session,
+    project_id: UUID,
+    task_data: TaskCreateForProject,
+    created_by_id: UUID,
+) -> Task:
+    """
+    Create a new task for a specific project.
+
+    Can either:
+    - Use an existing task definition (provide task_definition_id)
+    - Create an ad-hoc custom task (provide title and task_type)
+
+    Args:
+        db: Database session
+        project_id: UUID of the project to create the task for
+        task_data: Task creation data (TaskCreateForProject schema)
+        created_by_id: UUID of the user creating the task
+
+    Returns:
+        The created Task
+
+    Raises:
+        HTTPException: If validation fails (project not found, missing fields, etc.)
+    """
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Determine title, description, and task_type based on input
+    title = task_data.title
+    description = task_data.description
+    task_type = task_data.task_type
+
+    if task_data.task_definition_id:
+        # Fetch the task definition
+        task_definition = db.query(TaskDefinition).filter(
+            TaskDefinition.id == task_data.task_definition_id
+        ).first()
+
+        if not task_definition:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task definition with id {task_data.task_definition_id} not found"
+            )
+
+        # Use definition values (can be overridden by provided values)
+        title = title or task_definition.name
+        description = description or task_definition.description
+        task_type = task_type or task_definition.task_type
+    else:
+        # No task definition - require title and task_type
+        if not title:
+            raise HTTPException(
+                status_code=400,
+                detail="title is required when task_definition_id is not provided"
+            )
+        if not task_type:
+            raise HTTPException(
+                status_code=400,
+                detail="task_type is required when task_definition_id is not provided"
+            )
+
+    # Create the task with defaults
+    task = Task(
+        project_id=project_id,
+        created_by_id=created_by_id,
+        task_definition_id=task_data.task_definition_id,
+        title=title,
+        description=description,
+        task_type=task_type,
+        assigned_to_id=task_data.assigned_to_id,
+        due_date=task_data.due_date,
+        priority=task_data.priority or "medium",
+        is_required=task_data.is_required if task_data.is_required is not None else True,
+        status="pending",
+    )
+
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return task

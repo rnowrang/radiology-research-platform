@@ -182,6 +182,16 @@ export const userQueries = {
     return result.rows[0] || null;
   },
 
+  findByRole: async (role: string): Promise<User[]> => {
+    const result = await query<User>(
+      `SELECT id, email, full_name, role, is_active, email_verified,
+              created_at, updated_at
+       FROM users WHERE role = $1 AND is_active = true`,
+      [role]
+    );
+    return result.rows;
+  },
+
   findAll: async (page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number }> => {
     const offset = (page - 1) * limit;
 

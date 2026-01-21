@@ -16,6 +16,10 @@ import {
   AlertCircle,
   Loader2,
   User,
+  Send,
+  ThumbsUp,
+  ThumbsDown,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,9 +70,10 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
-import { projectsApi, formsApi, api } from '@/lib/api';
+import { projectsApi, formsApi, api, tasksApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
+import { AddTaskToProjectDialog } from '@/components/admin/AddTaskToProjectDialog';
 
 interface ProjectResponse {
   id: string;
@@ -90,6 +95,13 @@ interface ProjectResponse {
     added_at: string;
   }>;
   form_count: number;
+  // Approval workflow fields
+  submitted_for_approval_at?: string;
+  approved_at?: string;
+  approved_by_id?: string;
+  rejected_at?: string;
+  rejected_by_id?: string;
+  rejection_notes?: string;
 }
 
 interface FormItem {
@@ -147,6 +159,9 @@ interface CustomTaskFormData {
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
   active: { label: 'Active', variant: 'default' },
+  pending_approval: { label: 'Pending Approval', variant: 'default' },
+  approved: { label: 'Approved', variant: 'outline' },
+  rejected: { label: 'Rejected', variant: 'destructive' },
   completed: { label: 'Completed', variant: 'outline' },
   archived: { label: 'Archived', variant: 'outline' },
 };
@@ -215,6 +230,11 @@ export function ProjectDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [showDeleteTaskDialog, setShowDeleteTaskDialog] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<ProjectTask | null>(null);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionNotes, setRejectionNotes] = useState('');
   const [newTask, setNewTask] = useState<CustomTaskFormData>({
     title: '',
     description: '',
@@ -289,6 +309,63 @@ export function ProjectDetailPage() {
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to update status',
+      });
+    },
+  });
+
+  // Project approval workflow mutations
+  const submitForApprovalMutation = useMutation({
+    mutationFn: () => projectsApi.submitForApproval(id!),
+    onSuccess: () => {
+      toast({
+        title: 'Project submitted for approval',
+        description: 'Your project has been submitted for admin review',
+      });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || error.response?.data?.detail || 'Failed to submit project for approval',
+      });
+    },
+  });
+
+  const approveProjectMutation = useMutation({
+    mutationFn: () => projectsApi.approve(id!),
+    onSuccess: () => {
+      toast({
+        title: 'Project approved',
+        description: 'The project has been approved successfully',
+      });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || error.response?.data?.detail || 'Failed to approve project',
+      });
+    },
+  });
+
+  const rejectProjectMutation = useMutation({
+    mutationFn: (notes: string) => projectsApi.reject(id!, notes),
+    onSuccess: () => {
+      toast({
+        title: 'Project rejected',
+        description: 'The project has been rejected',
+      });
+      setShowRejectDialog(false);
+      setRejectionNotes('');
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || error.response?.data?.detail || 'Failed to reject project',
       });
     },
   });
@@ -370,6 +447,35 @@ export function ProjectDetailPage() {
     },
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.delete(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+      setShowDeleteTaskDialog(false);
+      setTaskToDelete(null);
+      toast({ title: 'Task deleted successfully' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to delete task',
+      });
+    },
+  });
+
+  const handleDeleteTask = (task: ProjectTask) => {
+    setTaskToDelete(task);
+    setShowDeleteTaskDialog(true);
+  };
+
+  const confirmDeleteTask = () => {
+    if (taskToDelete) {
+      deleteTaskMutation.mutate(taskToDelete.id);
+    }
+  };
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not set';
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -396,6 +502,22 @@ export function ProjectDetailPage() {
     completion_percentage: 0,
     tasks: [],
   };
+
+  // Check if all required tasks are completed (for submit for approval eligibility)
+  const allRequiredTasksCompleted = projectTasks.length === 0 || projectTasks.every(task => {
+    // If task is not required, it doesn't block submission
+    if (!task.is_required) return true;
+    // Required tasks must be completed or approved
+    return ['completed', 'approved'].includes(task.status);
+  });
+
+  // Can submit for approval: PI or admin, project status allows it, and all required tasks done
+  const canSubmitForApproval = (isOwner || isAdmin) &&
+    ['draft', 'active', 'rejected'].includes(project?.status || '') &&
+    allRequiredTasksCompleted;
+
+  // Can admin review: admin only, project is pending_approval
+  const canAdminReview = isAdmin && project?.status === 'pending_approval';
 
   const handleCreateTask = () => {
     if (!newTask.title.trim()) {
@@ -468,46 +590,147 @@ export function ProjectDetailPage() {
           </div>
         </div>
 
-        {isOwner && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Project
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {project.status === 'draft' && (
-                <DropdownMenuItem onClick={() => updateStatusMutation.mutate('active')}>
-                  Mark as Active
-                </DropdownMenuItem>
+        <div className="flex items-center gap-2">
+          {/* Submit for Approval Button - Researcher */}
+          {canSubmitForApproval && (
+            <Button
+              onClick={() => submitForApprovalMutation.mutate()}
+              disabled={submitForApprovalMutation.isPending}
+            >
+              {submitForApprovalMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
               )}
-              {project.status === 'active' && (
-                <DropdownMenuItem onClick={() => updateStatusMutation.mutate('completed')}>
-                  Mark as Completed
-                </DropdownMenuItem>
-              )}
-              {project.status !== 'archived' && (
-                <DropdownMenuItem onClick={() => updateStatusMutation.mutate('archived')}>
-                  Archive Project
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
+              Submit for Approval
+            </Button>
+          )}
+
+          {/* Admin Review Buttons */}
+          {canAdminReview && (
+            <>
+              <Button
+                variant="default"
+                onClick={() => approveProjectMutation.mutate()}
+                disabled={approveProjectMutation.isPending}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                {approveProjectMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ThumbsUp className="mr-2 h-4 w-4" />
+                )}
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setShowRejectDialog(true)}
+                disabled={rejectProjectMutation.isPending}
+              >
+                <ThumbsDown className="mr-2 h-4 w-4" />
+                Reject
+              </Button>
+            </>
+          )}
+
+          {(isOwner || isAdmin) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate(`/projects/${id}/edit`)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Project
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {project.status === 'draft' && (
+                  <DropdownMenuItem onClick={() => updateStatusMutation.mutate('active')}>
+                    Mark as Active
+                  </DropdownMenuItem>
+                )}
+                {project.status === 'active' && (
+                  <DropdownMenuItem onClick={() => updateStatusMutation.mutate('completed')}>
+                    Mark as Completed
+                  </DropdownMenuItem>
+                )}
+                {project.status !== 'archived' && (
+                  <DropdownMenuItem onClick={() => updateStatusMutation.mutate('archived')}>
+                    Archive Project
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
+
+      {/* Rejection Notes Alert - Show when project is rejected */}
+      {project.status === 'rejected' && project.rejection_notes && (
+        <Card className="border-destructive bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-destructive flex items-center gap-2 text-lg">
+              <XCircle className="h-5 w-5" />
+              Project Rejected
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-2">
+              Rejected on {formatDate(project.rejected_at)}
+            </p>
+            <p className="text-sm">{project.rejection_notes}</p>
+            {canSubmitForApproval && (
+              <p className="text-sm text-muted-foreground mt-3">
+                Please address the feedback and resubmit your project for approval.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Approval Info - Show when waiting for admin review */}
+      {project.status === 'pending_approval' && !isAdmin && (
+        <Card className="border-yellow-500 bg-yellow-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-yellow-700 flex items-center gap-2 text-lg">
+              <Clock className="h-5 w-5" />
+              Pending Admin Approval
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Your project was submitted for approval on {formatDate(project.submitted_for_approval_at)}.
+              An administrator will review it shortly.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Approved Info - Show when project is approved */}
+      {project.status === 'approved' && (
+        <Card className="border-green-500 bg-green-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-green-700 flex items-center gap-2 text-lg">
+              <CheckCircle className="h-5 w-5" />
+              Project Approved
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This project was approved on {formatDate(project.approved_at)}.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Project Info Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -701,9 +924,9 @@ export function ProjectDetailPage() {
                     </Button>
                   )}
                   {canManageTasks && (
-                    <Button onClick={() => setShowCreateTaskDialog(true)}>
+                    <Button onClick={() => setShowAddTaskDialog(true)}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Custom Task
+                      Add Task
                     </Button>
                   )}
                 </div>
@@ -843,6 +1066,20 @@ export function ProjectDetailPage() {
                                 disabled={updateTaskMutation.isPending}
                               >
                                 Revise
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTask(task);
+                                }}
+                                disabled={deleteTaskMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
@@ -1122,6 +1359,106 @@ export function ProjectDetailPage() {
           queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
         }}
       />
+
+      {/* Add Task to Project Dialog */}
+      {id && (
+        <AddTaskToProjectDialog
+          projectId={id}
+          open={showAddTaskDialog}
+          onOpenChange={setShowAddTaskDialog}
+          onTaskAdded={() => {
+            queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+            queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', id] });
+          }}
+          collaborators={project?.collaborators?.map((c) => ({
+            id: c.id,
+            user_id: c.user_id,
+            role: c.role,
+          }))}
+        />
+      )}
+
+      {/* Delete Task Confirmation Dialog */}
+      <AlertDialog open={showDeleteTaskDialog} onOpenChange={setShowDeleteTaskDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the task "{taskToDelete?.title}"? This action cannot be undone.
+              {taskToDelete?.status === 'in_progress' && (
+                <span className="block mt-2 text-amber-600">
+                  Warning: This task is currently in progress.
+                </span>
+              )}
+              {taskToDelete?.status === 'submitted' && (
+                <span className="block mt-2 text-amber-600">
+                  Warning: This task has been submitted for review.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteTask}
+              disabled={deleteTaskMutation.isPending}
+            >
+              {deleteTaskMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete Task
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject Project Dialog (Admin only) */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Project</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this project. The researcher will be notified and can address the feedback before resubmitting.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection_notes">
+                Rejection Notes <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="rejection_notes"
+                value={rejectionNotes}
+                onChange={(e) => setRejectionNotes(e.target.value)}
+                placeholder="Explain why the project is being rejected and what changes are needed..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRejectDialog(false);
+                setRejectionNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => rejectProjectMutation.mutate(rejectionNotes)}
+              disabled={!rejectionNotes.trim() || rejectProjectMutation.isPending}
+            >
+              {rejectProjectMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Reject Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import {
   User,
@@ -8,6 +9,8 @@ import {
   Save,
   Loader2,
   Key,
+  Bell,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -245,6 +248,30 @@ export function ProfilePage() {
               {user.isActive ? 'Active' : 'Inactive'}
             </Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notifications</CardTitle>
+          <CardDescription>Manage how you receive notifications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/settings/notifications" className="block">
+            <div className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Notification Preferences</p>
+                  <p className="text-sm text-muted-foreground">
+                    Control which notifications you receive
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </Link>
         </CardContent>
       </Card>
 

@@ -50,7 +50,7 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     project_type: Optional[str] = None
     department: Optional[str] = None
-    status: Optional[str] = Field(None, pattern="^(draft|active|completed|archived)$")
+    status: Optional[str] = Field(None, pattern="^(draft|active|pending_approval|approved|rejected|completed|archived)$")
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     is_public: Optional[bool] = None
@@ -65,6 +65,14 @@ class ProjectResponse(ProjectBase):
     updated_at: Optional[datetime] = None
     collaborators: List[ProjectCollaboratorResponse] = []
     form_count: int = 0
+
+    # Approval workflow fields
+    submitted_for_approval_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+    approved_by_id: Optional[UUID] = None
+    rejected_at: Optional[datetime] = None
+    rejected_by_id: Optional[UUID] = None
+    rejection_notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -85,5 +93,25 @@ class ProjectListResponse(BaseModel):
     form_count: int = 0
     collaborator_count: int = 0
 
+    # Approval workflow fields
+    submitted_for_approval_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+    rejected_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
+
+
+class ProjectSubmitForApprovalRequest(BaseModel):
+    """Schema for submitting a project for approval."""
+    notes: Optional[str] = None
+
+
+class ProjectApproveRequest(BaseModel):
+    """Schema for approving a project."""
+    notes: Optional[str] = None
+
+
+class ProjectRejectRequest(BaseModel):
+    """Schema for rejecting a project."""
+    notes: str = Field(..., min_length=1, description="Rejection notes are required")

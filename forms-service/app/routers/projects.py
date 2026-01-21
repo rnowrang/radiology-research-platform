@@ -1,9 +1,10 @@
 """Project management endpoints."""
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
@@ -17,11 +18,15 @@ from app.schemas.project import (
     ProjectListResponse,
     ProjectCollaboratorCreate,
     ProjectCollaboratorResponse,
+    ProjectSubmitForApprovalRequest,
+    ProjectApproveRequest,
+    ProjectRejectRequest,
 )
 from app.schemas.task import TaskCreateForProject, TaskResponse
 from app.schemas.task_definition import ProjectTaskProgress
 from app.models.task_definition import TaskDefinition
 from app.services import task_definition as task_def_service
+from app.services.task import create_task_for_project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -70,18 +75,28 @@ def list_projects(
             (Project.is_public == True)
         )
 
+    # Eagerly load collaborators to avoid N+1 when accessing project.collaborators
+    query = query.options(joinedload(Project.collaborators))
+
     projects = query.order_by(Project.created_at.desc()).all()
 
-    result = []
-    for project in projects:
-        # Count forms and collaborators
-        form_count = db.query(func.count(FormInstance.id)).filter(
-            FormInstance.project_id == project.id
-        ).scalar() or 0
+    # Get all project IDs to fetch form counts in a single query (prevents N+1)
+    project_ids = [p.id for p in projects]
 
-        collaborator_count = len(project.collaborators)
+    # Single query to get form counts for all projects at once
+    form_counts_result = db.query(
+        FormInstance.project_id,
+        func.count(FormInstance.id).label('count')
+    ).filter(
+        FormInstance.project_id.in_(project_ids)
+    ).group_by(FormInstance.project_id).all()
 
-        result.append(ProjectListResponse(
+    # Build a lookup dict for O(1) access
+    form_counts: Dict[UUID, int] = {row.project_id: row.count for row in form_counts_result}
+
+    # Build response using pre-fetched counts (no additional queries)
+    result = [
+        ProjectListResponse(
             id=project.id,
             title=project.title,
             description=project.description,
@@ -92,9 +107,14 @@ def list_projects(
             start_date=project.start_date,
             end_date=project.end_date,
             created_at=project.created_at,
-            form_count=form_count,
-            collaborator_count=collaborator_count,
-        ))
+            form_count=form_counts.get(project.id, 0),
+            collaborator_count=len(project.collaborators),
+            submitted_for_approval_at=project.submitted_for_approval_at,
+            approved_at=project.approved_at,
+            rejected_at=project.rejected_at,
+        )
+        for project in projects
+    ]
 
     return result
 
@@ -205,6 +225,12 @@ def get_project(
         is_public=project.is_public,
         created_at=project.created_at,
         updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
         collaborators=[
             ProjectCollaboratorResponse(
                 id=c.id,
@@ -260,6 +286,12 @@ def update_project(
         is_public=project.is_public,
         created_at=project.created_at,
         updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
         collaborators=[
             ProjectCollaboratorResponse(
                 id=c.id,
@@ -496,80 +528,44 @@ def list_project_tasks(
 
 
 @router.post("/{project_id}/tasks", response_model=TaskResponse, status_code=201)
-def create_project_task(
+def create_project_task_endpoint(
     project_id: UUID,
     task_data: TaskCreateForProject,
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
 ):
     """
-    Manually create a task for a project.
+    Manually create a task for a project. Admin only.
 
     Can either:
     - Use an existing task definition (provide task_definition_id)
     - Create an ad-hoc custom task (provide title and task_type)
+
+    The task will be created with:
+    - status = 'pending'
+    - priority = 'medium' (if not provided)
+    - is_required = True (if not provided)
+    - assigned_to_id is optional (can be assigned later)
     """
     # Validate user_id is provided
     if not user_id:
         raise HTTPException(status_code=401, detail="X-User-Id header required")
 
-    # Verify project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    # Admin-only check (defense in depth - gateway also checks)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can manually create project tasks"
+        )
 
-    # Determine title, description, and task_type based on input
-    title = task_data.title
-    description = task_data.description
-    task_type = task_data.task_type
-
-    if task_data.task_definition_id:
-        # Fetch the task definition
-        task_definition = db.query(TaskDefinition).filter(
-            TaskDefinition.id == task_data.task_definition_id
-        ).first()
-
-        if not task_definition:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Task definition with id {task_data.task_definition_id} not found"
-            )
-
-        # Use definition values (can be overridden by provided values)
-        title = title or task_definition.name
-        description = description or task_definition.description
-        task_type = task_type or task_definition.task_type
-    else:
-        # No task definition - require title and task_type
-        if not title:
-            raise HTTPException(
-                status_code=400,
-                detail="title is required when task_definition_id is not provided"
-            )
-        if not task_type:
-            raise HTTPException(
-                status_code=400,
-                detail="task_type is required when task_definition_id is not provided"
-            )
-
-    # Create the task
-    task = Task(
+    # Use the service method to create the task
+    task = create_task_for_project(
+        db=db,
         project_id=project_id,
+        task_data=task_data,
         created_by_id=user_id,
-        task_definition_id=task_data.task_definition_id,
-        title=title,
-        description=description,
-        task_type=task_type,
-        assigned_to_id=task_data.assigned_to_id,
-        due_date=task_data.due_date,
-        priority=task_data.priority,
-        is_required=task_data.is_required,
-        status="pending",
     )
-
-    db.add(task)
-    db.commit()
-    db.refresh(task)
 
     return TaskResponse(
         id=task.id,
@@ -584,7 +580,7 @@ def create_project_task(
         status=task.status,
         priority=task.priority,
         due_date=task.due_date,
-        is_required=task.is_required,
+        is_required=task.is_required if task.is_required is not None else True,
         completed_at=task.completed_at,
         submitted_at=task.submitted_at,
         reviewed_at=task.reviewed_at,
@@ -607,3 +603,266 @@ def get_project_task_progress(
         raise HTTPException(status_code=404, detail="Project not found")
 
     return task_def_service.get_project_task_progress(db, project_id)
+
+
+# =============================================================================
+# Project Approval Workflow
+# =============================================================================
+
+@router.post("/{project_id}/submit-for-approval", response_model=ProjectResponse)
+def submit_project_for_approval(
+    project_id: UUID,
+    request_body: Optional[ProjectSubmitForApprovalRequest] = None,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
+):
+    """
+    Submit project for admin approval. Researcher action.
+
+    Validates that all required tasks are completed/approved before allowing submission.
+    Changes project status to 'pending_approval'.
+    """
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Only PI or admin can submit for approval
+    if user_id and project.principal_investigator_id != user_id and user_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the principal investigator or admin can submit this project for approval"
+        )
+
+    # Check current status - must be in draft or active (or rejected to resubmit)
+    allowed_statuses = ["draft", "active", "rejected"]
+    if project.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project cannot be submitted for approval from '{project.status}' status. "
+                   f"Allowed statuses: {', '.join(allowed_statuses)}"
+        )
+
+    # Get task progress to validate all required tasks are complete
+    progress = task_def_service.get_project_task_progress(db, project_id)
+
+    # Check if there are any tasks
+    if progress.total_tasks > 0:
+        # Find incomplete required tasks
+        incomplete_required = []
+        for task_info in progress.tasks:
+            if task_info.get("is_required", True):
+                task_status = task_info.get("status")
+                # Required tasks must be 'completed' or 'approved'
+                if task_status not in ["completed", "approved"]:
+                    incomplete_required.append(task_info.get("title", f"Task {task_info.get('id')}"))
+
+        if incomplete_required:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot submit for approval. The following required tasks are not completed: {', '.join(incomplete_required)}"
+            )
+
+    # Update project status to pending_approval
+    project.status = "pending_approval"
+    project.submitted_for_approval_at = datetime.now(timezone.utc)
+    # Clear any previous rejection data if resubmitting
+    project.rejected_at = None
+    project.rejected_by_id = None
+    project.rejection_notes = None
+
+    db.commit()
+    db.refresh(project)
+
+    form_count = db.query(func.count(FormInstance.id)).filter(
+        FormInstance.project_id == project.id
+    ).scalar() or 0
+
+    return ProjectResponse(
+        id=project.id,
+        title=project.title,
+        description=project.description,
+        project_type=project.project_type,
+        department=project.department,
+        principal_investigator_id=project.principal_investigator_id,
+        status=project.status,
+        start_date=project.start_date,
+        end_date=project.end_date,
+        is_public=project.is_public,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
+        collaborators=[
+            ProjectCollaboratorResponse(
+                id=c.id,
+                project_id=c.project_id,
+                user_id=c.user_id,
+                role=c.role,
+                added_at=c.added_at,
+            )
+            for c in project.collaborators
+        ],
+        form_count=form_count,
+    )
+
+
+@router.post("/{project_id}/approve", response_model=ProjectResponse)
+def approve_project(
+    project_id: UUID,
+    request_body: Optional[ProjectApproveRequest] = None,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
+):
+    """
+    Approve the project. Admin only.
+
+    Validates project is in pending_approval status.
+    Changes status to 'approved' and sets approved_at timestamp.
+    """
+    # Admin-only check
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can approve projects"
+        )
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check current status - must be pending_approval
+    if project.status != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project cannot be approved from '{project.status}' status. "
+                   f"Project must be in 'pending_approval' status."
+        )
+
+    # Update project status to approved
+    project.status = "approved"
+    project.approved_at = datetime.now(timezone.utc)
+    project.approved_by_id = user_id
+
+    db.commit()
+    db.refresh(project)
+
+    form_count = db.query(func.count(FormInstance.id)).filter(
+        FormInstance.project_id == project.id
+    ).scalar() or 0
+
+    return ProjectResponse(
+        id=project.id,
+        title=project.title,
+        description=project.description,
+        project_type=project.project_type,
+        department=project.department,
+        principal_investigator_id=project.principal_investigator_id,
+        status=project.status,
+        start_date=project.start_date,
+        end_date=project.end_date,
+        is_public=project.is_public,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
+        collaborators=[
+            ProjectCollaboratorResponse(
+                id=c.id,
+                project_id=c.project_id,
+                user_id=c.user_id,
+                role=c.role,
+                added_at=c.added_at,
+            )
+            for c in project.collaborators
+        ],
+        form_count=form_count,
+    )
+
+
+@router.post("/{project_id}/reject", response_model=ProjectResponse)
+def reject_project(
+    project_id: UUID,
+    request_body: ProjectRejectRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
+):
+    """
+    Reject the project. Admin only.
+
+    Validates project is in pending_approval status.
+    Changes status to 'rejected' and stores rejection notes.
+    """
+    # Admin-only check
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can reject projects"
+        )
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check current status - must be pending_approval
+    if project.status != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project cannot be rejected from '{project.status}' status. "
+                   f"Project must be in 'pending_approval' status."
+        )
+
+    # Update project status to rejected
+    project.status = "rejected"
+    project.rejected_at = datetime.now(timezone.utc)
+    project.rejected_by_id = user_id
+    project.rejection_notes = request_body.notes
+
+    db.commit()
+    db.refresh(project)
+
+    form_count = db.query(func.count(FormInstance.id)).filter(
+        FormInstance.project_id == project.id
+    ).scalar() or 0
+
+    return ProjectResponse(
+        id=project.id,
+        title=project.title,
+        description=project.description,
+        project_type=project.project_type,
+        department=project.department,
+        principal_investigator_id=project.principal_investigator_id,
+        status=project.status,
+        start_date=project.start_date,
+        end_date=project.end_date,
+        is_public=project.is_public,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
+        collaborators=[
+            ProjectCollaboratorResponse(
+                id=c.id,
+                project_id=c.project_id,
+                user_id=c.user_id,
+                role=c.role,
+                added_at=c.added_at,
+            )
+            for c in project.collaborators
+        ],
+        form_count=form_count,
+    )

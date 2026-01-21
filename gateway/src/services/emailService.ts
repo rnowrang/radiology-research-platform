@@ -335,6 +335,54 @@ export const emailService = {
   },
 
   /**
+   * Send task status change notification email
+   */
+  sendTaskStatusChangedEmail: async (
+    to: string,
+    taskTitle: string,
+    projectTitle: string,
+    status: 'submitted' | 'approved' | 'rejected' | 'revision_requested',
+    taskId: number,
+    reviewerComments?: string
+  ): Promise<SendResult> => {
+    const statusLabels: Record<string, string> = {
+      submitted: 'Submitted for Review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      revision_requested: 'Revision Requested',
+    };
+
+    const statusClasses: Record<string, string> = {
+      submitted: 'info',
+      approved: 'success',
+      rejected: 'error',
+      revision_requested: 'warning',
+    };
+
+    const html = await loadTemplate('task-status-changed', {
+      taskTitle,
+      projectTitle,
+      taskId: taskId.toString(),
+      taskLink: `${config.email.appUrl}/tasks/${taskId}`,
+      status: statusLabels[status],
+      statusClass: statusClasses[status],
+      reviewerComments: reviewerComments || '',
+      hasComments: reviewerComments ? 'true' : '',
+      isSubmitted: status === 'submitted' ? 'true' : '',
+      isApproved: status === 'approved' ? 'true' : '',
+      isRejected: status === 'rejected' ? 'true' : '',
+      isRevisionRequested: status === 'revision_requested' ? 'true' : '',
+      year: new Date().getFullYear().toString(),
+    });
+
+    return emailService.sendEmail(
+      to,
+      `Task ${statusLabels[status]}: ${taskTitle}`,
+      html
+    );
+  },
+
+  /**
    * Send a test email
    */
   sendTestEmail: async (to: string): Promise<SendResult> => {

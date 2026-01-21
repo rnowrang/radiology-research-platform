@@ -83,6 +83,13 @@ export const projectsApi = {
     api.post(`/projects/${id}/collaborators`, data),
   getTasksForProjectType: (projectType: string) =>
     api.get(`/project-types/${projectType}/tasks`),
+  // Project approval workflow
+  submitForApproval: (id: string, notes?: string) =>
+    api.post(`/projects/${id}/submit-for-approval`, { notes }),
+  approve: (id: string, notes?: string) =>
+    api.post(`/projects/${id}/approve`, { notes }),
+  reject: (id: string, notes: string) =>
+    api.post(`/projects/${id}/reject`, { notes }),
 };
 
 export const templatesApi = {
@@ -201,6 +208,7 @@ export const tasksApi = {
   get: (id: number) => api.get(`/tasks/${id}`),
   create: (data: any) => api.post('/tasks', data),
   update: (id: number, data: any) => api.put(`/tasks/${id}`, data),
+  delete: (id: number) => api.delete(`/tasks/${id}`),
   complete: (id: number) => api.post(`/tasks/${id}/complete`),
   // Enhanced task workflow methods
   submit: (id: number) => api.post(`/tasks/${id}/submit`),
@@ -216,6 +224,11 @@ export const tasksApi = {
     api.get(`/projects/${projectId}/task-progress`),
   createFormForTask: (taskId: number, templateId: number) =>
     api.post(`/tasks/${taskId}/create-form`, { template_id: templateId }),
+  // Auto-complete upload task after file upload
+  autoCompleteUpload: (projectId: string, fileCategory: string) =>
+    api.post('/tasks/auto-complete-upload', null, {
+      params: { project_id: projectId, file_category: fileCategory },
+    }),
 };
 
 // Task Definitions API (admin)
@@ -255,13 +268,91 @@ export const projectTypeMappingsApi = {
   delete: (id: number) => api.delete(`/admin/project-type-mappings/${id}`),
 };
 
+export interface NotificationListParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  is_read?: boolean;
+}
+
 export const notificationsApi = {
-  list: (params?: { page?: number; limit?: number }) =>
+  list: (params?: NotificationListParams) =>
     api.get('/notifications', { params }),
   markAsRead: (id: number) => api.post(`/notifications/${id}/read`),
   markAllAsRead: () => api.post('/notifications/read-all'),
   delete: (id: number) => api.delete(`/notifications/${id}`),
   getUnreadCount: () => api.get('/notifications/unread-count'),
+};
+
+// Notification Preferences types
+export type NotificationType =
+  | 'approval_request'
+  | 'status_change'
+  | 'comment'
+  | 'task_assigned'
+  | 'mention'
+  | 'reminder';
+
+export interface NotificationPreference {
+  id: number;
+  userId: string;
+  notificationType: NotificationType;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  label: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationPreferencesResponse {
+  preferences: NotificationPreference[];
+  types: NotificationType[];
+  labels: Record<NotificationType, string>;
+  descriptions: Record<NotificationType, string>;
+}
+
+export interface UpdatePreferenceData {
+  notificationType: NotificationType;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+}
+
+export const notificationPreferencesApi = {
+  // GET /api/users/me/notification-preferences - Get all preferences
+  getPreferences: () =>
+    api.get<{ success: boolean; data: NotificationPreferencesResponse }>(
+      '/users/me/notification-preferences'
+    ),
+
+  // GET /api/users/me/notification-preferences/types - Get available types
+  getTypes: () =>
+    api.get<{
+      success: boolean;
+      data: {
+        types: NotificationType[];
+        labels: Record<NotificationType, string>;
+        descriptions: Record<NotificationType, string>;
+        defaults: { in_app_enabled: boolean; email_enabled: boolean };
+      };
+    }>('/users/me/notification-preferences/types'),
+
+  // PUT /api/users/me/notification-preferences/:type - Update single preference
+  updatePreference: (
+    type: NotificationType,
+    data: { inAppEnabled?: boolean; emailEnabled?: boolean }
+  ) =>
+    api.put<{ success: boolean; data: NotificationPreference; message: string }>(
+      `/users/me/notification-preferences/${type}`,
+      data
+    ),
+
+  // PUT /api/users/me/notification-preferences - Update multiple preferences
+  updatePreferences: (preferences: UpdatePreferenceData[]) =>
+    api.put<{ success: boolean; data: NotificationPreference[]; message: string }>(
+      '/users/me/notification-preferences',
+      { preferences }
+    ),
 };
 
 export interface UsersListParams {

@@ -17,7 +17,10 @@ import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
 import { CreateProjectPage } from '@/pages/projects/CreateProjectPage';
 import { TasksPage } from '@/pages/tasks/TasksPage';
 import { SelectFormPage } from '@/pages/tasks/SelectFormPage';
+import { TaskDetailPage } from '@/pages/tasks/TaskDetailPage';
 import { ProfilePage } from '@/pages/profile/ProfilePage';
+import { NotificationsPage } from '@/pages/notifications/NotificationsPage';
+import { NotificationPreferencesPage } from '@/pages/settings/NotificationPreferencesPage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { AuditLogsPage } from '@/pages/admin/AuditLogsPage';
 import { UsersPage } from '@/pages/admin/UsersPage';
@@ -179,19 +182,16 @@ function App() {
         {/* Profile route */}
         <Route path="/profile" element={<ProfilePage />} />
 
-        {/* Settings route - placeholder */}
-        <Route
-          path="/settings"
-          element={
-            <div className="space-y-4">
-              <h1 className="text-3xl font-bold">Settings</h1>
-              <p className="text-muted-foreground">Coming soon...</p>
-            </div>
-          }
-        />
+        {/* Notifications route */}
+        <Route path="/notifications" element={<NotificationsPage />} />
+
+        {/* Settings routes */}
+        <Route path="/settings" element={<Navigate to="/settings/notifications" replace />} />
+        <Route path="/settings/notifications" element={<NotificationPreferencesPage />} />
 
         {/* Tasks routes */}
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
         <Route path="/tasks/:taskId/select-form" element={<SelectFormPage />} />
 
         {/* Search route */}
