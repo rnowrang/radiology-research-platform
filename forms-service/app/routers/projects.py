@@ -866,3 +866,82 @@ def reject_project(
         ],
         form_count=form_count,
     )
+
+
+@router.post("/{project_id}/request-changes", response_model=ProjectResponse)
+def request_project_changes(
+    project_id: UUID,
+    request_body: ProjectRejectRequest,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+    user_role: Optional[str] = Depends(get_user_role),
+):
+    """
+    Request changes on the project. Admin only.
+
+    Validates project is in pending_approval status.
+    Changes status to 'needs_changes' and stores notes.
+    """
+    # Admin-only check
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can request changes on projects"
+        )
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check current status - must be pending_approval
+    if project.status != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot request changes on project in '{project.status}' status. "
+                   f"Project must be in 'pending_approval' status."
+        )
+
+    # Update project status to needs_changes
+    project.status = "needs_changes"
+    project.rejected_at = datetime.now(timezone.utc)
+    project.rejected_by_id = user_id
+    project.rejection_notes = request_body.notes
+
+    db.commit()
+    db.refresh(project)
+
+    form_count = db.query(func.count(FormInstance.id)).filter(
+        FormInstance.project_id == project.id
+    ).scalar() or 0
+
+    return ProjectResponse(
+        id=project.id,
+        title=project.title,
+        description=project.description,
+        project_type=project.project_type,
+        department=project.department,
+        principal_investigator_id=project.principal_investigator_id,
+        status=project.status,
+        start_date=project.start_date,
+        end_date=project.end_date,
+        is_public=project.is_public,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        submitted_for_approval_at=project.submitted_for_approval_at,
+        approved_at=project.approved_at,
+        approved_by_id=project.approved_by_id,
+        rejected_at=project.rejected_at,
+        rejected_by_id=project.rejected_by_id,
+        rejection_notes=project.rejection_notes,
+        collaborators=[
+            ProjectCollaboratorResponse(
+                id=c.id,
+                project_id=c.project_id,
+                user_id=c.user_id,
+                role=c.role,
+                added_at=c.added_at,
+            )
+            for c in project.collaborators
+        ],
+        form_count=form_count,
+    )

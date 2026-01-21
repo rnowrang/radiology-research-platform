@@ -575,6 +575,67 @@ export const projectController = {
   },
 
   /**
+   * Request changes on a project
+   * POST /api/projects/:id/request-changes
+   * Admin only
+   */
+  requestChangesProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      // Admin only
+      if (req.user!.role !== USER_ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators can request changes on projects');
+      }
+
+      if (!notes || !notes.trim()) {
+        throw new ValidationError('Notes are required when requesting changes');
+      }
+
+      const project = await projectQueries.findById(id);
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Call forms-service to update status
+      const result = await formsProxy.requestChangesProject(id, req.user!.id, req.user!.role, notes);
+
+      // Update local project status
+      await projectQueries.update(id, { status: 'needs_changes' });
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'project',
+        resourceId: id,
+        details: { title: project.title, notes, action: 'request_changes' },
+      });
+
+      // Notify the PI about requested changes
+      try {
+        const reviewerName = req.user!.full_name || 'An administrator';
+        await notificationService.createNotification(
+          project.principal_investigator_id,
+          'status_change',
+          'Project requires changes',
+          `Your project "${project.title}" requires changes. Reviewer: ${reviewerName}. Notes: ${notes}`,
+          `/projects/${id}`
+        );
+      } catch (notifyError) {
+        console.error('Failed to send notification:', notifyError);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        message: 'Changes requested on project',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
    * Get project review summary for admin review page
    * GET /api/projects/:projectId/review-summary
    * Admin only - aggregates all information needed for AdminProjectReviewPage

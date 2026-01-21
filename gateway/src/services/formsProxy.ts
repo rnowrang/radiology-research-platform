@@ -942,6 +942,23 @@ export const formsProxy = {
       headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
     });
   },
+
+  /**
+   * Request changes on a project.
+   * Admin only action - requires notes explaining what needs to change.
+   */
+  requestChangesProject: async (
+    projectId: string,
+    userId: string,
+    userRole: string,
+    notes: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/projects/${projectId}/request-changes`, {
+      notes,
+    }, {
+      headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+    });
+  },
 };
 
 export default formsProxy;

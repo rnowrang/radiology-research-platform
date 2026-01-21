@@ -42,5 +42,6 @@ router.post('/:projectId/tasks', asyncHandler(projectController.createProjectTas
 router.post('/:id/submit-for-approval', asyncHandler(projectController.submitForApproval));
 router.post('/:id/approve', asyncHandler(projectController.approveProject));
 router.post('/:id/reject', asyncHandler(projectController.rejectProject));
+router.post('/:id/request-changes', asyncHandler(projectController.requestChangesProject));
 
 export default router;
