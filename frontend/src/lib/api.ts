@@ -99,7 +99,12 @@ export const templatesApi = {
 
 export const formsApi = {
   list: (params?: { projectId?: string; status?: string }) =>
-    api.get('/forms', { params }),
+    api.get('/forms', {
+      params: {
+        project_id: params?.projectId,
+        status: params?.status,
+      }
+    }),
   get: (id: number) => api.get(`/forms/${id}`),
   create: (data: { template_id: number; project_id?: string; title: string }) =>
     api.post('/forms', data),
@@ -125,23 +130,23 @@ export const formsApi = {
       params: { version_id: versionId },
       responseType: 'blob',
     }),
-  // Review actions (routes are under /review prefix)
+  // Review actions
   submitForReview: (id: number, notes?: string) =>
-    api.post(`/review/forms/${id}/submit`, { notes }),
+    api.post(`/forms/${id}/submit`, { notes }),
   requestChanges: (id: number, notes: string) =>
-    api.post(`/review/forms/${id}/request-changes`, { notes }),
+    api.post(`/forms/${id}/request-changes`, { notes }),
   approve: (id: number, notes?: string) =>
-    api.post(`/review/forms/${id}/approve`, { notes }),
+    api.post(`/forms/${id}/approve`, { notes }),
   reject: (id: number, notes: string) =>
-    api.post(`/review/forms/${id}/reject`, { notes }),
+    api.post(`/forms/${id}/reject`, { notes }),
   returnToDraft: (id: number, notes?: string) =>
-    api.post(`/review/forms/${id}/return-to-draft`, { notes }),
-  getReviewHistory: (id: number) => api.get(`/review/forms/${id}/history`),
-  // Comments (routes are under /review prefix)
+    api.post(`/forms/${id}/return-to-draft`, { notes }),
+  getReviewHistory: (id: number) => api.get(`/forms/${id}/review-history`),
+  // Comments
   getComments: (id: number, includeResolved?: boolean) =>
-    api.get(`/review/forms/${id}/comments`, { params: { include_resolved: includeResolved } }),
+    api.get(`/forms/${id}/comments`, { params: { include_resolved: includeResolved } }),
   addComment: (id: number, data: { content: string; field_id?: string; section_id?: string }) =>
-    api.post(`/review/forms/${id}/comments`, data),
+    api.post(`/forms/${id}/comments`, data),
   // Audit
   getAuditLog: (id: number, params?: any) => api.get(`/forms/${id}/audit`, { params }),
   getFieldHistory: (id: number, fieldId: string) => api.get(`/forms/${id}/audit/field/${fieldId}`),
@@ -149,11 +154,11 @@ export const formsApi = {
 
 export const reviewApi = {
   getQueue: (status?: string) => api.get('/review/queue', { params: status ? { status } : {} }),
-  resolveThread: (threadId: number) => api.post(`/review/threads/${threadId}/resolve`),
-  reopenThread: (threadId: number) => api.post(`/review/threads/${threadId}/reopen`),
+  resolveThread: (threadId: number) => api.post(`/threads/${threadId}/resolve`),
+  reopenThread: (threadId: number) => api.post(`/threads/${threadId}/reopen`),
   replyToThread: (threadId: number, content: string) =>
-    api.post(`/review/threads/${threadId}/reply`, { content }),
-  getMentionableUsers: (formId: number) => api.get(`/review/forms/${formId}/mentionable-users`),
+    api.post(`/threads/${threadId}/reply`, { content }),
+  getMentionableUsers: (formId: number) => api.get(`/forms/${formId}/mentionable-users`),
 };
 
 export interface LockInfo {
@@ -225,10 +230,12 @@ export const tasksApi = {
   createFormForTask: (taskId: number, templateId: number) =>
     api.post(`/tasks/${taskId}/create-form`, { template_id: templateId }),
   // Auto-complete upload task after file upload
-  autoCompleteUpload: (projectId: string, fileCategory: string) =>
+  autoCompleteUpload: (projectId: string, fileCategory: string, taskId?: number) =>
     api.post('/tasks/auto-complete-upload', null, {
-      params: { project_id: projectId, file_category: fileCategory },
+      params: { project_id: projectId, file_category: fileCategory, ...(taskId && { task_id: taskId }) },
     }),
+  // Manually mark task as complete
+  markComplete: (taskId: number) => api.post(`/tasks/${taskId}/mark-complete`),
 };
 
 // Task Definitions API (admin)
@@ -395,6 +402,7 @@ export interface FileUploadParams {
   project_id?: string;
   form_id?: number;
   category?: FileCategory;
+  taskId?: number;
 }
 
 export interface FileMetadata {
@@ -413,6 +421,9 @@ export interface FileMetadata {
   created_at: string;
 }
 
+// API base URL for constructing preview URLs
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 export const filesApi = {
   upload: (params: FileUploadParams, onUploadProgress?: (progressEvent: any) => void) => {
     const formData = new FormData();
@@ -420,6 +431,7 @@ export const filesApi = {
     if (params.project_id) formData.append('project_id', params.project_id);
     if (params.form_id) formData.append('form_id', params.form_id.toString());
     if (params.category) formData.append('category', params.category);
+    if (params.taskId) formData.append('task_id', params.taskId.toString());
 
     return api.post('/files', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -433,6 +445,8 @@ export const filesApi = {
     api.get<{ success: boolean; data: FileMetadata[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/projects/${projectId}/files`, { params }),
   listFormFiles: (formId: number, params?: { page?: number; limit?: number }) =>
     api.get<{ success: boolean; data: FileMetadata[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/forms/${formId}/files`, { params }),
+  getTaskFiles: (taskId: number) => api.get(`/files/task/${taskId}`),
+  getPreviewUrl: (fileId: number) => `${API_BASE_URL}/files/${fileId}/preview`,
 };
 
 // Search types

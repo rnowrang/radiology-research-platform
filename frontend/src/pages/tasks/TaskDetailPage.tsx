@@ -22,10 +22,10 @@ import {
   MessageSquare,
   History,
   AlertTriangle,
-  FileUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Breadcrumb, type BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
@@ -56,8 +56,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
-import { tasksApi, filesApi, type FileMetadata } from '@/lib/api';
-import { TaskFileUpload } from '@/components/tasks/TaskFileUpload';
+import { tasksApi, filesApi } from '@/lib/api';
+import { UploadDropzone } from '@/components/tasks/UploadDropzone';
+import { FileCard, type FileCardFile } from '@/components/files/FileCard';
+import { FilePreviewModal, type FilePreviewModalFile } from '@/components/files/FilePreviewModal';
 
 // Task status types
 type TaskStatus =
@@ -183,8 +185,11 @@ export function TaskDetailPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showRevisionDialog, setShowRevisionDialog] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
+
+  // File preview states
+  const [previewFile, setPreviewFile] = useState<FilePreviewModalFile | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Fetch task details
   const { data: task, isLoading: taskLoading, error: taskError } = useQuery({
@@ -196,15 +201,14 @@ export function TaskDetailPage() {
     enabled: !!taskId,
   });
 
-  // Fetch project files if this is a document_upload task
-  const { data: projectFiles } = useQuery({
-    queryKey: ['projectFiles', task?.project_id],
+  // Fetch task-specific files if this is a document_upload task
+  const { data: taskFiles, isLoading: taskFilesLoading, error: taskFilesError } = useQuery({
+    queryKey: ['taskFiles', taskId],
     queryFn: async () => {
-      if (!task?.project_id) return [];
-      const response = await filesApi.listProjectFiles(task.project_id);
-      return response.data.data as FileMetadata[];
+      const response = await filesApi.getTaskFiles(parseInt(taskId!));
+      return response.data.data as FileCardFile[];
     },
-    enabled: !!task?.project_id && task?.task_type === 'document_upload',
+    enabled: !!taskId && task?.task_type === 'document_upload',
   });
 
   // Mutations
@@ -306,6 +310,37 @@ export function TaskDetailPage() {
     },
   });
 
+  const markCompleteMutation = useMutation({
+    mutationFn: () => tasksApi.markComplete(parseInt(taskId!)),
+    onSuccess: () => {
+      toast({ title: 'Task marked as complete' });
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to mark task as complete',
+      });
+    },
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: (fileId: string) => filesApi.delete(fileId),
+    onSuccess: () => {
+      toast({ title: 'File deleted' });
+      queryClient.invalidateQueries({ queryKey: ['taskFiles', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to delete file',
+      });
+    },
+  });
+
   // Loading state
   if (taskLoading) {
     return (
@@ -387,8 +422,24 @@ export function TaskDetailPage() {
   // Sort by timestamp descending
   statusHistory.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+  // Build breadcrumb items based on whether task has a project
+  const breadcrumbItems: BreadcrumbItem[] = task.project_id
+    ? [
+        { label: 'Projects', href: '/projects' },
+        { label: task.project_title || 'Project', href: `/projects/${task.project_id}` },
+        { label: 'Tasks', href: `/projects/${task.project_id}/tasks` },
+        { label: task.title, current: true },
+      ]
+    : [
+        { label: 'Tasks', href: '/tasks' },
+        { label: task.title, current: true },
+      ];
+
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb items={breadcrumbItems} />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
@@ -699,66 +750,89 @@ export function TaskDetailPage() {
                   Upload required documents for this task
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                {projectFiles && projectFiles.length > 0 ? (
-                  <div className="space-y-2">
-                    {projectFiles.map((file) => (
-                      <div
+              <CardContent className="space-y-4">
+                {/* Upload Dropzone - Always visible for document_upload tasks that allow uploads */}
+                {(task.status === 'pending' || task.status === 'in_progress' || task.status === 'revision_required') && (
+                  <UploadDropzone
+                    taskId={task.id}
+                    projectId={task.project_id}
+                    fileCategory="irb_document"
+                    onUploadComplete={() => {
+                      queryClient.invalidateQueries({ queryKey: ['taskFiles', taskId] });
+                      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+                    }}
+                    disabled={!isOwner}
+                  />
+                )}
+
+                {/* Uploaded Files Section */}
+                {taskFilesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : taskFilesError ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                    <p className="text-muted-foreground">Failed to load files</p>
+                  </div>
+                ) : taskFiles && taskFiles.length > 0 ? (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground">
+                      Uploaded Files ({taskFiles.length})
+                    </h4>
+                    {taskFiles.map((file) => (
+                      <FileCard
                         key={file.id}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium text-sm">{file.original_file_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(file.file_size / 1024).toFixed(1)} KB | Uploaded {formatDate(file.created_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const response = await filesApi.download(file.id);
-                              const url = window.URL.createObjectURL(new Blob([response.data]));
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.setAttribute('download', file.original_file_name);
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                            } catch (error) {
-                              toast({
-                                variant: 'destructive',
-                                title: 'Download failed',
-                              });
-                            }
-                          }}
-                        >
-                          Download
-                        </Button>
-                      </div>
+                        file={file}
+                        onPreview={() => {
+                          setPreviewFile({
+                            id: file.id,
+                            filename: file.original_filename,
+                            mime_type: file.mime_type,
+                          });
+                          setIsPreviewOpen(true);
+                        }}
+                        onDownload={() => {
+                          window.open(filesApi.getPreviewUrl(file.id), '_blank');
+                        }}
+                        onDelete={
+                          (task.status === 'in_progress' || task.status === 'revision_required')
+                            ? () => deleteFileMutation.mutate(file.id.toString())
+                            : undefined
+                        }
+                      />
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Upload className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium">No documents uploaded</h3>
-                    <p className="text-muted-foreground mt-1 mb-4">
+                    <p className="text-muted-foreground mt-1">
                       Upload the required documents to complete this task
                     </p>
                   </div>
                 )}
-                {(canStart || task.status === 'in_progress') && (
-                  <Button
-                    className="mt-4 w-full"
-                    onClick={() => setShowUploadDialog(true)}
-                  >
-                    <FileUp className="mr-2 h-4 w-4" />
-                    Upload Document
-                  </Button>
+
+                {/* Mark as Complete Button - Show when files exist and task is not completed */}
+                {taskFiles && taskFiles.length > 0 &&
+                  task.status !== 'completed' &&
+                  task.status !== 'approved' &&
+                  task.status !== 'submitted' &&
+                  isOwner && (
+                  <div className="pt-4 border-t">
+                    <Button
+                      className="w-full"
+                      onClick={() => markCompleteMutation.mutate()}
+                      disabled={markCompleteMutation.isPending}
+                    >
+                      {markCompleteMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Mark as Complete
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1053,20 +1127,15 @@ export function TaskDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* File Upload Dialog */}
-      {isDocumentUploadTask && task.project_id && (
-        <TaskFileUpload
-          taskId={task.id}
-          taskTitle={task.title}
-          projectId={task.project_id}
-          open={showUploadDialog}
-          onOpenChange={setShowUploadDialog}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['projectFiles', task.project_id] });
-            queryClient.invalidateQueries({ queryKey: ['task', taskId] });
-          }}
-        />
-      )}
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFile(null);
+        }}
+      />
     </div>
   );
 }

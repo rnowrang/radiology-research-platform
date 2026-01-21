@@ -359,7 +359,7 @@ CREATE TABLE files (
     original_file_name VARCHAR(255) NOT NULL,
     file_size BIGINT,
     mime_type VARCHAR(100),
-    category VARCHAR(100) CHECK (category IN ('proposal', 'irb_document', 'consent_form', 'protocol', 'data', 'result', 'template', 'generated', 'other')),
+    category VARCHAR(100) CHECK (category IN ('proposal', 'abstract', 'protocol', 'consent_form', 'citi_certificate', 'funding', 'data_management', 'irb_document', 'data', 'result', 'template', 'generated', 'other')),
     storage_path VARCHAR(500) NOT NULL,
     checksum VARCHAR(64),
     is_encrypted BOOLEAN DEFAULT false,

@@ -4,6 +4,7 @@ export interface FileRecord {
   id: string;
   project_id?: string;
   form_instance_id?: number;
+  task_id?: number;
   uploaded_by_id: string;
   file_name: string;
   original_file_name: string;
@@ -25,6 +26,7 @@ export interface FileWithUploader extends FileRecord {
 export interface CreateFileData {
   project_id?: string;
   form_instance_id?: number;
+  task_id?: number;
   uploaded_by_id: string;
   file_name: string;
   original_file_name: string;
@@ -40,13 +42,14 @@ export const fileQueries = {
   createFile: async (data: CreateFileData): Promise<FileRecord> => {
     const result = await query<FileRecord>(
       `INSERT INTO files (
-        project_id, form_instance_id, uploaded_by_id, file_name, original_file_name,
+        project_id, form_instance_id, task_id, uploaded_by_id, file_name, original_file_name,
         file_size, mime_type, category, storage_path, checksum, is_encrypted
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         data.project_id || null,
         data.form_instance_id || null,
+        data.task_id || null,
         data.uploaded_by_id,
         data.file_name,
         data.original_file_name,
@@ -128,6 +131,18 @@ export const fileQueries = {
       files: filesResult.rows,
       total: parseInt(countResult.rows[0]?.count || '0', 10),
     };
+  },
+
+  getFilesByTaskId: async (taskId: number): Promise<FileWithUploader[]> => {
+    const result = await query<FileWithUploader>(
+      `SELECT f.*, u.full_name as uploaded_by_name, u.email as uploaded_by_email
+       FROM files f
+       LEFT JOIN users u ON f.uploaded_by_id = u.id
+       WHERE f.task_id = $1 AND f.is_deleted = false
+       ORDER BY f.created_at DESC`,
+      [taskId]
+    );
+    return result.rows;
   },
 
   softDeleteFile: async (id: string): Promise<boolean> => {

@@ -760,7 +760,7 @@ export const formsProxy = {
   },
 
   getPendingReviewTasks: async (userRole: string): Promise<AxiosResponse> => {
-    return formsClient.get('/api/tasks/pending-review', {
+    return formsClient.get('/api/tasks/pending-review/list', {
       headers: { 'X-User-Role': userRole },
     });
   },
@@ -813,16 +813,25 @@ export const formsProxy = {
    * - citi_certificate -> Upload CITI Training Certificate
    * - funding -> Upload Funding Documentation
    * - data_management -> Upload Data Management Plan
+   *
+   * @param projectId - The project ID to find tasks for
+   * @param fileCategory - The file category to match against task types
+   * @param taskId - Optional specific task ID to complete (takes precedence over category matching)
    */
   autoCompleteUploadTask: async (
     projectId: string,
-    fileCategory: string
+    fileCategory: string,
+    taskId?: number
   ): Promise<AxiosResponse> => {
+    const params: Record<string, string | number> = {
+      project_id: projectId,
+      file_category: fileCategory,
+    };
+    if (taskId !== undefined) {
+      params.task_id = taskId;
+    }
     return formsClient.post('/api/tasks/auto-complete-upload', null, {
-      params: {
-        project_id: projectId,
-        file_category: fileCategory,
-      },
+      params,
     });
   },
 

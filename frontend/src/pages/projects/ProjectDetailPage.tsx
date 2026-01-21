@@ -736,13 +736,13 @@ export function ProjectDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Forms</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Tasks</CardTitle>
+            <CheckSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projectForms.length}</div>
+            <div className="text-2xl font-bold">{projectTasks.length}</div>
             <p className="text-xs text-muted-foreground">
-              {projectForms.filter((f) => f.status === 'approved').length} approved
+              {projectTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length} completed
             </p>
           </CardContent>
         </Card>

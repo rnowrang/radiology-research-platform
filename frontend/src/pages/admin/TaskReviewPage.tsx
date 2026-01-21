@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Filter,
   CheckCircle,
   XCircle,
@@ -18,6 +20,7 @@ import {
   ExternalLink,
   File,
   Plus,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,6 +49,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/useToast';
 import { api } from '@/lib/api';
 import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
@@ -151,6 +160,10 @@ export function TaskReviewPage() {
   // Assign task dialog state
   const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
 
+  // Group by project state
+  const [groupByProject, setGroupByProject] = useState(false);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
   // Fetch submitted tasks
   const { data: tasksData, isLoading } = useQuery({
     queryKey: ['pendingTasks', projectTypeFilter, taskTypeFilter, page, limit],
@@ -165,6 +178,79 @@ export function TaskReviewPage() {
 
   const tasks: SubmittedTask[] = tasksData?.data || [];
   const pagination = tasksData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
+
+  // Group tasks by project when groupByProject is enabled
+  interface ProjectGroup {
+    projectId: string;
+    projectTitle: string;
+    projectType?: string;
+    piName?: string;
+    tasks: SubmittedTask[];
+  }
+
+  const groupedTasks = useMemo(() => {
+    if (!groupByProject) return null;
+
+    const groups = new Map<string, ProjectGroup>();
+    const noProjectGroup: SubmittedTask[] = [];
+
+    for (const task of tasks) {
+      if (task.project_id && task.project_title) {
+        const existing = groups.get(task.project_id);
+        if (existing) {
+          existing.tasks.push(task);
+        } else {
+          groups.set(task.project_id, {
+            projectId: task.project_id,
+            projectTitle: task.project_title,
+            projectType: task.project_type,
+            piName: task.submitted_by_name,
+            tasks: [task],
+          });
+        }
+      } else {
+        noProjectGroup.push(task);
+      }
+    }
+
+    const result = Array.from(groups.values());
+    // Sort by number of pending tasks (most first)
+    result.sort((a, b) => b.tasks.length - a.tasks.length);
+
+    // Add ungrouped tasks if any
+    if (noProjectGroup.length > 0) {
+      result.push({
+        projectId: '__no_project__',
+        projectTitle: 'No Project Assigned',
+        tasks: noProjectGroup,
+      });
+    }
+
+    return result;
+  }, [tasks, groupByProject]);
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
+
+  // Expand all projects by default when grouping is enabled
+  const expandAllProjects = () => {
+    if (groupedTasks) {
+      setExpandedProjects(new Set(groupedTasks.map((g) => g.projectId)));
+    }
+  };
+
+  const collapseAllProjects = () => {
+    setExpandedProjects(new Set());
+  };
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -290,7 +376,7 @@ export function TaskReviewPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select
@@ -332,6 +418,45 @@ export function TaskReviewPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="group-by-project"
+                  checked={groupByProject}
+                  onCheckedChange={(checked) => {
+                    setGroupByProject(checked);
+                    if (checked && groupedTasks) {
+                      // Auto-expand all when enabling grouping
+                      setExpandedProjects(new Set(groupedTasks.map((g) => g.projectId)));
+                    }
+                  }}
+                />
+                <Label htmlFor="group-by-project" className="flex items-center gap-2 cursor-pointer">
+                  <Layers className="h-4 w-4" />
+                  Group by Project
+                </Label>
+              </div>
+              {groupByProject && groupedTasks && groupedTasks.length > 0 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={expandAllProjects}
+                    className="text-xs"
+                  >
+                    Expand All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={collapseAllProjects}
+                    className="text-xs"
+                  >
+                    Collapse All
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -345,6 +470,7 @@ export function TaskReviewPage() {
           </CardTitle>
           <CardDescription>
             {pagination.total} task{pagination.total !== 1 ? 's' : ''} awaiting review
+            {groupByProject && groupedTasks && ` across ${groupedTasks.length} project${groupedTasks.length !== 1 ? 's' : ''}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -360,7 +486,118 @@ export function TaskReviewPage() {
                 No tasks pending review
               </p>
             </div>
+          ) : groupByProject && groupedTasks ? (
+            // Grouped view
+            <div className="space-y-4">
+              {groupedTasks.map((group) => {
+                const isExpanded = expandedProjects.has(group.projectId);
+                return (
+                  <Collapsible
+                    key={group.projectId}
+                    open={isExpanded}
+                    onOpenChange={() => toggleProjectExpanded(group.projectId)}
+                    className="border rounded-lg"
+                  >
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors rounded-t-lg">
+                        <div className="flex items-center gap-3">
+                          {isExpanded ? (
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronUp className="h-5 w-5 text-muted-foreground rotate-180" />
+                          )}
+                          <FolderKanban className="h-5 w-5 text-primary" />
+                          <div className="text-left">
+                            <span className="font-medium">{group.projectTitle}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <Badge variant="secondary">
+                                {group.tasks.length} pending
+                              </Badge>
+                              {group.piName && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {group.piName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {group.projectId !== '__no_project__' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link to={`/admin/projects/${group.projectId}/review`}>
+                              Open Project Review
+                              <ExternalLink className="ml-2 h-3 w-3" />
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t">
+                        <div className="space-y-2 p-4 pl-12">
+                          {group.tasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium">{task.title}</span>
+                                  {task.task_type && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {taskTypeLabels[task.task_type] || task.task_type}
+                                    </Badge>
+                                  )}
+                                  {task.is_required && (
+                                    <Badge variant="secondary" className="text-xs">Required</Badge>
+                                  )}
+                                  {task.revision_count > 0 && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Revision #{task.revision_count}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                  {task.submitted_by_name && (
+                                    <span className="flex items-center gap-1">
+                                      <User className="h-3 w-3" />
+                                      {task.submitted_by_name}
+                                    </span>
+                                  )}
+                                  {task.submitted_at && (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {formatDate(task.submitted_at)}
+                                    </span>
+                                  )}
+                                  {task.files && task.files.length > 0 && (
+                                    <span className="flex items-center gap-1">
+                                      <File className="h-3 w-3" />
+                                      {task.files.length} file{task.files.length !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button size="sm" onClick={() => handleOpenReview(task)}>
+                                <Eye className="mr-2 h-3 w-3" />
+                                Review
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </div>
           ) : (
+            // Flat list view
             <div className="space-y-3">
               {tasks.map((task) => (
                 <div

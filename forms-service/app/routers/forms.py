@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/forms", tags=["forms"])
 @router.get("", response_model=List[FormListResponse])
 async def get_forms(
     owner_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     status: Optional[str] = None,
     template_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -34,6 +35,8 @@ async def get_forms(
 
     if owner_id:
         query = query.filter(FormInstance.owner_id == owner_id)
+    if project_id:
+        query = query.filter(FormInstance.project_id == project_id)
     if status:
         query = query.filter(FormInstance.status == status)
     if template_id:
@@ -159,6 +162,9 @@ async def get_form(
     db: Session = Depends(get_db),
 ):
     """Get a form instance with its data and template schema."""
+    from sqlalchemy import text
+    from app.models.project import Project
+
     form = db.query(FormInstance).filter(FormInstance.id == form_id).first()
     if not form:
         raise HTTPException(
@@ -168,6 +174,27 @@ async def get_form(
 
     # Get form data
     form_data = db.query(FormData).filter(FormData.form_instance_id == form_id).first()
+
+    # Get owner information from users table
+    owner_name = None
+    owner_email = None
+    if form.owner_id:
+        query = text("""
+            SELECT full_name, email FROM users
+            WHERE id = :owner_id
+            LIMIT 1
+        """)
+        row = db.execute(query, {"owner_id": str(form.owner_id)}).fetchone()
+        if row:
+            owner_name = row[0]
+            owner_email = row[1]
+
+    # Get project title if project_id exists
+    project_title = None
+    if form.project_id:
+        project = db.query(Project).filter(Project.id == form.project_id).first()
+        if project:
+            project_title = project.title
 
     # Build template object with transformed schema
     template_obj = None
@@ -186,6 +213,9 @@ async def get_form(
         "template_id": form.template_id,
         "project_id": form.project_id,
         "owner_id": str(form.owner_id),
+        "owner_name": owner_name,
+        "owner_email": owner_email,
+        "project_title": project_title,
         "title": form.title,
         "status": form.status,
         "current_version_number": form.current_version_number,

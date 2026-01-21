@@ -25,7 +25,7 @@ export const fileController = {
         throw new ValidationError('No file uploaded');
       }
 
-      const { project_id, form_id, category } = req.body;
+      const { project_id, form_id, task_id, category } = req.body;
 
       // Validate project access if project_id provided
       if (project_id) {
@@ -52,6 +52,7 @@ export const fileController = {
         {
           projectId: project_id,
           formId: form_id ? parseInt(form_id, 10) : undefined,
+          taskId: task_id ? parseInt(task_id, 10) : undefined,
           category: category as FileCategory,
         },
         req
@@ -118,6 +119,97 @@ export const fileController = {
             error: 'Error downloading file',
           });
         }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Preview a file (inline viewing)
+   * GET /api/files/:id/preview
+   */
+  previewFile: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const isAdmin = req.user!.role === 'admin';
+
+      // Get file metadata
+      const file = await fileService.getFileMetadata(id, req.user!.id, isAdmin);
+
+      // Get full file path
+      const filePath = path.join(STORAGE_BASE_PATH, file.storage_path);
+
+      // Check if file exists on disk
+      try {
+        await fs.access(filePath);
+      } catch {
+        logger.error(`File not found on disk: ${filePath}`);
+        throw new NotFoundError('File not found on disk');
+      }
+
+      // Log preview audit
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.DOWNLOAD,
+        resourceType: 'file',
+        resourceId: id,
+        details: {
+          original_file_name: file.original_file_name,
+          file_size: file.file_size,
+          preview: true,
+        },
+      });
+
+      // Set headers for inline preview
+      res.setHeader('Content-Type', file.mime_type);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.original_file_name)}"`);
+      res.setHeader('Content-Length', file.file_size);
+
+      // Stream file to response
+      const fileStream = createReadStream(filePath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        logger.error('Error streaming file for preview', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: 'Error previewing file',
+          });
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get files by task ID
+   * GET /api/files/task/:taskId
+   */
+  getFilesByTaskId: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      if (isNaN(taskId)) {
+        res.status(400).json({ success: false, error: 'Invalid task ID' });
+        return;
+      }
+
+      const files = await fileQueries.getFilesByTaskId(taskId);
+
+      res.json({
+        success: true,
+        data: files.map(file => ({
+          id: file.id,
+          filename: file.storage_path?.split('/').pop() || file.original_file_name,
+          original_filename: file.original_file_name,
+          file_size: file.file_size,
+          mime_type: file.mime_type,
+          category: file.category,
+          uploaded_at: file.created_at,
+          uploaded_by_id: file.uploaded_by_id,
+          task_id: file.task_id,
+        })),
       });
     } catch (error) {
       next(error);

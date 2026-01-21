@@ -13,10 +13,15 @@ import {
   History,
   ChevronLeft,
   Send,
+  XCircle,
+  Eye,
+  User,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -32,6 +37,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
 import { formsApi, reviewApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
+import { PdfPreviewModal } from '@/components/forms/PdfPreviewModal';
 import type { FormInstance, CommentThread, ReviewAction } from '@/types';
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any; color: string }> = {
@@ -57,6 +63,8 @@ export function FormViewPage() {
   const [commentFieldId, setCommentFieldId] = useState('');
 
   const isReviewer = user?.role === 'admin' || user?.role === 'reviewer';
+  const [showAllFields, setShowAllFields] = useState(isReviewer);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   // Fetch form data
   const { data: formData, isLoading: formLoading } = useQuery({
@@ -241,8 +249,77 @@ export function FormViewPage() {
     return labels[actionType] || actionType;
   };
 
+  // Helper function to get nested value from object using dot notation path
+  const getNestedValue = (obj: any, path: string): any => {
+    if (!obj || !path) return undefined;
+    return path.split('.').reduce((curr, key) => curr?.[key], obj);
+  };
+
+  // Helper function to get fields for a section
+  // Handles both nested fields (section.fields) and flat fields array (schema.fields with section_id)
+  const getSectionFields = (section: any, schema: any): any[] => {
+    // First check if fields are nested inside section
+    if (section.fields && section.fields.length > 0) {
+      return section.fields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    }
+
+    // Fall back to flat fields array with section_id
+    if (schema?.fields) {
+      return schema.fields
+        .filter((f: any) => f.section_id === section.id)
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    }
+
+    return [];
+  };
+
+  // Calculate completion statistics
+  const calculateCompletionStats = () => {
+    const schema = form?.template?.schema;
+    const formData = form?.data?.data || {};
+
+    if (!schema?.sections) return { total: 0, filled: 0, requiredMissing: [], percentage: 0 };
+
+    let total = 0;
+    let filled = 0;
+    const requiredMissing: string[] = [];
+
+    schema.sections.forEach((section: any) => {
+      const sectionFields = getSectionFields(section, schema);
+      sectionFields.forEach((field: any) => {
+        total++;
+        const value = getNestedValue(formData, field.id);
+        const hasValue = value !== undefined && value !== null && value !== '';
+        if (hasValue) filled++;
+        else if (field.required || field.validation?.required) {
+          requiredMissing.push(field.label);
+        }
+      });
+    });
+
+    return { total, filled, requiredMissing, percentage: total > 0 ? Math.round((filled / total) * 100) : 0 };
+  };
+
+  const completionStats = calculateCompletionStats();
+
+  // Build breadcrumb items based on user role
+  const isAdmin = user?.role === 'admin';
+  const breadcrumbItems = isAdmin
+    ? [
+        { label: 'Admin', href: '/admin' },
+        { label: 'Forms', href: '/admin/forms' },
+        { label: form?.title || 'Form', current: true },
+      ]
+    : [
+        { label: 'Forms', href: '/forms' },
+        { label: form?.title || 'Form', current: true },
+      ];
+
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb items={breadcrumbItems} />
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -254,8 +331,29 @@ export function FormViewPage() {
             <Badge variant={config.variant}>{config.label}</Badge>
           </div>
           <p className="text-muted-foreground">
-            {form?.template?.name} v{form?.template?.version} · Version {form?.current_version_number}
+            {form?.template?.name} v{form?.template?.version} · Version {form?.currentVersionNumber || (form as any)?.current_version_number}
           </p>
+          {/* Project and Owner Info */}
+          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+            {(form?.project || (form as any)?.project_name) && (
+              <div className="flex items-center gap-1">
+                <FolderOpen className="h-4 w-4" />
+                <span>Project: </span>
+                <span className="font-medium text-foreground">
+                  {form?.project?.title || (form as any)?.project_name || (form as any)?.project_id}
+                </span>
+              </div>
+            )}
+            {(form?.owner || (form as any)?.owner_name || form?.ownerId || (form as any)?.owner_id) && (
+              <div className="flex items-center gap-1">
+                <User className="h-4 w-4" />
+                <span>Owner: </span>
+                <span className="font-medium text-foreground">
+                  {form?.owner?.fullName || (form as any)?.owner?.full_name || (form as any)?.owner_name || form?.ownerId || (form as any)?.owner_id}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {canEdit && (
@@ -264,6 +362,10 @@ export function FormViewPage() {
               Edit
             </Button>
           )}
+          <Button variant="outline" onClick={() => setShowPdfPreview(true)}>
+            <Eye className="h-4 w-4 mr-2" />
+            Preview PDF
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF
@@ -326,33 +428,102 @@ export function FormViewPage() {
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="mt-6">
+        <TabsContent value="details" className="mt-6 space-y-4">
+          {/* Completion Summary (for reviewers) */}
+          {isReviewer && (
+            <Card className={completionStats.requiredMissing.length > 0 ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'border-green-500 bg-green-50 dark:bg-green-950/20'}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`text-2xl font-bold ${completionStats.percentage === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+                        {completionStats.percentage}%
+                      </div>
+                      <span className="text-sm text-muted-foreground">Complete</span>
+                    </div>
+                    <Separator orientation="vertical" className="h-8" />
+                    <div className="text-sm">
+                      <span className="font-medium">{completionStats.filled}</span>
+                      <span className="text-muted-foreground"> of {completionStats.total} fields filled</span>
+                    </div>
+                  </div>
+                  {completionStats.requiredMissing.length > 0 && (
+                    <div className="text-sm text-amber-700 dark:text-amber-300">
+                      <span className="font-medium">{completionStats.requiredMissing.length} required field{completionStats.requiredMissing.length !== 1 ? 's' : ''} missing:</span>
+                      <span className="ml-1">{completionStats.requiredMissing.slice(0, 3).join(', ')}{completionStats.requiredMissing.length > 3 ? '...' : ''}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
-            <CardHeader>
-              <CardTitle>Form Data</CardTitle>
-              <CardDescription>Current form field values</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Form Data</CardTitle>
+                <CardDescription>
+                  {showAllFields ? 'Showing all form fields' : 'Showing filled fields only'}
+                </CardDescription>
+              </div>
+              {isReviewer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllFields(!showAllFields)}
+                >
+                  {showAllFields ? 'Show Filled Only' : 'Show All Fields'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {form?.template?.schema?.sections?.map((section: any) => (
-                  <div key={section.id} className="space-y-3">
-                    <h3 className="font-semibold text-lg border-b pb-2">{section.title}</h3>
-                    <div className="grid gap-3">
-                      {section.fields?.map((field: any) => {
-                        const value = form?.data?.data?.[field.id];
-                        if (value === undefined || value === null || value === '') return null;
-                        return (
-                          <div key={field.id} className="grid grid-cols-3 gap-4">
-                            <div className="text-sm text-muted-foreground">{field.label}</div>
-                            <div className="col-span-2 text-sm">
-                              {Array.isArray(value) ? value.join(', ') : String(value)}
+                {form?.template?.schema?.sections?.map((section: any) => {
+                  const sectionFields = getSectionFields(section, form?.template?.schema);
+                  return (
+                    <div key={section.id} className="space-y-3">
+                      <h3 className="font-semibold text-lg border-b pb-2">{section.title}</h3>
+                      <div className="grid gap-3">
+                        {sectionFields.map((field: any) => {
+                          const value = getNestedValue(form?.data?.data, field.id);
+                          const hasValue = value !== undefined && value !== null && value !== '';
+                          const isRequired = field.required || field.validation?.required;
+
+                          // In regular mode, skip empty fields
+                          if (!showAllFields && !hasValue) return null;
+
+                          return (
+                            <div key={field.id} className="grid grid-cols-3 gap-4 py-2 border-b border-muted last:border-0">
+                              <div className="flex items-center gap-2 text-sm">
+                                {/* Status indicator */}
+                                {hasValue ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                ) : isRequired ? (
+                                  <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                )}
+                                <span className="text-muted-foreground">
+                                  {field.label}
+                                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                                </span>
+                              </div>
+                              <div className="col-span-2 text-sm">
+                                {hasValue ? (
+                                  Array.isArray(value) ? value.join(', ') : String(value)
+                                ) : (
+                                  <span className={isRequired ? 'text-red-500 italic' : 'text-muted-foreground italic'}>
+                                    Not provided
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )) || (
+                  );
+                }) || (
                   <p className="text-muted-foreground">No form data available</p>
                 )}
               </div>
@@ -568,6 +739,14 @@ export function FormViewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        formId={formId}
+        formTitle={form?.title || 'Form'}
+        isOpen={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+      />
     </div>
   );
 }

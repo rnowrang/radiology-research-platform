@@ -45,9 +45,10 @@ interface ProjectFormData {
 
 interface TaskDefinition {
   id: number;
-  name: string;
-  description?: string;
-  task_type: 'document_upload' | 'form_completion' | 'approval_required';
+  task_definition_id: number;
+  task_definition_name: string;
+  task_definition_description?: string;
+  task_type: string;
   is_required: boolean;
   display_order: number;
 }
@@ -221,23 +222,32 @@ export function CreateProjectPage() {
               </div>
             )}
             {!loadingTasks && previewTasks.length > 0 && (
-              <div className="mt-4 p-4 border rounded-lg bg-muted/50">
-                <h4 className="font-medium mb-2">Tasks that will be created:</h4>
-                <ul className="space-y-2">
+              <div className="mt-4 p-3 border rounded-lg bg-muted/50 text-sm">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Tasks that will be created</h4>
+                <div className="space-y-1">
                   {previewTasks.map((task) => (
-                    <li key={task.id} className="flex items-center gap-2">
-                      <Badge variant={task.task_type === 'form_completion' ? 'default' : 'secondary'}>
+                    <div key={task.id} className="grid grid-cols-[60px_1fr_auto] gap-2 items-center py-1.5 border-b last:border-b-0 border-border/50">
+                      <Badge
+                        variant={task.task_type === 'form_completion' ? 'default' : task.task_type === 'approval_required' ? 'outline' : 'secondary'}
+                        className="justify-center text-[10px] h-5"
+                      >
                         {task.task_type === 'form_completion'
-                          ? 'Form Completion'
+                          ? 'Form'
                           : task.task_type === 'document_upload'
-                          ? 'Document Upload'
-                          : 'Approval Required'}
+                          ? 'Upload'
+                          : 'Approval'}
                       </Badge>
-                      <span>{task.name}</span>
-                      {task.is_required && <Badge variant="outline">Required</Badge>}
-                    </li>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{task.task_definition_name}</p>
+                      </div>
+                      {task.is_required ? (
+                        <span className="text-[10px] text-muted-foreground">Required</span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/60">Optional</span>
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 

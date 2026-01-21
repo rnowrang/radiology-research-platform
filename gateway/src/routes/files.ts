@@ -24,11 +24,25 @@ router.get(
   asyncHandler(fileController.download)
 );
 
+// Get files by task ID
+// GET /api/files/task/:taskId
+router.get(
+  '/task/:taskId',
+  asyncHandler(fileController.getFilesByTaskId)
+);
+
 // Get file metadata
 // GET /api/files/:id/metadata
 router.get(
   '/:id/metadata',
   asyncHandler(fileController.getMetadata)
+);
+
+// Preview file (inline viewing)
+// GET /api/files/:id/preview
+router.get(
+  '/:id/preview',
+  asyncHandler(fileController.previewFile)
 );
 
 // Soft delete file

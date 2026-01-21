@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { projectQueries } from '../database/queries/projectQueries.js';
+import { fileQueries } from '../database/queries/fileQueries.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
@@ -567,6 +568,110 @@ export const projectController = {
         success: true,
         data: result.data,
         message: 'Project rejected',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get project review summary for admin review page
+   * GET /api/projects/:projectId/review-summary
+   * Admin only - aggregates all information needed for AdminProjectReviewPage
+   */
+  getProjectReviewSummary: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+
+      // Admin only
+      if (req.user!.role !== USER_ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators can access project review summaries');
+      }
+
+      // Get project details with PI info
+      const project = await projectQueries.findById(projectId);
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Fetch all data in parallel for better performance
+      const [formsResponse, tasksResponse, filesResult] = await Promise.all([
+        // Get forms for project from forms-service
+        formsProxy.getFormsByProject(projectId).catch(() => ({ data: [] })),
+        // Get tasks for project from forms-service
+        formsProxy.getProjectTasks(projectId, req.user!.id).catch(() => ({ data: [] })),
+        // Get files for project from local database
+        fileQueries.findFilesByProjectId(projectId, 1, 100),
+      ]);
+
+      const forms = formsResponse.data || [];
+      const tasks = tasksResponse.data || [];
+      const files = filesResult.files || [];
+
+      // Calculate progress stats
+      const completedTasks = tasks.filter((t: { status: string }) => t.status === 'completed' || t.status === 'approved').length;
+      const totalTasks = tasks.length;
+      const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      // Project type labels
+      const projectTypeLabels: Record<string, string> = {
+        retrospective: 'Retrospective Study',
+        prospective: 'Prospective Study',
+        clinical_trial: 'Clinical Trial',
+        quality_improvement: 'Quality Improvement',
+        other: 'Other',
+      };
+
+      // Format response
+      res.json({
+        success: true,
+        data: {
+          project: {
+            id: project.id,
+            title: project.title,
+            status: project.status,
+            project_type: project.project_type,
+            project_type_label: projectTypeLabels[project.project_type] || project.project_type,
+            description: project.description,
+            department: project.department,
+            created_at: project.created_at,
+            updated_at: project.updated_at,
+            submitted_at: project.updated_at, // Use updated_at as fallback since submitted_for_approval_at doesn't exist
+          },
+          principal_investigator: {
+            id: project.principal_investigator_id,
+            name: project.principal_investigator_name || 'Unknown',
+            email: project.principal_investigator_email || '',
+          },
+          forms: forms.map((f: { id: number; title: string; status: string; template_name?: string; updated_at: string }) => ({
+            id: f.id,
+            title: f.title,
+            status: f.status,
+            template_name: f.template_name || '',
+            updated_at: f.updated_at,
+          })),
+          tasks: tasks.map((t: { id: number; title?: string; name?: string; status: string; task_type?: string; completed_at?: string; due_date?: string }) => ({
+            id: t.id,
+            name: t.title || t.name || '',
+            status: t.status,
+            task_type: t.task_type || '',
+            completed_at: t.completed_at || null,
+            due_date: t.due_date || null,
+          })),
+          files: files.map((f) => ({
+            id: f.id,
+            filename: f.original_file_name,
+            file_size: f.file_size,
+            uploaded_at: f.created_at,
+            uploaded_by_name: f.uploaded_by_name || '',
+          })),
+          progress: {
+            tasks_completed: completedTasks,
+            tasks_total: totalTasks,
+            forms_count: forms.length,
+            percentage,
+          },
+        },
       });
     } catch (error) {
       next(error);

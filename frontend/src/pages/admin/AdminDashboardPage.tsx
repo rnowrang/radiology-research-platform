@@ -12,6 +12,9 @@ import {
   Mail,
   Settings2,
   ClipboardCheck,
+  AlertCircle,
+  User,
+  ArrowRight,
 } from 'lucide-react';
 import {
   Card,
@@ -23,6 +26,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { formsApi, projectsApi, api } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
+import { Badge } from '@/components/ui/badge';
+
+interface ProjectWithPendingReview {
+  id: string;
+  title: string;
+  pi_name: string;
+  pi_email: string;
+  pending_tasks_count: number;
+  project_type: string;
+  project_type_label: string;
+  status: string;
+}
 
 interface DashboardStats {
   totalUsers: number;
@@ -59,6 +74,48 @@ export function AdminDashboardPage() {
         return response.data.pagination?.total || 0;
       } catch {
         return 0;
+      }
+    },
+  });
+
+  // Fetch projects with pending review items
+  const { data: projectsPendingReview } = useQuery({
+    queryKey: ['adminProjectsPendingReview'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/admin/projects-pending-review');
+        return (response.data.data || []) as ProjectWithPendingReview[];
+      } catch {
+        // Fallback: compute from pending tasks if dedicated endpoint not available
+        try {
+          const tasksResponse = await api.get('/tasks/pending-review', { params: { limit: 100 } });
+          const tasks = tasksResponse.data.data || [];
+
+          // Group tasks by project
+          const projectMap = new Map<string, ProjectWithPendingReview>();
+          for (const task of tasks) {
+            if (task.project_id && task.project_title) {
+              const existing = projectMap.get(task.project_id);
+              if (existing) {
+                existing.pending_tasks_count += 1;
+              } else {
+                projectMap.set(task.project_id, {
+                  id: task.project_id,
+                  title: task.project_title,
+                  pi_name: task.submitted_by_name || 'Unknown',
+                  pi_email: '',
+                  pending_tasks_count: 1,
+                  project_type: task.project_type || '',
+                  project_type_label: task.project_type || '',
+                  status: 'active',
+                });
+              }
+            }
+          }
+          return Array.from(projectMap.values());
+        } catch {
+          return [];
+        }
       }
     },
   });
@@ -137,6 +194,63 @@ export function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Projects Pending Review */}
+      {projectsPendingReview && projectsPendingReview.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Projects Pending Review
+              </CardTitle>
+              <CardDescription>
+                {projectsPendingReview.length} project{projectsPendingReview.length !== 1 ? 's' : ''} with items awaiting review
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/task-review">View All Tasks</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {projectsPendingReview.slice(0, 5).map((project) => (
+                <Link
+                  key={project.id}
+                  to={`/admin/projects/${project.id}/review`}
+                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                      <span className="font-medium truncate">{project.title}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {project.pi_name}
+                      </span>
+                      <Badge variant="secondary">
+                        {project.pending_tasks_count} item{project.pending_tasks_count !== 1 ? 's' : ''} pending
+                      </Badge>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                </Link>
+              ))}
+              {projectsPendingReview.length > 5 && (
+                <div className="text-center pt-2">
+                  <Button variant="link" asChild>
+                    <Link to="/admin/task-review">
+                      View all {projectsPendingReview.length} projects
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2">

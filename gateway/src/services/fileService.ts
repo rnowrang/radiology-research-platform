@@ -9,7 +9,7 @@ import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.
 import { logger } from '../utils/logger.js';
 import { formsProxy } from './formsProxy.js';
 
-// File categories
+// File categories (must match database check constraint)
 export const FILE_CATEGORIES = {
   PROPOSAL: 'proposal',
   ABSTRACT: 'abstract',
@@ -21,6 +21,8 @@ export const FILE_CATEGORIES = {
   IRB_DOCUMENT: 'irb_document',
   DATA: 'data',
   RESULT: 'result',
+  TEMPLATE: 'template',
+  GENERATED: 'generated',
   OTHER: 'other',
 } as const;
 
@@ -48,6 +50,7 @@ const UPLOADS_PATH = path.join(STORAGE_BASE_PATH, 'uploads');
 export interface SaveFileOptions {
   projectId?: string;
   formId?: number;
+  taskId?: number;
   category?: FileCategory;
 }
 
@@ -133,6 +136,7 @@ export const fileService = {
       const fileData: CreateFileData = {
         project_id: options.projectId,
         form_instance_id: options.formId,
+        task_id: options.taskId,
         uploaded_by_id: uploadedById,
         file_name: file.filename,
         original_file_name: file.originalname,
@@ -162,6 +166,7 @@ export const fileService = {
             category: options.category || 'other',
             project_id: options.projectId,
             form_id: options.formId,
+            task_id: options.taskId,
           },
         });
       }
@@ -173,14 +178,15 @@ export const fileService = {
         try {
           const autoCompleteResult = await formsProxy.autoCompleteUploadTask(
             options.projectId,
-            options.category
+            options.category,
+            options.taskId
           );
           if (autoCompleteResult.data?.success) {
-            logger.info(`Auto-completed upload task for project ${options.projectId}, category ${options.category}: ${autoCompleteResult.data.task_title}`);
+            logger.info(`Auto-completed upload task for project ${options.projectId}, category ${options.category}, task_id ${options.taskId}: ${autoCompleteResult.data.task_title}`);
           }
         } catch (autoCompleteError) {
           // Log but don't fail the upload - this is a non-critical operation
-          logger.warn(`Failed to auto-complete upload task for project ${options.projectId}, category ${options.category}:`, autoCompleteError);
+          logger.warn(`Failed to auto-complete upload task for project ${options.projectId}, category ${options.category}, task_id ${options.taskId}:`, autoCompleteError);
         }
       }
 

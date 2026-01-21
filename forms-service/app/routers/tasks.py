@@ -641,6 +641,7 @@ from app.services.task import auto_complete_upload_task, sync_task_status_from_f
 def auto_complete_upload_task_endpoint(
     project_id: UUID = Query(..., description="Project ID"),
     file_category: str = Query(..., description="File category (proposal, abstract, protocol, etc.)"),
+    task_id: Optional[int] = Query(None, description="Optional specific task ID to complete directly"),
     db: Session = Depends(get_db),
 ):
     """
@@ -648,6 +649,9 @@ def auto_complete_upload_task_endpoint(
 
     This endpoint is called by the gateway after a file is successfully uploaded.
     It finds the matching task by file_category and marks it as completed.
+
+    If task_id is provided, it will complete that specific task directly
+    (validating it exists, is document_upload type, and has completable status).
 
     File Category Mapping:
     - proposal -> Upload Research Proposal
@@ -658,22 +662,70 @@ def auto_complete_upload_task_endpoint(
     - funding -> Upload Funding Documentation
     - data_management -> Upload Data Management Plan
     """
-    task = auto_complete_upload_task(db, project_id, file_category)
+    result = auto_complete_upload_task(db, project_id, file_category, task_id)
+    return result
 
-    if task:
-        return {
-            "success": True,
-            "message": f"Task '{task.title}' auto-completed",
-            "task_id": task.id,
-            "task_title": task.title,
-            "task_status": task.status,
-        }
-    else:
-        return {
-            "success": False,
-            "message": "No matching task found to auto-complete",
-            "task_id": None,
-        }
+
+@router.post("/{task_id}/mark-complete", response_model=TaskResponse)
+def mark_upload_task_complete(
+    task_id: int,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """
+    Manually mark a document_upload task as complete.
+
+    This endpoint allows task owners (creators) or assignees to manually
+    mark a document_upload task as completed.
+
+    Validation:
+    - Task must exist (404 if not)
+    - Task must be of type 'document_upload' (400 if not)
+    - User must be the task creator or assignee (403 if not)
+    - Task status must be 'pending' or 'in_progress' (400 otherwise)
+
+    On success:
+    - Updates task status to 'completed'
+    - Sets completed_at to current timestamp
+    - Returns the updated TaskResponse
+    """
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    # Verify the task exists
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Verify it's a document_upload task
+    if task.task_type != "document_upload":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only document_upload tasks can be marked complete via this endpoint. Task type: {task.task_type}"
+        )
+
+    # Verify the user is the task creator or assignee
+    if task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the task creator or assignee can mark this task as complete"
+        )
+
+    # Only allow completion if status is pending or in_progress
+    if task.status not in ("pending", "in_progress"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task cannot be marked complete. Current status: {task.status}. Must be 'pending' or 'in_progress'."
+        )
+
+    # Update status to completed and set completed_at
+    task.status = "completed"
+    task.completed_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
 
 
 # =============================================================================

@@ -5,6 +5,7 @@ import { activityController } from '../controllers/activityController.js';
 import { taskController } from '../controllers/taskController.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { requireAdmin } from '../middleware/roles.js';
 
 const router = Router();
 
@@ -17,6 +18,9 @@ router.post('/', projectController.create);
 router.get('/:id', projectController.get);
 router.put('/:id', projectController.update);
 router.delete('/:id', projectController.delete);
+
+// Admin review summary route (must be before :id routes to avoid conflicts)
+router.get('/:projectId/review-summary', requireAdmin, asyncHandler(projectController.getProjectReviewSummary));
 
 // Collaborator routes
 router.get('/:id/collaborators', projectController.getCollaborators);

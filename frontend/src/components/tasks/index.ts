@@ -22,3 +22,8 @@ export {
   TaskFileUpload,
   type TaskFileUploadProps,
 } from './TaskFileUpload';
+
+export {
+  UploadDropzone,
+  type UploadDropzoneProps,
+} from './UploadDropzone';

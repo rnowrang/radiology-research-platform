@@ -13,7 +13,7 @@ export const taskController = {
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const response = await formsProxy.getTasks(req.user!.id, req.query as Record<string, unknown>);
-      res.json(response.data);
+      res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
     }

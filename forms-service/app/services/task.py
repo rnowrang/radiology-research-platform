@@ -52,11 +52,15 @@ def auto_complete_upload_task(
     db: Session,
     project_id: UUID,
     file_category: str,
-) -> Optional[Task]:
+    task_id: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     Auto-complete a document_upload task when a matching file is uploaded.
 
-    Finds a task in the project where:
+    If task_id is provided, finds and completes that specific task directly
+    (validates it exists, is document_upload type, and has completable status).
+
+    Otherwise, finds a task in the project where:
     - task_type = 'document_upload'
     - status in ('pending', 'in_progress')
     - task_definition.file_category = file_category
@@ -67,49 +71,102 @@ def auto_complete_upload_task(
         db: Database session
         project_id: UUID of the project
         file_category: Category of the uploaded file
+        task_id: Optional specific task ID to complete directly
 
     Returns:
-        The updated Task if found and updated, None otherwise
+        Dict with: success, message, task_id, task_title, task_status
     """
-    if not project_id or not file_category:
-        return None
+    task = None
 
-    # Find matching task by joining with task_definition to check file_category
-    task = (
-        db.query(Task)
-        .join(TaskDefinition, Task.task_definition_id == TaskDefinition.id)
-        .filter(
-            Task.project_id == project_id,
-            Task.task_type == "document_upload",
-            Task.status.in_(["pending", "in_progress"]),
-            TaskDefinition.file_category == file_category,
-        )
-        .first()
-    )
+    # If task_id is provided, find and complete that specific task directly
+    if task_id is not None:
+        task = db.query(Task).filter(Task.id == task_id).first()
 
-    # If no task found by file_category, try matching by task name
-    if not task:
-        task_name = FILE_CATEGORY_TASK_MAP.get(file_category)
-        if task_name:
-            task = (
-                db.query(Task)
-                .filter(
-                    Task.project_id == project_id,
-                    Task.task_type == "document_upload",
-                    Task.status.in_(["pending", "in_progress"]),
-                    Task.title == task_name,
-                )
-                .first()
+        if not task:
+            return {
+                "success": False,
+                "message": f"Task with id {task_id} not found",
+                "task_id": None,
+                "task_title": None,
+                "task_status": None,
+            }
+
+        if task.task_type != "document_upload":
+            return {
+                "success": False,
+                "message": f"Task is not a document_upload task. Task type: {task.task_type}",
+                "task_id": task.id,
+                "task_title": task.title,
+                "task_status": task.status,
+            }
+
+        if task.status not in ("pending", "in_progress"):
+            return {
+                "success": False,
+                "message": f"Task cannot be completed. Current status: {task.status}",
+                "task_id": task.id,
+                "task_title": task.title,
+                "task_status": task.status,
+            }
+    else:
+        # Fall back to category matching if task_id is not provided
+        if not project_id or not file_category:
+            return {
+                "success": False,
+                "message": "project_id and file_category are required when task_id is not provided",
+                "task_id": None,
+                "task_title": None,
+                "task_status": None,
+            }
+
+        # Find matching task by joining with task_definition to check file_category
+        task = (
+            db.query(Task)
+            .join(TaskDefinition, Task.task_definition_id == TaskDefinition.id)
+            .filter(
+                Task.project_id == project_id,
+                Task.task_type == "document_upload",
+                Task.status.in_(["pending", "in_progress"]),
+                TaskDefinition.file_category == file_category,
             )
+            .first()
+        )
+
+        # If no task found by file_category, try matching by task name
+        if not task:
+            task_name = FILE_CATEGORY_TASK_MAP.get(file_category)
+            if task_name:
+                task = (
+                    db.query(Task)
+                    .filter(
+                        Task.project_id == project_id,
+                        Task.task_type == "document_upload",
+                        Task.status.in_(["pending", "in_progress"]),
+                        Task.title == task_name,
+                    )
+                    .first()
+                )
 
     if task:
         task.status = "completed"
         task.completed_at = datetime.utcnow()
         db.commit()
         db.refresh(task)
-        return task
+        return {
+            "success": True,
+            "message": f"Task '{task.title}' auto-completed",
+            "task_id": task.id,
+            "task_title": task.title,
+            "task_status": task.status,
+        }
 
-    return None
+    return {
+        "success": False,
+        "message": "No matching task found to auto-complete",
+        "task_id": None,
+        "task_title": None,
+        "task_status": None,
+    }
 
 
 def auto_complete_upload_task_by_name(
