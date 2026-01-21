@@ -31,6 +31,18 @@ router.delete('/:id', taskController.delete);
 // POST /api/tasks/:id/complete - Mark task as completed
 router.post('/:id/complete', taskController.complete);
 
+// POST /api/tasks/:id/start - Start a pending task
+router.post('/:id/start', taskController.start);
+
+// POST /api/tasks/:id/assign - Assign/reassign task
+router.post('/:id/assign', taskController.assign);
+
+// POST /api/tasks/:id/reopen - Reopen rejected/cancelled task
+router.post('/:id/reopen', taskController.reopen);
+
+// POST /api/tasks/:id/unblock - Unblock a blocked task
+router.post('/:id/unblock', taskController.unblock);
+
 // =============================================================================
 // Task Workflow Actions
 // =============================================================================

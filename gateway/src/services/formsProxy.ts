@@ -413,6 +413,32 @@ export const formsProxy = {
     });
   },
 
+  startTask: async (taskId: number, userId: string, userRole?: string): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/start`, {}, {
+      headers: { 'X-User-ID': userId, ...(userRole && { 'X-User-Role': userRole }) },
+    });
+  },
+
+  assignTask: async (taskId: number, assignedToId: string, userId: string, userRole?: string): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/assign`, {
+      assigned_to_id: assignedToId,
+    }, {
+      headers: { 'X-User-ID': userId, ...(userRole && { 'X-User-Role': userRole }) },
+    });
+  },
+
+  reopenTask: async (taskId: number, userId: string, userRole?: string): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/reopen`, {}, {
+      headers: { 'X-User-ID': userId, ...(userRole && { 'X-User-Role': userRole }) },
+    });
+  },
+
+  unblockTask: async (taskId: number, userId: string, userRole?: string): Promise<AxiosResponse> => {
+    return formsClient.post(`/api/tasks/${taskId}/unblock`, {}, {
+      headers: { 'X-User-ID': userId, ...(userRole && { 'X-User-Role': userRole }) },
+    });
+  },
+
   // Amendments
   getFormAmendments: async (formId: number, status?: string): Promise<AxiosResponse> => {
     return formsClient.get(`/api/forms/${formId}/amendments`, {

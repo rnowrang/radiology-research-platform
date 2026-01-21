@@ -240,6 +240,13 @@ export const tasksApi = {
     }),
   // Manually mark task as complete
   markComplete: (taskId: number) => api.post(`/tasks/${taskId}/mark-complete`),
+  // Task management actions
+  start: (id: number) => api.post(`/tasks/${id}/start`),
+  reopen: (id: number) => api.post(`/tasks/${id}/reopen`),
+  unblock: (id: number) => api.post(`/tasks/${id}/unblock`),
+  // Assign or reassign a task to a user
+  assign: (id: number, assignedToId: string) =>
+    api.post(`/tasks/${id}/assign`, { assigned_to_id: assignedToId }),
 };
 
 // Task Definitions API (admin)

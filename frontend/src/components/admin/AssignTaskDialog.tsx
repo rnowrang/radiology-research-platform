@@ -455,3 +455,7 @@ export function AssignTaskDialog({
     </Dialog>
   );
 }
+
+// Re-export ReassignTaskDialog for convenient imports
+export { ReassignTaskDialog } from './ReassignTaskDialog';
+export type { ReassignTaskDialogProps } from './ReassignTaskDialog';

@@ -154,6 +154,11 @@ class CreateFormForTaskRequest(BaseModel):
     template_id: int = Field(..., description="ID of the template to use for the form")
 
 
+class TaskAssignRequest(BaseModel):
+    """Schema for assigning a task."""
+    assigned_to_id: UUID = Field(..., description="ID of the user to assign the task to")
+
+
 class CreateFormForTaskResponse(BaseModel):
     """Schema for the response after creating a form for a task."""
     success: bool = True

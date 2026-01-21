@@ -32,6 +32,10 @@ export type ProjectStatus = typeof PROJECT_STATUS[keyof typeof PROJECT_STATUS];
 export const TASK_STATUS = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
+  SUBMITTED: 'submitted',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  REVISION_REQUIRED: 'revision_required',
   COMPLETED: 'completed',
   BLOCKED: 'blocked',
   CANCELLED: 'cancelled',

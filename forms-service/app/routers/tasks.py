@@ -22,6 +22,7 @@ from app.schemas.task import (
     PendingReviewItem,
     CreateFormForTaskRequest,
     CreateFormForTaskResponse,
+    TaskAssignRequest,
 )
 from app.services.task import create_form_for_task
 
@@ -361,10 +362,20 @@ def delete_task(
     db: Session = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_user_id),
 ):
-    """Delete a task."""
+    """Delete a task (soft delete not supported, this is a hard delete).
+
+    Cannot delete tasks with status 'approved' or 'completed'.
+    """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Prevent deletion of approved or completed tasks
+    if task.status in ("approved", "completed"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete task with status '{task.status}'. Approved and completed tasks cannot be deleted."
+        )
 
     # Only creator can delete
     if user_id and task.created_by_id != user_id:
@@ -541,6 +552,150 @@ def request_task_revision(
     task.reviewed_by_id = user_id
     task.reviewer_comments = request.comments
     task.revision_count = (task.revision_count or 0) + 1
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+# =============================================================================
+# Task Status Actions
+# =============================================================================
+
+def get_user_role(request: Request) -> Optional[str]:
+    """Extract user role from header."""
+    return request.headers.get("X-User-Role", "").lower() or None
+
+
+def is_admin(request: Request) -> bool:
+    """Check if the user has admin role."""
+    role = get_user_role(request)
+    return role == "admin"
+
+
+@router.post("/{task_id}/start", response_model=TaskResponse)
+def start_task(
+    task_id: int,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Start a pending task - changes status from 'pending' to 'in_progress'."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user can start (creator, assignee, or admin)
+    if user_id and not is_admin(http_request) and task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to start this task")
+
+    # Can only start pending tasks
+    if task.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot start task with status '{task.status}'. Must be 'pending'."
+        )
+
+    task.status = "in_progress"
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/assign", response_model=TaskResponse)
+def assign_task(
+    task_id: int,
+    request: TaskAssignRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Assign or reassign a task to a user."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user can assign (creator, current assignee, or admin)
+    if user_id and not is_admin(http_request) and task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to assign this task")
+
+    # Cannot reassign approved or completed tasks
+    if task.status in ("approved", "completed"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot assign task with status '{task.status}'."
+        )
+
+    task.assigned_to_id = request.assigned_to_id
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/reopen", response_model=TaskResponse)
+def reopen_task(
+    task_id: int,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Reopen a rejected or cancelled task - changes status back to 'pending'."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user can reopen (creator, assignee, or admin)
+    if user_id and not is_admin(http_request) and task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to reopen this task")
+
+    # Can only reopen rejected or cancelled tasks
+    if task.status not in ("rejected", "cancelled"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reopen task with status '{task.status}'. Must be 'rejected' or 'cancelled'."
+        )
+
+    task.status = "pending"
+    # Clear review information when reopening
+    task.reviewed_at = None
+    task.reviewed_by_id = None
+    task.reviewer_comments = None
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/unblock", response_model=TaskResponse)
+def unblock_task(
+    task_id: int,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """Unblock a blocked task - changes status from 'blocked' to 'pending'."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user can unblock (creator, assignee, or admin)
+    if user_id and not is_admin(http_request) and task.created_by_id != user_id and task.assigned_to_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to unblock this task")
+
+    # Can only unblock blocked tasks
+    if task.status != "blocked":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot unblock task with status '{task.status}'. Must be 'blocked'."
+        )
+
+    task.status = "pending"
 
     db.commit()
     db.refresh(task)

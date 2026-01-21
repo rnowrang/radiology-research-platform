@@ -140,12 +140,23 @@ export const taskController = {
   delete: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const taskId = parseInt(req.params.id);
+
+      // First, get the task to check its status
+      const taskResponse = await formsProxy.getTask(taskId, req.user!.id);
+      const task = taskResponse.data?.data || taskResponse.data;
+
+      // Prevent deletion of approved or completed tasks
+      if (task.status === 'approved' || task.status === 'completed') {
+        throw new ValidationError(`Cannot delete task with status '${task.status}'. Approved and completed tasks cannot be deleted.`);
+      }
+
       const response = await formsProxy.deleteTask(taskId, req.user!.id);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.DELETE,
         resourceType: 'task',
         resourceId: req.params.id,
+        details: { previous_status: task.status },
       });
 
       res.json(response.data);
@@ -167,6 +178,129 @@ export const taskController = {
       });
 
       res.json(response.data);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Start a pending task
+   * POST /api/tasks/:id/start
+   */
+  start: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const response = await formsProxy.startTask(taskId, req.user!.id, req.user!.role);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'task',
+        resourceId: req.params.id,
+        details: { action: 'start', new_status: 'in_progress' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Assign or reassign a task
+   * POST /api/tasks/:id/assign
+   */
+  assign: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { assigned_to_id } = req.body;
+
+      if (!assigned_to_id) {
+        throw new ValidationError('assigned_to_id is required');
+      }
+
+      const response = await formsProxy.assignTask(taskId, assigned_to_id, req.user!.id, req.user!.role);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'task',
+        resourceId: req.params.id,
+        details: { action: 'assign', assigned_to_id },
+      });
+
+      // Send notification to the new assignee (async, don't block response)
+      try {
+        const taskData = response.data?.data || response.data;
+        const taskTitle = taskData?.title || 'Task';
+        const dueDate = taskData?.due_date ? new Date(taskData.due_date) : undefined;
+
+        // Get assigner name
+        let assignerName: string | undefined;
+        try {
+          const assigner = await userQueries.findById(req.user!.id);
+          if (assigner) {
+            assignerName = assigner.full_name;
+          }
+        } catch (err) {
+          logger.warn('Failed to get assigner name', err);
+        }
+
+        // Notify the new assignee
+        notificationService.notifyTaskAssigned(
+          taskId,
+          taskTitle,
+          assigned_to_id,
+          assignerName,
+          dueDate
+        ).catch((err) => logger.warn('Failed to send task assignment notification', err));
+      } catch (notifyError) {
+        logger.warn('Failed to send task assignment notification', notifyError);
+      }
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Reopen a rejected or cancelled task
+   * POST /api/tasks/:id/reopen
+   */
+  reopen: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const response = await formsProxy.reopenTask(taskId, req.user!.id, req.user!.role);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'task',
+        resourceId: req.params.id,
+        details: { action: 'reopen', new_status: 'pending' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Unblock a blocked task
+   * POST /api/tasks/:id/unblock
+   */
+  unblock: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const response = await formsProxy.unblockTask(taskId, req.user!.id, req.user!.role);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'task',
+        resourceId: req.params.id,
+        details: { action: 'unblock', new_status: 'pending' },
+      });
+
+      res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);
     }

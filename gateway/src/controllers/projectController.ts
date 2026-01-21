@@ -1,13 +1,14 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { projectQueries } from '../database/queries/projectQueries.js';
-import { fileQueries } from '../database/queries/fileQueries.js';
+import { fileQueries, FileWithUploader } from '../database/queries/fileQueries.js';
 import { logAudit } from '../middleware/audit.js';
 import { AUDIT_ACTIONS, USER_ROLES } from '../config/constants.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { formsProxy } from '../services/formsProxy.js';
 import { notificationService } from '../services/notificationService.js';
 import { userQueries } from '../database/queries/userQueries.js';
+import { taskQueries } from '../database/queries/taskQueries.js';
 
 export const projectController = {
   list: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -707,8 +708,89 @@ export const projectController = {
       const tasks = tasksResponse.data || [];
       const files = filesResult.files || [];
 
+      // Define task type for the tasks from forms-service
+      interface TaskFromService {
+        id: number;
+        title?: string;
+        name?: string;
+        description?: string;
+        status: string;
+        task_type?: string;
+        priority?: string;
+        is_required?: boolean;
+        due_date?: string;
+        completed_at?: string;
+        created_at?: string;
+        updated_at?: string;
+        assigned_to_id?: string;
+        created_by_id?: string;
+        reviewer_comments?: string;
+        revision_count?: number;
+      }
+
+      // Collect all unique user IDs from tasks (assigned_to_id and created_by_id)
+      const userIds = new Set<string>();
+      tasks.forEach((t: TaskFromService) => {
+        if (t.assigned_to_id) userIds.add(t.assigned_to_id);
+        if (t.created_by_id) userIds.add(t.created_by_id);
+      });
+
+      // Batch fetch user details and task-related data
+      const taskIds = tasks.map((t: TaskFromService) => t.id);
+
+      // Fetch users, task files, and status history in parallel
+      const [usersMap, taskFilesMap, statusHistoryMap] = await Promise.all([
+        // Fetch all users by IDs
+        (async () => {
+          const map = new Map<string, { id: string; name: string; email: string }>();
+          const userIdArray = Array.from(userIds);
+          if (userIdArray.length > 0) {
+            const userPromises = userIdArray.map(id => userQueries.findById(id));
+            const users = await Promise.all(userPromises);
+            users.forEach((user, index) => {
+              if (user) {
+                map.set(userIdArray[index], {
+                  id: user.id,
+                  name: user.full_name,
+                  email: user.email,
+                });
+              }
+            });
+          }
+          return map;
+        })(),
+        // Fetch files for all tasks
+        (async () => {
+          const map = new Map<number, Array<{ id: string; original_file_name: string; mime_type: string }>>();
+          if (taskIds.length > 0) {
+            const filePromises = taskIds.map((taskId: number) => fileQueries.getFilesByTaskId(taskId));
+            const fileResults = await Promise.all(filePromises);
+            fileResults.forEach((taskFiles, index) => {
+              map.set(taskIds[index], taskFiles.map((f: FileWithUploader) => ({
+                id: f.id,
+                original_file_name: f.original_file_name,
+                mime_type: f.mime_type,
+              })));
+            });
+          }
+          return map;
+        })(),
+        // Fetch status history for all tasks
+        (async () => {
+          if (taskIds.length > 0) {
+            try {
+              return await taskQueries.getTasksStatusHistory(taskIds);
+            } catch {
+              // If table doesn't exist yet, return empty map
+              return new Map<number, Array<{ status: string; created_at: Date; performed_by_name: string | null; comments: string | null }>>();
+            }
+          }
+          return new Map<number, Array<{ status: string; created_at: Date; performed_by_name: string | null; comments: string | null }>>();
+        })(),
+      ]);
+
       // Calculate progress stats
-      const completedTasks = tasks.filter((t: { status: string }) => t.status === 'completed' || t.status === 'approved').length;
+      const completedTasks = tasks.filter((t: TaskFromService) => t.status === 'completed' || t.status === 'approved').length;
       const totalTasks = tasks.length;
       const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -721,7 +803,7 @@ export const projectController = {
         other: 'Other',
       };
 
-      // Format response
+      // Format response with enhanced task details
       res.json({
         success: true,
         data: {
@@ -730,7 +812,7 @@ export const projectController = {
             title: project.title,
             status: project.status,
             project_type: project.project_type,
-            project_type_label: projectTypeLabels[project.project_type] || project.project_type,
+            project_type_label: project.project_type ? (projectTypeLabels[project.project_type] || project.project_type) : '',
             description: project.description,
             department: project.department,
             created_at: project.created_at,
@@ -749,14 +831,51 @@ export const projectController = {
             template_name: f.template_name || '',
             updated_at: f.updated_at,
           })),
-          tasks: tasks.map((t: { id: number; title?: string; name?: string; status: string; task_type?: string; completed_at?: string; due_date?: string }) => ({
-            id: t.id,
-            name: t.title || t.name || '',
-            status: t.status,
-            task_type: t.task_type || '',
-            completed_at: t.completed_at || null,
-            due_date: t.due_date || null,
-          })),
+          tasks: tasks.map((t: TaskFromService) => {
+            // Get assignee details
+            const assignee = t.assigned_to_id ? usersMap.get(t.assigned_to_id) : null;
+            // Get creator details
+            const creator = t.created_by_id ? usersMap.get(t.created_by_id) : null;
+            // Get task files
+            const taskFiles = taskFilesMap.get(t.id) || [];
+            // Get status history
+            const history = statusHistoryMap.get(t.id) || [];
+
+            return {
+              id: t.id,
+              title: t.title || t.name || '',
+              description: t.description || null,
+              task_type: t.task_type || '',
+              status: t.status,
+              priority: t.priority || 'medium',
+              is_required: t.is_required ?? true,
+              due_date: t.due_date || null,
+              completed_at: t.completed_at || null,
+              created_at: t.created_at || null,
+              updated_at: t.updated_at || null,
+              assigned_to: assignee ? {
+                id: assignee.id,
+                name: assignee.name,
+                email: assignee.email,
+              } : null,
+              created_by: creator ? {
+                id: creator.id,
+                name: creator.name,
+              } : {
+                id: t.created_by_id || '',
+                name: 'Unknown',
+              },
+              reviewer_comments: t.reviewer_comments || null,
+              revision_count: t.revision_count ?? 0,
+              files: taskFiles,
+              status_history: history.map(h => ({
+                status: h.status,
+                timestamp: h.created_at instanceof Date ? h.created_at.toISOString() : h.created_at,
+                performed_by: h.performed_by_name || null,
+                comments: h.comments || null,
+              })),
+            };
+          }),
           files: files.map((f) => ({
             id: f.id,
             original_file_name: f.original_file_name,

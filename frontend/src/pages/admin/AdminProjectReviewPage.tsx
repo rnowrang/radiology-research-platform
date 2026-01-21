@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   CheckCircle,
   XCircle,
   RotateCcw,
@@ -23,6 +25,13 @@ import {
   Info,
   Eye,
   Trash2,
+  MessageSquare,
+  History,
+  Play,
+  UserPlus,
+  Edit,
+  Unlock,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +80,9 @@ import { api, filesApi, tasksApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { CollaboratorsManagement } from '@/components/admin/CollaboratorsManagement';
 import { FilePreviewModal } from '@/components/files/FilePreviewModal';
+import { CreateTaskDialog } from '@/components/admin/CreateTaskDialog';
+import { EditTaskDialog } from '@/components/admin/EditTaskDialog';
+import { ReassignTaskDialog } from '@/components/admin/ReassignTaskDialog';
 
 // =============================================================================
 // Types
@@ -119,12 +131,36 @@ interface TaskSummary {
   id: number;
   title: string;
   description?: string;
-  task_type?: string;
+  task_type: string;
   status: string;
+  priority: string;
   is_required: boolean;
   due_date?: string;
   completed_at?: string;
-  assigned_to_name?: string;
+  created_at?: string;
+  updated_at?: string;
+  assigned_to: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  created_by: {
+    id: string;
+    name: string;
+  };
+  reviewer_comments?: string;
+  revision_count: number;
+  files: Array<{
+    id: string;
+    original_file_name: string;
+    mime_type: string;
+  }>;
+  status_history: Array<{
+    status: string;
+    timestamp: string;
+    performed_by: string | null;
+    comments: string | null;
+  }>;
 }
 
 interface FileSummary {
@@ -274,6 +310,30 @@ const getTaskStatusLabel = (status?: string): string => {
   return labels[status] || status;
 };
 
+const getPriorityBadgeClasses = (priority: string): string => {
+  switch (priority) {
+    case 'urgent':
+      return 'bg-red-100 text-red-800 border-red-200';
+    case 'high':
+      return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'medium':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'low':
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
+const getPriorityLabel = (priority: string): string => {
+  const labels: Record<string, string> = {
+    urgent: 'Urgent',
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+  };
+  return labels[priority] || priority;
+};
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -303,6 +363,15 @@ export function AdminProjectReviewPage() {
     action: 'reject' | 'requestChanges' | null;
   }>({ open: false, taskId: null, action: null });
   const [taskReviewNotes, setTaskReviewNotes] = useState('');
+
+  // Expanded task state
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
+
+  // Task management state
+  const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
+  const [assignTaskDialog, setAssignTaskDialog] = useState<{ open: boolean; taskId: number | null }>({ open: false, taskId: null });
+  const [editTaskDialog, setEditTaskDialog] = useState<{ open: boolean; task: TaskSummary | null }>({ open: false, task: null });
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
 
   // Fetch project review summary
   const {
@@ -432,6 +501,60 @@ export function AdminProjectReviewPage() {
     },
   });
 
+  // Start task mutation
+  const startTaskMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.start(taskId),
+    onSuccess: async () => {
+      toast({ title: 'Task started' });
+      await refetch();
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to start task' });
+    },
+  });
+
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.delete(taskId),
+    onSuccess: async () => {
+      toast({ title: 'Task deleted' });
+      setTaskToDelete(null);
+      await refetch();
+    },
+    onError: (err: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to delete task',
+        description: err.response?.data?.error || 'Cannot delete approved or completed tasks'
+      });
+      setTaskToDelete(null);
+    },
+  });
+
+  // Reopen task mutation
+  const reopenTaskMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.reopen(taskId),
+    onSuccess: async () => {
+      toast({ title: 'Task reopened' });
+      await refetch();
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to reopen task' });
+    },
+  });
+
+  // Unblock task mutation
+  const unblockTaskMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.unblock(taskId),
+    onSuccess: async () => {
+      toast({ title: 'Task unblocked' });
+      await refetch();
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to unblock task' });
+    },
+  });
+
   const handleOpenReviewDialog = (action: 'approve' | 'reject' | 'request_changes') => {
     setReviewAction(action);
     setReviewNotes('');
@@ -467,6 +590,96 @@ export function AdminProjectReviewPage() {
   };
 
   const isSubmitting = approveMutation.isPending || rejectMutation.isPending || requestChangesMutation.isPending;
+
+  // Helper function to determine which actions are available based on task status
+  const getTaskActions = (status: string): string[] => {
+    switch (status) {
+      case 'pending':
+        return ['start', 'assign', 'edit', 'delete'];
+      case 'in_progress':
+        return ['reassign', 'edit'];
+      case 'submitted':
+        return ['approve', 'requestChanges', 'reject'];
+      case 'approved':
+      case 'completed':
+        return []; // No actions - view only
+      case 'rejected':
+        return ['reopen', 'edit', 'delete'];
+      case 'revision_required':
+        return ['edit'];
+      case 'blocked':
+        return ['unblock', 'edit', 'delete'];
+      case 'cancelled':
+        return ['reopen', 'delete'];
+      default:
+        return [];
+    }
+  };
+
+  // Render task action buttons based on status
+  const renderTaskActions = (task: TaskSummary) => {
+    const actions = getTaskActions(task.status);
+    if (actions.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 pt-4 border-t mt-4">
+        {actions.includes('start') && (
+          <Button size="sm" onClick={() => startTaskMutation.mutate(task.id)} disabled={startTaskMutation.isPending}>
+            <Play className="mr-1 h-4 w-4" /> Start
+          </Button>
+        )}
+        {actions.includes('approve') && (
+          <Button size="sm" variant="default" className="bg-green-600 hover:bg-green-700"
+            onClick={() => approveTaskFromFileMutation.mutate(task.id)}>
+            <CheckCircle className="mr-1 h-4 w-4" /> Approve
+          </Button>
+        )}
+        {actions.includes('requestChanges') && (
+          <Button size="sm" variant="outline" className="text-amber-600 border-amber-600"
+            onClick={() => setTaskReviewDialog({ open: true, taskId: task.id, action: 'requestChanges' })}>
+            <RotateCcw className="mr-1 h-4 w-4" /> Request Changes
+          </Button>
+        )}
+        {actions.includes('reject') && (
+          <Button size="sm" variant="destructive"
+            onClick={() => setTaskReviewDialog({ open: true, taskId: task.id, action: 'reject' })}>
+            <XCircle className="mr-1 h-4 w-4" /> Reject
+          </Button>
+        )}
+        {actions.includes('assign') && (
+          <Button size="sm" variant="outline" onClick={() => setAssignTaskDialog({ open: true, taskId: task.id })}>
+            <UserPlus className="mr-1 h-4 w-4" /> Assign
+          </Button>
+        )}
+        {actions.includes('reassign') && (
+          <Button size="sm" variant="outline" onClick={() => setAssignTaskDialog({ open: true, taskId: task.id })}>
+            <UserPlus className="mr-1 h-4 w-4" /> Reassign
+          </Button>
+        )}
+        {actions.includes('edit') && (
+          <Button size="sm" variant="outline" onClick={() => setEditTaskDialog({ open: true, task })}>
+            <Edit className="mr-1 h-4 w-4" /> Edit
+          </Button>
+        )}
+        {actions.includes('reopen') && (
+          <Button size="sm" variant="outline" onClick={() => reopenTaskMutation.mutate(task.id)}>
+            <RotateCcw className="mr-1 h-4 w-4" /> Reopen
+          </Button>
+        )}
+        {actions.includes('unblock') && (
+          <Button size="sm" variant="outline" onClick={() => unblockTaskMutation.mutate(task.id)}>
+            <Unlock className="mr-1 h-4 w-4" /> Unblock
+          </Button>
+        )}
+        {actions.includes('delete') && (
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+            onClick={() => setTaskToDelete(task.id)}>
+            <Trash2 className="mr-1 h-4 w-4" /> Delete
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   // Loading state
   if (isLoading) {
@@ -761,11 +974,17 @@ export function AdminProjectReviewPage() {
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Tasks</CardTitle>
-              <CardDescription>
-                All tasks associated with this project
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Tasks</CardTitle>
+                <CardDescription>
+                  All tasks associated with this project
+                </CardDescription>
+              </div>
+              <Button onClick={() => setCreateTaskDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Task
+              </Button>
             </CardHeader>
             <CardContent>
               {tasks.length === 0 ? (
@@ -775,48 +994,270 @@ export function AdminProjectReviewPage() {
                   <p className="text-muted-foreground mt-1">
                     No tasks have been assigned to this project yet
                   </p>
+                  <Button className="mt-4" onClick={() => setCreateTaskDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create First Task
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">{task.title}</span>
-                          <Badge variant={getStatusBadgeVariant(task.status)}>
-                            {getStatusLabel(task.status)}
-                          </Badge>
-                          {task.is_required && (
-                            <Badge variant="secondary">Required</Badge>
-                          )}
+                  {tasks.map((task) => {
+                    const isExpanded = expandedTaskId === task.id;
+                    return (
+                      <div
+                        key={task.id}
+                        className="border rounded-lg"
+                      >
+                        {/* Task Header - Clickable to expand */}
+                        <div
+                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                          onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{task.title}</span>
+                              <Badge variant={getStatusBadgeVariant(task.status)}>
+                                {getStatusLabel(task.status)}
+                              </Badge>
+                              <Badge variant="outline" className={getPriorityBadgeClasses(task.priority)}>
+                                {getPriorityLabel(task.priority)}
+                              </Badge>
+                              {task.is_required && (
+                                <Badge variant="secondary">Required</Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                              <span>{getTaskTypeLabel(task.task_type)}</span>
+                              {task.assigned_to && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {task.assigned_to.name}
+                                </span>
+                              )}
+                              {task.due_date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Due {formatDate(task.due_date)}
+                                </span>
+                              )}
+                              {task.completed_at && (
+                                <span className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Completed {formatDate(task.completed_at)}
+                                </span>
+                              )}
+                              {task.revision_count > 0 && (
+                                <span className="flex items-center gap-1 text-amber-600">
+                                  <RotateCcw className="h-3 w-3" />
+                                  {task.revision_count} revision{task.revision_count > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon">
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                          <span>{getTaskTypeLabel(task.task_type)}</span>
-                          {task.assigned_to_name && (
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {task.assigned_to_name}
-                            </span>
-                          )}
-                          {task.due_date && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Due {formatDate(task.due_date)}
-                            </span>
-                          )}
-                          {task.completed_at && (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <CheckCircle className="h-3 w-3" />
-                              Completed {formatDate(task.completed_at)}
-                            </span>
-                          )}
-                        </div>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 border-t bg-muted/30 rounded-b-lg">
+                            <div className="ml-4 space-y-4 pt-4">
+                              {/* Description */}
+                              {task.description && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-1">Description</h4>
+                                  <p className="text-sm text-muted-foreground">{task.description}</p>
+                                </div>
+                              )}
+
+                              {/* Details Grid */}
+                              <div>
+                                <h4 className="text-sm font-medium mb-2">Details</h4>
+                                <div className="space-y-1.5 text-sm">
+                                  {task.assigned_to && (
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground">Assigned to:</span>
+                                      <span>
+                                        {task.assigned_to.name} ({task.assigned_to.email})
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground ml-6">Priority:</span>
+                                    <Badge
+                                      variant="outline"
+                                      className={getPriorityBadgeClasses(task.priority)}
+                                    >
+                                      {getPriorityLabel(task.priority)}
+                                    </Badge>
+                                  </div>
+                                  {task.due_date && (
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground">Due:</span>
+                                      <span>{formatDate(task.due_date)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Created by:</span>
+                                    <span>{task.created_by.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Created:</span>
+                                    <span>{formatDate(task.created_at)}</span>
+                                    {task.updated_at && task.updated_at !== task.created_at && (
+                                      <>
+                                        <span className="text-muted-foreground mx-1">|</span>
+                                        <span className="text-muted-foreground">Updated:</span>
+                                        <span>{formatDate(task.updated_at)}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {task.completed_at && (
+                                    <div className="flex items-center gap-2 text-green-600">
+                                      <CheckCircle className="h-4 w-4" />
+                                      <span>Completed:</span>
+                                      <span>{formatDate(task.completed_at)}</span>
+                                    </div>
+                                  )}
+                                  {task.revision_count > 0 && (
+                                    <div className="flex items-center gap-2">
+                                      <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground">Revisions:</span>
+                                      <span>{task.revision_count}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Files Section */}
+                              {task.files && task.files.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Files ({task.files.length})
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {task.files.map((file) => (
+                                      <div
+                                        key={file.id}
+                                        className="flex items-center justify-between p-2 bg-background rounded border"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                                          <span className="text-sm truncate">
+                                            {file.original_file_name}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setPreviewFile({
+                                                id: file.id,
+                                                filename: file.original_file_name,
+                                                mime_type: file.mime_type,
+                                              });
+                                              setIsPreviewOpen(true);
+                                            }}
+                                            title="Preview"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              window.open(`/api/files/${file.id}`, '_blank');
+                                            }}
+                                            title="Download"
+                                          >
+                                            <Download className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Reviewer Comments Section */}
+                              {task.reviewer_comments && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <MessageSquare className="h-4 w-4" />
+                                    Reviewer Comments
+                                  </h4>
+                                  <div className="p-3 bg-background rounded border italic text-sm">
+                                    "{task.reviewer_comments}"
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Status History Section */}
+                              {task.status_history && task.status_history.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <History className="h-4 w-4" />
+                                    Status History
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {task.status_history.map((history, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-start gap-2 text-sm"
+                                      >
+                                        <div className="w-2 h-2 rounded-full bg-muted-foreground mt-1.5 shrink-0" />
+                                        <div>
+                                          <span className="text-muted-foreground">
+                                            {formatDate(history.timestamp)}:
+                                          </span>{' '}
+                                          <Badge
+                                            variant={getTaskStatusBadgeVariant(history.status)}
+                                            className="text-xs"
+                                          >
+                                            {getTaskStatusLabel(history.status)}
+                                          </Badge>
+                                          {history.performed_by && (
+                                            <span className="text-muted-foreground">
+                                              {' '}by {history.performed_by}
+                                            </span>
+                                          )}
+                                          {history.comments && (
+                                            <p className="text-muted-foreground mt-0.5 italic">
+                                              "{history.comments}"
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Task Actions - Added by Agent B */}
+                              <div className="pt-2 border-t">
+                                {renderTaskActions(task)}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1133,6 +1574,27 @@ export function AdminProjectReviewPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Task Confirmation Dialog */}
+      <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => taskToDelete && deleteTaskMutation.mutate(taskToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* File Preview Modal */}
       <FilePreviewModal
         file={previewFile}
@@ -1141,6 +1603,31 @@ export function AdminProjectReviewPage() {
           setIsPreviewOpen(false);
           setPreviewFile(null);
         }}
+      />
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        projectId={projectId!}
+        open={createTaskDialogOpen}
+        onOpenChange={setCreateTaskDialogOpen}
+        onSuccess={refetch}
+      />
+
+      {/* Edit Task Dialog */}
+      <EditTaskDialog
+        task={editTaskDialog.task}
+        open={editTaskDialog.open}
+        onOpenChange={(open) => !open && setEditTaskDialog({ open: false, task: null })}
+        onSuccess={refetch}
+      />
+
+      {/* Assign/Reassign Task Dialog */}
+      <ReassignTaskDialog
+        taskId={assignTaskDialog.taskId}
+        projectId={projectId!}
+        open={assignTaskDialog.open}
+        onOpenChange={(open) => !open && setAssignTaskDialog({ open: false, taskId: null })}
+        onSuccess={refetch}
       />
     </div>
   );
