@@ -123,8 +123,8 @@ const adminNavItems: AdminNavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: 'Project Review',
-    href: '/projects?status=pending_approval',
+    title: 'Projects',
+    href: '/admin/projects',
     icon: FolderKanban,
     badgeKey: 'projectReview',
   },

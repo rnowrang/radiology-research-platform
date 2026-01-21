@@ -193,6 +193,17 @@ export const projectQueries = {
     return (result.rowCount ?? 0) > 0;
   },
 
+  updateCollaboratorRole: async (projectId: string, userId: string, role: string): Promise<void> => {
+    const validRoles = ['co_investigator', 'research_assistant', 'coordinator', 'viewer'];
+    if (!validRoles.includes(role)) {
+      throw new Error('Invalid role');
+    }
+    await query(
+      'UPDATE project_collaborators SET role = $1 WHERE project_id = $2 AND user_id = $3',
+      [role, projectId, userId]
+    );
+  },
+
   getCollaborators: async (projectId: string): Promise<Array<{ user_id: string; full_name: string; email: string; role: string }>> => {
     const result = await query<{ user_id: string; full_name: string; email: string; role: string }>(
       `SELECT pc.user_id, u.full_name, u.email, pc.role

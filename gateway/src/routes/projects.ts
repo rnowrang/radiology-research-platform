@@ -25,6 +25,7 @@ router.get('/:projectId/review-summary', requireAdmin, asyncHandler(projectContr
 // Collaborator routes
 router.get('/:id/collaborators', projectController.getCollaborators);
 router.post('/:id/collaborators', projectController.addCollaborator);
+router.put('/:id/collaborators/:userId', projectController.updateCollaboratorRole);
 router.delete('/:id/collaborators/:userId', projectController.removeCollaborator);
 
 // File routes

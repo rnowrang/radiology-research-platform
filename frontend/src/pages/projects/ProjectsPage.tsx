@@ -66,12 +66,8 @@ export function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const { data: projectsData, isLoading } = useQuery({
-    queryKey: ['projects', statusFilter],
+    queryKey: ['projects'],
     queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (statusFilter !== 'all') {
-        params.status = statusFilter;
-      }
       const response = await projectsApi.list();
       return response.data.data as ProjectListItem[];
     },
@@ -79,12 +75,23 @@ export function ProjectsPage() {
 
   const projects = projectsData || [];
 
-  // Filter by search term
-  const filteredProjects = projects.filter((project) =>
-    project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter by search term and status
+  const filteredProjects = projects.filter((project) => {
+    // Status filter
+    if (statusFilter !== 'all' && project.status !== statusFilter) {
+      return false;
+    }
+    // Search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        project.title.toLowerCase().includes(searchLower) ||
+        project.description?.toLowerCase().includes(searchLower) ||
+        project.department?.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
+  });
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Not set';

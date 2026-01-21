@@ -30,6 +30,7 @@ import { EmailSettingsPage } from '@/pages/admin/EmailSettingsPage';
 import { WorkflowConfigPage } from '@/pages/admin/WorkflowConfigPage';
 import { TaskReviewPage } from '@/pages/admin/TaskReviewPage';
 import { AdminProjectReviewPage } from '@/pages/admin/AdminProjectReviewPage';
+import { AdminProjectsPage } from '@/pages/admin/AdminProjectsPage';
 import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { useAuthStore } from '@/stores/authStore';
 import { authApi } from '@/lib/api';
@@ -176,6 +177,14 @@ function App() {
           element={
             <ProtectedRoute requiredRoles={['admin']}>
               <TaskReviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/projects"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <AdminProjectsPage />
             </ProtectedRoute>
           }
         />

@@ -305,6 +305,44 @@ export const projectController = {
     }
   },
 
+  updateCollaboratorRole: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: projectId, userId } = req.params;
+      const { role } = req.body;
+
+      if (!role) {
+        throw new ValidationError('Role is required');
+      }
+
+      const project = await projectQueries.findById(projectId);
+
+      if (!project) {
+        throw new NotFoundError('Project not found');
+      }
+
+      // Only PI or admin can update collaborator roles
+      if (project.principal_investigator_id !== req.user!.id && req.user!.role !== 'admin') {
+        throw new ForbiddenError('Only the principal investigator or admin can update collaborator roles');
+      }
+
+      await projectQueries.updateCollaboratorRole(projectId, userId, role);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'project_collaborator',
+        resourceId: projectId,
+        details: { user_id: userId, role },
+      });
+
+      res.json({
+        success: true,
+        message: 'Collaborator role updated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   /**
    * Get task definitions for a project type preview
    * GET /api/project-types/:projectType/tasks

@@ -81,6 +81,10 @@ export const projectsApi = {
   getCollaborators: (id: string) => api.get(`/projects/${id}/collaborators`),
   addCollaborator: (id: string, data: any) =>
     api.post(`/projects/${id}/collaborators`, data),
+  removeCollaborator: (projectId: string, userId: string) =>
+    api.delete(`/projects/${projectId}/collaborators/${userId}`),
+  updateCollaboratorRole: (projectId: string, userId: string, role: string) =>
+    api.put(`/projects/${projectId}/collaborators/${userId}`, { role }),
   getTasksForProjectType: (projectType: string) =>
     api.get(`/project-types/${projectType}/tasks`),
   // Project approval workflow

@@ -11,6 +11,7 @@ import {
   FolderKanban,
   Calendar,
   User,
+  Users,
   Mail,
   Clock,
   Download,
@@ -56,6 +57,7 @@ import {
 import { useToast } from '@/hooks/useToast';
 import { api } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
+import { CollaboratorsManagement } from '@/components/admin/CollaboratorsManagement';
 
 // =============================================================================
 // Types
@@ -502,6 +504,10 @@ export function AdminProjectReviewPage() {
             <File className="h-4 w-4" />
             Files
           </TabsTrigger>
+          <TabsTrigger value="collaborators" className="gap-2">
+            <Users className="h-4 w-4" />
+            Collaborators
+          </TabsTrigger>
           <TabsTrigger value="activity" className="gap-2">
             <Activity className="h-4 w-4" />
             Activity
@@ -757,6 +763,11 @@ export function AdminProjectReviewPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Collaborators Tab */}
+        <TabsContent value="collaborators" className="mt-4">
+          <CollaboratorsManagement projectId={projectId!} />
         </TabsContent>
 
         {/* Activity Tab */}
