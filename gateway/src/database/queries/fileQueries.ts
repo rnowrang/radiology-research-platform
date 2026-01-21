@@ -21,6 +21,8 @@ export interface FileRecord {
 export interface FileWithUploader extends FileRecord {
   uploaded_by_name?: string;
   uploaded_by_email?: string;
+  task_status?: string;
+  task_title?: string;
 }
 
 export interface CreateFileData {
@@ -84,9 +86,15 @@ export const fileQueries = {
 
     const [filesResult, countResult] = await Promise.all([
       query<FileWithUploader>(
-        `SELECT f.*, u.full_name as uploaded_by_name, u.email as uploaded_by_email
+        `SELECT f.id, f.project_id, f.form_instance_id, f.task_id,
+                f.uploaded_by_id, f.file_name, f.original_file_name,
+                f.file_size, f.mime_type, f.category, f.storage_path,
+                f.checksum, f.is_encrypted, f.is_deleted, f.created_at,
+                u.full_name as uploaded_by_name, u.email as uploaded_by_email,
+                t.status as task_status, t.title as task_title
          FROM files f
          LEFT JOIN users u ON f.uploaded_by_id = u.id
+         LEFT JOIN tasks t ON f.task_id = t.id
          WHERE f.project_id = $1 AND f.is_deleted = false
          ORDER BY f.created_at DESC
          LIMIT $2 OFFSET $3`,

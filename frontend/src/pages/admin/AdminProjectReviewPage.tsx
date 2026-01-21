@@ -21,6 +21,8 @@ import {
   ListTodo,
   Activity,
   Info,
+  Eye,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,10 +56,21 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/useToast';
-import { api } from '@/lib/api';
+import { api, filesApi, tasksApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { CollaboratorsManagement } from '@/components/admin/CollaboratorsManagement';
+import { FilePreviewModal } from '@/components/files/FilePreviewModal';
 
 // =============================================================================
 // Types
@@ -122,6 +135,9 @@ interface FileSummary {
   category: string;
   uploaded_by_name?: string;
   created_at: string;
+  task_id?: number;
+  task_status?: string;
+  task_title?: string;
 }
 
 // =============================================================================
@@ -228,6 +244,36 @@ const getTaskTypeLabel = (taskType?: string): string => {
   return labels[taskType] || taskType;
 };
 
+const getTaskStatusBadgeVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' => {
+  switch (status) {
+    case 'submitted':
+      return 'warning';
+    case 'approved':
+      return 'success';
+    case 'rejected':
+      return 'destructive';
+    case 'revision_required':
+      return 'secondary';
+    case 'in_progress':
+    default:
+      return 'default';
+  }
+};
+
+const getTaskStatusLabel = (status?: string): string => {
+  if (!status) return '-';
+  const labels: Record<string, string> = {
+    pending: 'Pending',
+    in_progress: 'In Progress',
+    submitted: 'Submitted',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    revision_required: 'Revision Required',
+    completed: 'Completed',
+  };
+  return labels[status] || status;
+};
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -243,6 +289,21 @@ export function AdminProjectReviewPage() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'request_changes' | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+
+  // File preview state
+  const [previewFile, setPreviewFile] = useState<{ id: number; filename: string; mime_type: string } | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // File delete state
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+
+  // Task review dialog state
+  const [taskReviewDialog, setTaskReviewDialog] = useState<{
+    open: boolean;
+    taskId: number | null;
+    action: 'reject' | 'requestChanges' | null;
+  }>({ open: false, taskId: null, action: null });
+  const [taskReviewNotes, setTaskReviewNotes] = useState('');
 
   // Fetch project review summary
   const {
@@ -312,6 +373,61 @@ export function AdminProjectReviewPage() {
         title: 'Error',
         description: err.response?.data?.error || 'Failed to request changes',
       });
+    },
+  });
+
+  // Delete file mutation
+  const deleteFileMutation = useMutation({
+    mutationFn: (fileId: string) => filesApi.delete(fileId),
+    onSuccess: () => {
+      toast({ title: 'File deleted' });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      setFileToDelete(null);
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to delete file' });
+    },
+  });
+
+  // Approve task mutation
+  const approveTaskFromFileMutation = useMutation({
+    mutationFn: (taskId: number) => tasksApi.approve(taskId),
+    onSuccess: () => {
+      toast({ title: 'Task approved' });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to approve task' });
+    },
+  });
+
+  // Reject task mutation
+  const rejectTaskFromFileMutation = useMutation({
+    mutationFn: ({ taskId, notes }: { taskId: number; notes: string }) =>
+      tasksApi.reject(taskId, notes),
+    onSuccess: () => {
+      toast({ title: 'Task rejected' });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      setTaskReviewDialog({ open: false, taskId: null, action: null });
+      setTaskReviewNotes('');
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to reject task' });
+    },
+  });
+
+  // Request revision mutation
+  const requestRevisionFromFileMutation = useMutation({
+    mutationFn: ({ taskId, notes }: { taskId: number; notes: string }) =>
+      tasksApi.requestRevision(taskId, notes),
+    onSuccess: () => {
+      toast({ title: 'Revision requested' });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      setTaskReviewDialog({ open: false, taskId: null, action: null });
+      setTaskReviewNotes('');
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Failed to request revision' });
     },
   });
 
@@ -731,13 +847,14 @@ export function AdminProjectReviewPage() {
                       key={file.id}
                       className="flex items-center justify-between p-4 border rounded-lg"
                     >
+                      {/* Left side - File info */}
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <File className="h-8 w-8 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
                           <p className="font-medium truncate">
                             {file.original_file_name}
                           </p>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                             <Badge variant="outline">
                               {getCategoryLabel(file.category)}
                             </Badge>
@@ -749,14 +866,96 @@ export function AdminProjectReviewPage() {
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </Button>
+
+                      {/* Right side - Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Task status badge */}
+                        {file.task_id && file.task_status && (
+                          <Badge variant={getTaskStatusBadgeVariant(file.task_status)}>
+                            {getTaskStatusLabel(file.task_status)}
+                          </Badge>
+                        )}
+
+                        {/* Preview button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setPreviewFile({
+                              id: parseInt(file.id, 10),
+                              filename: file.original_file_name,
+                              mime_type: file.mime_type,
+                            });
+                            setIsPreviewOpen(true);
+                          }}
+                          title="Preview"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        {/* Download button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+
+                        {/* Delete button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setFileToDelete(file.id)}
+                          title="Delete"
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+
+                        {/* Task review actions - only show for submitted tasks */}
+                        {file.task_id && file.task_status === 'submitted' && (
+                          <div className="flex items-center gap-1 ml-2 pl-2 border-l">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => approveTaskFromFileMutation.mutate(file.task_id!)}
+                              disabled={approveTaskFromFileMutation.isPending}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTaskReviewDialog({
+                                open: true,
+                                taskId: file.task_id!,
+                                action: 'requestChanges',
+                              })}
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            >
+                              <RotateCcw className="mr-1 h-4 w-4" />
+                              Request Changes
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTaskReviewDialog({
+                                open: true,
+                                taskId: file.task_id!,
+                                action: 'reject',
+                              })}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <XCircle className="mr-1 h-4 w-4" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -852,6 +1051,96 @@ export function AdminProjectReviewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete File Confirmation Dialog */}
+      <AlertDialog open={!!fileToDelete} onOpenChange={() => setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this file? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => fileToDelete && deleteFileMutation.mutate(fileToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Task Review Dialog (for reject/request changes - needs notes) */}
+      <Dialog
+        open={taskReviewDialog.open}
+        onOpenChange={(open) => !open && setTaskReviewDialog({ open: false, taskId: null, action: null })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {taskReviewDialog.action === 'reject' ? 'Reject Task' : 'Request Changes'}
+            </DialogTitle>
+            <DialogDescription>
+              Please provide feedback for the task owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Notes (required)</Label>
+            <Textarea
+              value={taskReviewNotes}
+              onChange={(e) => setTaskReviewNotes(e.target.value)}
+              placeholder="Enter your feedback..."
+              rows={4}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTaskReviewDialog({ open: false, taskId: null, action: null })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={taskReviewDialog.action === 'reject' ? 'destructive' : 'default'}
+              onClick={() => {
+                if (taskReviewDialog.taskId && taskReviewNotes.trim()) {
+                  if (taskReviewDialog.action === 'reject') {
+                    rejectTaskFromFileMutation.mutate({
+                      taskId: taskReviewDialog.taskId,
+                      notes: taskReviewNotes,
+                    });
+                  } else {
+                    requestRevisionFromFileMutation.mutate({
+                      taskId: taskReviewDialog.taskId,
+                      notes: taskReviewNotes,
+                    });
+                  }
+                }
+              }}
+              disabled={!taskReviewNotes.trim() || rejectTaskFromFileMutation.isPending || requestRevisionFromFileMutation.isPending}
+            >
+              {(rejectTaskFromFileMutation.isPending || requestRevisionFromFileMutation.isPending) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {taskReviewDialog.action === 'reject' ? 'Reject' : 'Request Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFile(null);
+        }}
+      />
     </div>
   );
 }
