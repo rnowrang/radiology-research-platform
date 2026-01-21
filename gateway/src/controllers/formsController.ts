@@ -96,13 +96,13 @@ export const formsController = {
   updateFormData: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const formId = parseInt(req.params.formId, 10);
-      const { changes } = req.body;
+      const { changes, section_id } = req.body;
 
       if (!changes || !Array.isArray(changes)) {
         throw new ValidationError('Changes array is required');
       }
 
-      const response = await formsProxy.updateFormData(formId, changes, req.user!.id);
+      const response = await formsProxy.updateFormData(formId, changes, req.user!.id, section_id);
 
       await logAudit(req, {
         action: AUDIT_ACTIONS.UPDATE,

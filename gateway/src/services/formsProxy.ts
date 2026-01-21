@@ -106,11 +106,13 @@ export const formsProxy = {
   updateFormData: async (
     formId: number,
     changes: Array<{ field_id: string; field_label?: string; old_value?: unknown; new_value: unknown }>,
-    userId: string
+    userId: string,
+    sectionId?: string
   ): Promise<AxiosResponse> => {
     return formsClient.post(`/api/forms/${formId}/data`, {
       changes,
       user_id: userId,
+      section_id: sectionId,
     });
   },
 
