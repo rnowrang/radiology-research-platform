@@ -1162,21 +1162,21 @@ export function FormEditorPage() {
                           ) : (
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
                           )}
-                          <div className="flex items-center gap-2">
-                            <div>
+                          <div>
                               <CardTitle className="text-lg">{section.title}</CardTitle>
                               {section.description && (
                                 <CardDescription>{section.description}</CardDescription>
                               )}
                             </div>
-                            {isSectionComplete(section) && (
-                              <CheckCircle2 className="h-5 w-5 text-green-500" />
-                            )}
-                          </div>
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {sectionFields.length} field{sectionFields.length !== 1 ? 's' : ''}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            {sectionFields.length} field{sectionFields.length !== 1 ? 's' : ''}
+                          </span>
+                          {isSectionComplete(section) && (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          )}
+                        </div>
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
