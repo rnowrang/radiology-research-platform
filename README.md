@@ -27,24 +27,37 @@ For detailed architecture information, see [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 ### Running with Docker
 
-1. Clone the repository:
-   ```bash
-   cd /Users/rajamac/dev
-   git clone <repository-url> radiology-research-platform
-   cd radiology-research-platform
-   ```
+```bash
+# 1. Clone and configure
+git clone <repository-url> radiology-research-platform
+cd radiology-research-platform
+cp .env.example .env
 
-2. Copy environment file (optional):
-   ```bash
-   cp .env.example .env
-   ```
+# 2. Start services
+docker compose up -d
 
-3. Start all services:
-   ```bash
-   docker-compose up -d
-   ```
+# 3. Wait for database (IMPORTANT - first run takes 30-60 seconds)
+sleep 30
+docker exec radiology-db pg_isready -U radiology
 
-4. Wait for services to initialize (~60 seconds), then access:
+# 4. Apply Alembic migrations (CRITICAL)
+docker exec radiology-forms alembic upgrade head
+
+# 5. Apply SQL migrations (CRITICAL)
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/002_notification_preferences.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/003_update_files_category_constraint.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/004_add_task_status_history.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/005_add_project_approval_statuses.sql
+
+# 6. Load form schemas (CRITICAL)
+./scripts/load-schemas.sh
+
+# 7. Verify deployment
+docker compose ps
+curl http://localhost:3001/api/health
+```
+
+After successful deployment, access:
    - **Frontend**: http://localhost:5174
    - **Gateway API**: http://localhost:3001/api
    - **Forms Service API**: http://localhost:8001
@@ -278,14 +291,33 @@ docker-compose logs db
 docker exec radiology-db pg_isready -U radiology
 ```
 
+### Missing tables or columns
+Run all migrations in order:
+```bash
+docker exec radiology-forms alembic upgrade head
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/002_notification_preferences.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/003_update_files_category_constraint.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/004_add_task_status_history.sql
+docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/005_add_project_approval_statuses.sql
+```
+
+### Empty form templates
+Load the form schemas:
+```bash
+./scripts/load-schemas.sh
+```
+
 ### Forms Service won't start
 Check for `postgres://` vs `postgresql://` in DATABASE_URL.
 
 ### PDF generation fails
-Verify LibreOffice is installed in container:
+Verify LibreOffice is installed in the forms-service container:
 ```bash
 docker exec radiology-forms which soffice
 ```
+
+### Authentication errors
+Verify `JWT_SECRET` is consistent across all services (gateway and forms-service). Both services must use the same secret for token validation.
 
 ## License
 

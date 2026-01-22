@@ -17,32 +17,63 @@ This document provides instructions for deploying the Radiology Research Platfor
 
 1. **Clone the repository**:
    ```bash
-   cd /Users/rajamac/dev
    git clone <repository-url> radiology-research-platform
    cd radiology-research-platform
    ```
 
-2. **Create environment file** (optional):
+2. **Create environment file**:
    ```bash
    cp .env.example .env
-   # Edit .env with your settings
+   # Edit .env with your settings (defaults work for development)
    ```
 
 3. **Start all services**:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-4. **Verify services are running**:
+4. **Wait for database initialization** (CRITICAL):
    ```bash
-   docker-compose ps
+   # Wait for PostgreSQL to fully initialize (30-60 seconds on first run)
+   sleep 30
+
+   # Verify database is ready
+   docker exec radiology-db pg_isready -U radiology
    ```
 
-5. **Access the application**:
+5. **Apply Alembic migrations** (CRITICAL):
+   ```bash
+   docker exec radiology-forms alembic upgrade head
+   ```
+
+6. **Apply SQL migrations** (CRITICAL):
+   ```bash
+   # Apply all migrations in order
+   docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/002_notification_preferences.sql
+   docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/003_update_files_category_constraint.sql
+   docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/004_add_task_status_history.sql
+   docker exec radiology-db psql -U radiology -d radiology_research -f /migrations/005_add_project_approval_statuses.sql
+   ```
+
+7. **Load form schemas** (CRITICAL):
+   ```bash
+   # This loads IRB form templates into the database
+   ./scripts/load-schemas.sh
+   ```
+
+8. **Verify services are running**:
+   ```bash
+   docker compose ps
+   # All services should show "running" or "healthy"
+   ```
+
+9. **Access the application**:
    - Frontend: http://localhost:5174
    - Gateway API: http://localhost:3001/api
    - Forms Service API: http://localhost:8001
    - Forms Service Docs: http://localhost:8001/docs
+
+> **Note**: Steps 4-7 are CRITICAL for first-time deployment. Skipping these will result in missing tables, columns, or empty form templates.
 
 ### Default Test Credentials
 

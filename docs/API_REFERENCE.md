@@ -23,693 +23,566 @@ Authorization: Bearer <access_token>
 
 ---
 
-## Gateway API Endpoints
+## Gateway Service (Port 3001)
 
-### Authentication
-
-#### POST /api/auth/register
-Create a new user account.
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123",
-  "fullName": "John Doe"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com",
-      "fullName": "John Doe",
-      "role": "researcher",
-      "createdAt": "2026-01-14T00:00:00Z"
-    }
-  }
-}
-```
-
-**Errors**:
-- 400: Validation error
-- 409: Email already exists
-
----
-
-#### POST /api/auth/login
-Authenticate user and receive tokens.
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com",
-      "fullName": "John Doe",
-      "role": "researcher"
-    },
-    "accessToken": "eyJhbG...",
-    "refreshToken": "eyJhbG..."
-  }
-}
-```
-
-**Errors**:
-- 401: Invalid credentials
-- 423: Account locked
-
----
-
-#### POST /api/auth/refresh
-Refresh access token using refresh token.
-
-**Request Body**:
-```json
-{
-  "refreshToken": "eyJhbG..."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJhbG...",
-    "refreshToken": "eyJhbG..."
-  }
-}
-```
-
-**Errors**:
-- 401: Invalid or expired refresh token
-
----
-
-#### POST /api/auth/logout
-Invalidate current session.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
-
----
-
-#### GET /api/auth/me
-Get current user profile.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "fullName": "John Doe",
-    "role": "researcher",
-    "createdAt": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
+The Gateway Service is the main entry point for the application. It handles authentication, user management, and proxies requests to the Forms Service.
 
 ### Health Check
 
-#### GET /api/health
-Check gateway service health.
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/health` | Check gateway service health | No |
 
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "status": "healthy",
-    "timestamp": "2026-01-14T00:00:00Z",
-    "service": "gateway"
-  }
-}
-```
+---
+
+### Authentication (`/api/auth/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/auth/register` | Create a new user account | No |
+| POST | `/api/auth/login` | Authenticate and receive tokens | No |
+| POST | `/api/auth/refresh` | Refresh access token using refresh token | No |
+| POST | `/api/auth/forgot-password` | Request password reset email | No |
+| POST | `/api/auth/reset-password` | Reset password with token | No |
+| GET | `/api/auth/me` | Get current user profile | Yes |
+| POST | `/api/auth/logout` | Invalidate current session | Yes |
+| POST | `/api/auth/change-password` | Change current user's password | Yes |
+
+---
+
+### Users - Admin (`/api/admin/users/*`)
+
+All user management endpoints require Admin role.
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/users` | List all users (paginated, filterable) | Admin |
+| GET | `/api/admin/users/:id` | Get user details | Admin |
+| POST | `/api/admin/users` | Create a new user | Admin |
+| PUT | `/api/admin/users/:id` | Update a user | Admin |
+| DELETE | `/api/admin/users/:id` | Deactivate user (soft delete) | Admin |
+| POST | `/api/admin/users/:id/reset-password` | Reset user's password | Admin |
+| POST | `/api/admin/users/:id/unlock` | Unlock a locked account | Admin |
+| GET | `/api/admin/users/:id/activity` | Get user's activity feed | Admin |
+
+---
+
+### Projects (`/api/projects/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/projects` | List all projects user has access to | Yes |
+| POST | `/api/projects` | Create a new project | Yes |
+| GET | `/api/projects/:id` | Get project details | Yes |
+| PUT | `/api/projects/:id` | Update a project | Yes |
+| DELETE | `/api/projects/:id` | Delete a project | Yes |
+| GET | `/api/projects/:id/collaborators` | Get project collaborators | Yes |
+| POST | `/api/projects/:id/collaborators` | Add a collaborator | Yes |
+| PUT | `/api/projects/:id/collaborators/:userId` | Update collaborator role | Yes |
+| DELETE | `/api/projects/:id/collaborators/:userId` | Remove a collaborator | Yes |
+| GET | `/api/projects/:projectId/files` | List project files | Yes |
+| GET | `/api/projects/:id/activity` | Get project activity feed | Yes |
+| GET | `/api/projects/:projectId/tasks` | Get all tasks for project | Yes |
+| GET | `/api/projects/:projectId/task-progress` | Get task completion progress | Yes |
+| POST | `/api/projects/:projectId/tasks` | Create a task for project | Admin |
+| GET | `/api/projects/:projectId/review-summary` | Get project review summary | Admin |
+| POST | `/api/projects/:id/submit-for-approval` | Submit project for approval | Yes |
+| POST | `/api/projects/:id/approve` | Approve project | Admin |
+| POST | `/api/projects/:id/reject` | Reject project | Admin |
+| POST | `/api/projects/:id/request-changes` | Request changes on project | Admin |
+
+---
+
+### Project Types (`/api/project-types/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/project-types/:projectType/tasks` | Get task definitions for a project type | Yes |
+
+---
+
+### Tasks (`/api/tasks/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/tasks` | List all tasks for current user | Yes |
+| POST | `/api/tasks` | Create a new task | Yes |
+| GET | `/api/tasks/:id` | Get task details | Yes |
+| PUT | `/api/tasks/:id` | Update a task | Yes |
+| DELETE | `/api/tasks/:id` | Delete a task | Yes |
+| POST | `/api/tasks/:id/complete` | Mark task as completed | Yes |
+| POST | `/api/tasks/:id/start` | Start a pending task | Yes |
+| POST | `/api/tasks/:id/assign` | Assign/reassign task | Yes |
+| POST | `/api/tasks/:id/reopen` | Reopen rejected/cancelled task | Yes |
+| POST | `/api/tasks/:id/unblock` | Unblock a blocked task | Yes |
+| POST | `/api/tasks/:taskId/submit` | Submit task for review | Yes |
+| POST | `/api/tasks/:taskId/approve` | Approve a submitted task | Admin/Reviewer |
+| POST | `/api/tasks/:taskId/reject` | Reject a submitted task | Admin/Reviewer |
+| POST | `/api/tasks/:taskId/request-revision` | Request revision on task | Admin/Reviewer |
+| POST | `/api/tasks/:taskId/create-form` | Create form for form_completion task | Yes |
+| GET | `/api/tasks/pending-review` | Get tasks awaiting review | Admin/Reviewer |
+
+---
+
+### Files (`/api/files/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/files` | Upload a file (multipart/form-data) | Yes |
+| GET | `/api/files/:id` | Download a file | Yes |
+| GET | `/api/files/:id/metadata` | Get file metadata | Yes |
+| GET | `/api/files/:id/preview` | Preview file (inline viewing) | Yes |
+| DELETE | `/api/files/:id` | Soft delete a file | Yes |
+| GET | `/api/files/task/:taskId` | Get files by task ID | Yes |
+
+---
+
+### Notifications (`/api/notifications/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/notifications` | Get user's notifications (paginated) | Yes |
+| GET | `/api/notifications/unread-count` | Get unread count for badge | Yes |
+| POST | `/api/notifications/:id/read` | Mark notification as read | Yes |
+| POST | `/api/notifications/read-all` | Mark all notifications as read | Yes |
+| DELETE | `/api/notifications/:id` | Delete a notification | Yes |
+
+---
+
+### Notification Preferences (`/api/users/me/notification-preferences/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/users/me/notification-preferences` | Get all preferences | Yes |
+| GET | `/api/users/me/notification-preferences/types` | Get available notification types | Yes |
+| PUT | `/api/users/me/notification-preferences` | Update multiple preferences | Yes |
+| PUT | `/api/users/me/notification-preferences/:type` | Update single preference | Yes |
+
+---
+
+### Search (`/api/search/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/search` | Full-text search with pagination | Yes |
+| GET | `/api/search/quick` | Quick search for autocomplete | Yes |
+
+**Query Parameters for `/api/search`:**
+- `q` (required): Search query string
+- `type` (optional): Filter by type - `all`, `projects`, `forms`, `users`, `files`
+- `page`, `limit`: Pagination
+
+---
+
+### Activity (`/api/activity/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/activity` | Get global activity feed | Admin |
+| GET | `/api/activity/me` | Get current user's activity | Yes |
+
+---
+
+### Admin - Task Definitions (`/api/admin/task-definitions/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/task-definitions` | List all task definitions | Admin |
+| POST | `/api/admin/task-definitions` | Create a task definition | Admin |
+| PUT | `/api/admin/task-definitions/:id` | Update a task definition | Admin |
+| DELETE | `/api/admin/task-definitions/:id` | Deactivate a task definition | Admin |
+
+---
+
+### Admin - Project Type Mappings (`/api/admin/project-type-mappings/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/project-type-mappings` | List all mappings | Admin |
+| GET | `/api/admin/project-type-mappings/:projectType` | Get mappings for project type | Admin |
+| POST | `/api/admin/project-type-mappings` | Create a new mapping | Admin |
+| DELETE | `/api/admin/project-type-mappings/:id` | Delete a mapping | Admin |
+
+---
+
+### Admin - Review Stages (`/api/admin/review-stages/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/review-stages` | List all review stages | Admin |
+| POST | `/api/admin/review-stages` | Create a new review stage | Admin |
+| GET | `/api/admin/review-stages/:stageId` | Get a specific review stage | Admin |
+| PUT | `/api/admin/review-stages/:stageId` | Update a review stage | Admin |
+| DELETE | `/api/admin/review-stages/:stageId` | Deactivate a review stage | Admin |
+| POST | `/api/admin/review-stages/reorder` | Reorder review stages | Admin |
+
+---
+
+### Admin - Reports (`/api/admin/reports/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/reports/overview` | Get overview metrics | Admin |
+| GET | `/api/admin/reports/projects-by-type` | Projects grouped by type | Admin |
+| GET | `/api/admin/reports/projects-by-status` | Projects grouped by status | Admin |
+| GET | `/api/admin/reports/forms-by-status` | Forms grouped by status | Admin |
+| GET | `/api/admin/reports/forms-by-template` | Forms grouped by template | Admin |
+| GET | `/api/admin/reports/tasks-by-status` | Tasks grouped by status | Admin |
+| GET | `/api/admin/reports/tasks-by-priority` | Tasks grouped by priority | Admin |
+| GET | `/api/admin/reports/activity-trends` | Activity trends over time | Admin |
+| GET | `/api/admin/reports/top-researchers` | Top researchers by activity | Admin |
+| GET | `/api/admin/reports/department-stats` | Statistics by department | Admin |
+| GET | `/api/admin/reports/review-metrics` | Review performance metrics | Admin |
+| GET | `/api/admin/reports/monthly-submissions` | Monthly form submissions | Admin |
+| GET | `/api/admin/reports/users-by-role` | Users grouped by role | Admin |
+
+---
+
+### Admin - Email (`/api/admin/email/*`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/email/config` | Get email configuration | Admin |
+| POST | `/api/admin/email/test` | Send a test email | Admin |
+| POST | `/api/admin/email/verify` | Verify email server connection | Admin |
+
+---
+
+### Templates (Proxied to Forms Service)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/templates` | List all templates | Yes |
+| GET | `/api/templates/published` | List published templates only | Yes |
+| GET | `/api/templates/:templateId` | Get template details with schema | Yes |
 
 ---
 
 ### Forms (Proxied to Forms Service)
 
-#### GET /api/forms/templates
-List all published templates.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "IRB Application - Standard",
-      "description": "Standard IRB application...",
-      "version": "1.0",
-      "isActive": true,
-      "isPublished": true,
-      "createdAt": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/forms` | List user's forms | Yes |
+| POST | `/api/forms` | Create a new form instance | Yes |
+| GET | `/api/forms/:formId` | Get form with data and template | Yes |
+| POST | `/api/forms/:formId/data` | Update form data (autosave) | Yes |
+| GET | `/api/forms/:formId/versions` | List form versions | Yes |
+| POST | `/api/forms/:formId/versions` | Create a version snapshot | Yes |
+| GET | `/api/forms/:formId/files` | List files for a form | Yes |
+| GET | `/api/forms/:formId/activity` | Get form activity feed | Yes |
 
 ---
 
-#### GET /api/forms/templates/:id
-Get template details with schema.
+### Form Review Workflow (Proxied)
 
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "IRB Application - Standard",
-    "schema": {
-      "sections": [
-        {
-          "id": "section_1",
-          "title": "Project Information",
-          "fields": [...]
-        }
-      ]
-    }
-  }
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/review/queue` | Get forms pending review | Admin/Reviewer |
+| POST | `/api/forms/:formId/submit` | Submit form for review | Yes |
+| POST | `/api/forms/:formId/request-changes` | Request changes on form | Admin/Reviewer |
+| POST | `/api/forms/:formId/approve` | Approve a form | Admin/Reviewer |
+| POST | `/api/forms/:formId/reject` | Reject a form | Admin/Reviewer |
+| POST | `/api/forms/:formId/return-to-draft` | Return form to draft | Yes |
+| GET | `/api/forms/:formId/review-history` | Get review history | Yes |
 
 ---
 
-#### GET /api/forms
-List user's forms.
+### Form Comments (Proxied)
 
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `status` (optional): Filter by status
-- `projectId` (optional): Filter by project
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "templateId": 1,
-      "title": "My IRB Application",
-      "status": "draft",
-      "completionPercentage": 45,
-      "currentVersionNumber": 1,
-      "createdAt": "2026-01-14T00:00:00Z",
-      "updatedAt": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/forms/:formId/comments` | Get comment threads | Yes |
+| POST | `/api/forms/:formId/comments` | Create a new comment | Yes |
+| POST | `/api/threads/:threadId/resolve` | Resolve a comment thread | Yes |
+| POST | `/api/threads/:threadId/reopen` | Reopen a resolved thread | Yes |
 
 ---
 
-#### POST /api/forms
-Create a new form instance.
+### Form Export (Proxied)
 
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "templateId": 1,
-  "title": "My IRB Application",
-  "projectId": "uuid" // optional
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "templateId": 1,
-    "title": "My IRB Application",
-    "status": "draft",
-    "completionPercentage": 0,
-    "currentVersionNumber": 1
-  }
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/forms/:formId/generate` | Generate DOCX and PDF | Yes |
+| GET | `/api/forms/:formId/docx` | Download DOCX | Yes |
+| GET | `/api/forms/:formId/pdf` | Download PDF | Yes |
 
 ---
 
-#### GET /api/forms/:id
-Get form instance with data.
+### Form Audit (Proxied)
 
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "templateId": 1,
-    "template": { ... },
-    "title": "My IRB Application",
-    "status": "draft",
-    "data": {
-      "data": {
-        "field_1": "value",
-        "field_2": true
-      },
-      "conditionalState": {
-        "field_3": true
-      }
-    }
-  }
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/forms/:formId/audit` | Get form audit log | Yes |
+| GET | `/api/forms/:formId/audit/field/:fieldId` | Get field change history | Yes |
 
 ---
 
-#### POST /api/forms/:id/data
-Update form data (autosave).
+### Form Editing Locks (Proxied)
 
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "data": {
-    "field_1": "updated value",
-    "field_2": false
-  },
-  "conditionalState": {
-    "field_3": false
-  }
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "updatedAt": "2026-01-14T00:00:00Z",
-    "completionPercentage": 50
-  }
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/forms/:formId/lock` | Check lock status | Yes |
+| POST | `/api/forms/:formId/lock` | Acquire a lock | Yes |
+| DELETE | `/api/forms/:formId/lock` | Release a lock | Yes |
+| POST | `/api/forms/:formId/lock/extend` | Extend a lock | Yes |
+| GET | `/api/forms/:formId/locks` | Get all active locks | Yes |
+| GET | `/api/forms/:formId/sections/:sectionId/lock` | Check section lock | Yes |
+| POST | `/api/forms/:formId/sections/:sectionId/lock` | Acquire section lock | Yes |
+| DELETE | `/api/forms/:formId/sections/:sectionId/lock` | Release section lock | Yes |
 
 ---
 
-#### DELETE /api/forms/:id
-Delete a form instance.
+### Amendments (Proxied)
 
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Form deleted successfully"
-}
-```
-
----
-
-#### GET /api/forms/:id/versions
-List form versions.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "versionNumber": 1,
-      "versionLabel": "Initial submission",
-      "statusAtCreation": "draft",
-      "createdAt": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/forms/:formId/amendments` | List amendments for form | Yes |
+| POST | `/api/forms/:formId/amendments` | Create an amendment | Yes |
+| GET | `/api/amendments/:amendmentId` | Get amendment details | Yes |
+| PUT | `/api/amendments/:amendmentId` | Update draft amendment | Yes |
+| DELETE | `/api/amendments/:amendmentId` | Delete draft amendment | Yes |
+| POST | `/api/amendments/:amendmentId/changes` | Add field change | Yes |
+| PUT | `/api/amendments/:amendmentId/changes/:changeId` | Update field change | Yes |
+| DELETE | `/api/amendments/:amendmentId/changes/:changeId` | Remove field change | Yes |
+| POST | `/api/amendments/:amendmentId/submit` | Submit for review | Yes |
+| POST | `/api/amendments/:amendmentId/approve` | Approve amendment | Reviewer |
+| POST | `/api/amendments/:amendmentId/reject` | Reject amendment | Reviewer |
+| POST | `/api/amendments/:amendmentId/withdraw` | Withdraw amendment | Yes |
 
 ---
 
-#### POST /api/forms/:id/versions
-Create a new version snapshot.
+### Review Stages (Proxied)
 
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "label": "Version 2",
-  "summary": "Updated personnel section"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "versionNumber": 2,
-    "versionLabel": "Version 2"
-  }
-}
-```
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/review/forms/:formId/stages` | Get form review progress | Yes |
+| POST | `/api/review/forms/:formId/stages/:stageId/assign` | Assign reviewer to stage | Admin |
+| POST | `/api/review/forms/:formId/stages/:stageId/start` | Start stage review | Reviewer |
+| POST | `/api/review/forms/:formId/stages/:stageId/complete` | Complete stage review | Reviewer |
+| POST | `/api/review/forms/:formId/advance` | Advance to next stage | Admin |
 
 ---
 
-#### POST /api/forms/:id/export
-Generate DOCX and PDF documents.
+## Forms Service (Port 8001)
 
-**Headers**: Authorization required
+The Forms Service handles all form-related operations. It is typically accessed through the Gateway, but direct access is available for development.
 
-**Request Body**:
-```json
-{
-  "versionId": 2 // optional, defaults to latest
-}
-```
+### Health Check
 
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "docxPath": "/storage/generated/form_1_v2.docx",
-    "pdfPath": "/storage/generated/form_1_v2.pdf"
-  }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Forms service health check |
 
 ---
 
-#### GET /api/forms/:id/download/:format
-Download generated document.
+### Templates (`/api/templates/*`)
 
-**Headers**: Authorization required
-
-**Path Parameters**:
-- `format`: `docx` or `pdf`
-
-**Query Parameters**:
-- `versionId` (optional): Specific version
-
-**Response**: Binary file download
-
----
-
-#### POST /api/forms/:id/submit
-Submit form for review.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "status": "in_review",
-    "submittedAt": "2026-01-14T00:00:00Z"
-  }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/templates` | List all templates |
+| GET | `/api/templates/published` | List published templates only |
+| GET | `/api/templates/{template_id}` | Get template by ID |
+| POST | `/api/templates` | Create a new template |
+| PUT | `/api/templates/{template_id}` | Update a template |
+| POST | `/api/templates/{template_id}/publish` | Publish a template |
+| POST | `/api/templates/{template_id}/unpublish` | Unpublish a template |
 
 ---
 
-## Forms Service Direct API
+### Forms (`/api/forms/*`)
 
-The Forms Service API is typically accessed through the Gateway. Direct access is available for development.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/forms` | List forms with filters |
+| POST | `/api/forms` | Create a form instance |
+| GET | `/api/forms/{form_id}` | Get form with data |
+| PUT | `/api/forms/{form_id}` | Update form metadata |
+| POST | `/api/forms/{form_id}/data` | Update form field data |
+| DELETE | `/api/forms/{form_id}` | Delete a draft form |
 
-### Templates
-
-#### GET /api/templates
-List all templates.
-
-**Response** (200 OK):
-```json
-[
-  {
-    "id": 1,
-    "name": "IRB Application - Standard",
-    "description": "...",
-    "version": "1.0",
-    "original_file_name": "irb-standard.docx",
-    "schema": { ... },
-    "is_active": true,
-    "is_published": true,
-    "created_at": "2026-01-14T00:00:00Z",
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-]
-```
-
----
-
-#### GET /api/templates/{id}
-Get template by ID.
-
-**Response** (200 OK):
-```json
-{
-  "id": 1,
-  "name": "IRB Application - Standard",
-  "schema": {
-    "sections": [...],
-    "fields": [...],
-    "rules": [...]
-  }
-}
-```
-
----
-
-### Forms
-
-#### GET /api/forms
-List all forms.
-
-**Query Parameters**:
+**Query Parameters for GET `/api/forms`:**
 - `owner_id`: Filter by owner
-- `status`: Filter by status
 - `project_id`: Filter by project
-
-**Response** (200 OK):
-```json
-[
-  {
-    "id": 1,
-    "template_id": 1,
-    "owner_id": "uuid",
-    "title": "My Form",
-    "status": "draft",
-    "completion_percentage": 50,
-    "current_version_number": 1,
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-]
-```
+- `status`: Filter by status
+- `template_id`: Filter by template
 
 ---
 
-#### POST /api/forms
-Create form instance.
+### Versions (`/api/versions/*`)
 
-**Request Body**:
-```json
-{
-  "template_id": 1,
-  "owner_id": "uuid",
-  "title": "My Form",
-  "project_id": "uuid"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "id": 1,
-  "template_id": 1,
-  "title": "My Form",
-  "status": "draft"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/versions/form/{form_id}` | List all versions of a form |
+| GET | `/api/versions/{version_id}` | Get a specific version |
+| POST | `/api/versions/form/{form_id}/create` | Create a new version snapshot |
 
 ---
 
-#### GET /api/forms/{id}
-Get form with data.
+### Export (`/api/export/*`)
 
-**Response** (200 OK):
-```json
-{
-  "id": 1,
-  "template_id": 1,
-  "template": { ... },
-  "title": "My Form",
-  "status": "draft",
-  "data": {
-    "data": { ... },
-    "conditional_state": { ... }
-  }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/export/form/{form_id}/generate` | Generate DOCX and PDF |
+| GET | `/api/export/form/{form_id}/docx` | Download DOCX |
+| GET | `/api/export/form/{form_id}/pdf` | Download PDF |
 
 ---
 
-#### POST /api/forms/{id}/data
-Update form data.
+### Review (`/api/review/*`)
 
-**Request Body**:
-```json
-{
-  "data": { ... },
-  "conditional_state": { ... },
-  "user_id": "uuid"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "updated_at": "2026-01-14T00:00:00Z",
-  "completion_percentage": 75
-}
-```
-
----
-
-### Versions
-
-#### GET /api/forms/{id}/versions
-List versions.
-
-**Response** (200 OK):
-```json
-[
-  {
-    "id": 1,
-    "form_instance_id": 1,
-    "version_number": 1,
-    "version_label": "Initial",
-    "data_snapshot": { ... },
-    "status_at_creation": "draft",
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-]
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/review/queue` | Get forms pending review |
+| POST | `/api/review/forms/{form_id}/submit` | Submit for review |
+| POST | `/api/review/forms/{form_id}/request-changes` | Request changes |
+| POST | `/api/review/forms/{form_id}/approve` | Approve form |
+| POST | `/api/review/forms/{form_id}/reject` | Reject form |
+| POST | `/api/review/forms/{form_id}/return-to-draft` | Return to draft |
+| GET | `/api/review/forms/{form_id}/history` | Get review history |
+| GET | `/api/review/forms/{form_id}/comments` | Get comment threads |
+| GET | `/api/review/forms/{form_id}/mentionable-users` | Get users for @mentions |
+| POST | `/api/review/forms/{form_id}/comments` | Create a comment |
+| POST | `/api/review/threads/{thread_id}/reply` | Reply to thread |
+| POST | `/api/review/threads/{thread_id}/resolve` | Resolve thread |
+| POST | `/api/review/threads/{thread_id}/reopen` | Reopen thread |
+| PUT | `/api/review/comments/{comment_id}` | Update a comment |
+| DELETE | `/api/review/comments/{comment_id}` | Delete a comment |
 
 ---
 
-#### POST /api/forms/{id}/versions
-Create version.
+### Review Stages (`/api/admin/review-stages/*` and `/api/review/*`)
 
-**Request Body**:
-```json
-{
-  "label": "Version 2",
-  "summary": "Changes made",
-  "user_id": "uuid"
-}
-```
+**Admin Endpoints:**
 
-**Response** (201 Created):
-```json
-{
-  "id": 2,
-  "version_number": 2,
-  "version_label": "Version 2"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/review-stages` | List all review stages |
+| POST | `/api/admin/review-stages` | Create a review stage |
+| GET | `/api/admin/review-stages/{stage_id}` | Get a review stage |
+| PUT | `/api/admin/review-stages/{stage_id}` | Update a review stage |
+| DELETE | `/api/admin/review-stages/{stage_id}` | Deactivate a review stage |
+| POST | `/api/admin/review-stages/reorder` | Reorder stages |
 
----
+**Form Review Endpoints:**
 
-### Export
-
-#### POST /api/export/form/{id}/generate
-Generate documents.
-
-**Request Body**:
-```json
-{
-  "version_id": 2
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "docx_path": "/storage/generated/...",
-  "pdf_path": "/storage/generated/..."
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/review/forms/{form_id}/stages` | Get form review progress |
+| POST | `/api/review/forms/{form_id}/stages/{stage_id}/assign` | Assign reviewer |
+| POST | `/api/review/forms/{form_id}/stages/{stage_id}/start` | Start stage review |
+| POST | `/api/review/forms/{form_id}/stages/{stage_id}/complete` | Complete stage |
+| POST | `/api/review/forms/{form_id}/advance` | Advance to next stage |
 
 ---
 
-#### GET /api/export/form/{id}/download/{format}
-Download document.
+### Projects (`/api/projects/*`)
 
-**Path Parameters**:
-- `format`: `docx` or `pdf`
-
-**Query Parameters**:
-- `version_id`: Optional version
-
-**Response**: Binary file
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/projects` | List projects |
+| POST | `/api/projects` | Create a project |
+| GET | `/api/projects/{project_id}` | Get project details |
+| PUT | `/api/projects/{project_id}` | Update a project |
+| DELETE | `/api/projects/{project_id}` | Delete a project |
+| GET | `/api/projects/{project_id}/collaborators` | List collaborators |
+| POST | `/api/projects/{project_id}/collaborators` | Add collaborator |
+| DELETE | `/api/projects/{project_id}/collaborators/{collaborator_id}` | Remove collaborator |
+| GET | `/api/projects/{project_id}/forms` | List project forms |
+| GET | `/api/projects/{project_id}/tasks` | List project tasks |
+| POST | `/api/projects/{project_id}/tasks` | Create project task |
+| GET | `/api/projects/{project_id}/task-progress` | Get task progress |
+| POST | `/api/projects/{project_id}/submit-for-approval` | Submit for approval |
+| POST | `/api/projects/{project_id}/approve` | Approve project |
+| POST | `/api/projects/{project_id}/reject` | Reject project |
+| POST | `/api/projects/{project_id}/request-changes` | Request changes |
 
 ---
 
-### Health
+### Tasks (`/api/tasks/*`)
 
-#### GET /api/health
-Health check.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/tasks` | List tasks with filters |
+| POST | `/api/tasks` | Create a task |
+| GET | `/api/tasks/{task_id}` | Get task details |
+| PUT | `/api/tasks/{task_id}` | Update a task |
+| DELETE | `/api/tasks/{task_id}` | Delete a task |
+| POST | `/api/tasks/{task_id}/complete` | Mark as completed |
+| POST | `/api/tasks/{task_id}/start` | Start a pending task |
+| POST | `/api/tasks/{task_id}/assign` | Assign task |
+| POST | `/api/tasks/{task_id}/reopen` | Reopen task |
+| POST | `/api/tasks/{task_id}/unblock` | Unblock task |
+| POST | `/api/tasks/{task_id}/submit` | Submit for review |
+| POST | `/api/tasks/{task_id}/approve` | Approve task |
+| POST | `/api/tasks/{task_id}/reject` | Reject task |
+| POST | `/api/tasks/{task_id}/request-revision` | Request revision |
+| POST | `/api/tasks/{task_id}/create-form` | Create form for task |
+| POST | `/api/tasks/{task_id}/mark-complete` | Mark upload task complete |
+| GET | `/api/tasks/pending-review/list` | List tasks pending review |
+| POST | `/api/tasks/auto-complete-upload` | Auto-complete upload task |
+| POST | `/api/tasks/sync-from-form` | Sync task status from form |
 
-**Response** (200 OK):
-```json
-{
-  "status": "healthy",
-  "database": "connected",
-  "timestamp": "2026-01-14T00:00:00Z"
-}
-```
+---
+
+### Task Definitions (`/api/task-definitions/*`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/task-definitions` | List task definitions |
+| POST | `/api/task-definitions` | Create task definition |
+| GET | `/api/task-definitions/{definition_id}` | Get task definition |
+| PUT | `/api/task-definitions/{definition_id}` | Update task definition |
+| DELETE | `/api/task-definitions/{definition_id}` | Deactivate task definition |
+| GET | `/api/task-definitions/mappings/all` | List all project type mappings |
+| GET | `/api/task-definitions/mappings/{project_type}` | Get mappings for project type |
+| POST | `/api/task-definitions/mappings` | Create project type mapping |
+| DELETE | `/api/task-definitions/mappings/{mapping_id}` | Delete mapping |
+| GET | `/api/task-definitions/project-types/available` | List project types with mappings |
+| GET | `/api/task-definitions/project-types/{project_type}/tasks` | Preview tasks for project type |
+
+---
+
+### Editing Locks (`/api/forms/*`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/forms/{form_id}/lock` | Acquire a lock |
+| DELETE | `/api/forms/{form_id}/lock` | Release a lock |
+| GET | `/api/forms/{form_id}/lock` | Check lock status |
+| GET | `/api/forms/{form_id}/locks` | Get all active locks |
+| POST | `/api/forms/{form_id}/lock/extend` | Extend a lock |
+| POST | `/api/forms/{form_id}/lock/force-release` | Force release (admin) |
+| POST | `/api/forms/{form_id}/sections/{section_id}/lock` | Acquire section lock |
+| DELETE | `/api/forms/{form_id}/sections/{section_id}/lock` | Release section lock |
+| GET | `/api/forms/{form_id}/sections/{section_id}/lock` | Check section lock |
+
+---
+
+### Amendments (`/api/*`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/forms/{form_id}/amendments` | List form amendments |
+| POST | `/api/forms/{form_id}/amendments` | Create amendment |
+| GET | `/api/amendments/{amendment_id}` | Get amendment details |
+| PUT | `/api/amendments/{amendment_id}` | Update amendment |
+| DELETE | `/api/amendments/{amendment_id}` | Delete amendment |
+| POST | `/api/amendments/{amendment_id}/changes` | Add field change |
+| PUT | `/api/amendments/{amendment_id}/changes/{change_id}` | Update field change |
+| DELETE | `/api/amendments/{amendment_id}/changes/{change_id}` | Remove field change |
+| POST | `/api/amendments/{amendment_id}/submit` | Submit amendment |
+| POST | `/api/amendments/{amendment_id}/approve` | Approve amendment |
+| POST | `/api/amendments/{amendment_id}/reject` | Reject amendment |
+| POST | `/api/amendments/{amendment_id}/withdraw` | Withdraw amendment |
+
+---
+
+### Audit (`/api/audit/*`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/audit/form/{form_id}` | Get form audit log |
+| GET | `/api/audit/form/{form_id}/field/{field_id}` | Get field change history |
 
 ---
 
@@ -734,7 +607,7 @@ All errors follow this format:
 | UNAUTHORIZED | 401 | Missing or invalid token |
 | FORBIDDEN | 403 | Insufficient permissions |
 | NOT_FOUND | 404 | Resource not found |
-| CONFLICT | 409 | Resource already exists |
+| CONFLICT | 409 | Resource already exists or lock conflict |
 | RATE_LIMITED | 429 | Too many requests |
 | INTERNAL_ERROR | 500 | Server error |
 
@@ -745,6 +618,7 @@ All errors follow this format:
 | Endpoint | Limit | Window |
 |----------|-------|--------|
 | /api/auth/* | 10 | 1 minute |
+| /api/auth/forgot-password | 5 | 1 minute |
 | /api/* | 100 | 15 minutes |
 | /api/export/* | 20 | 15 minutes |
 
@@ -761,11 +635,11 @@ X-RateLimit-Reset: 1234567890
 
 For list endpoints:
 
-**Query Parameters**:
+**Query Parameters:**
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20, max: 100)
 
-**Response**:
+**Response:**
 ```json
 {
   "success": true,
@@ -781,2573 +655,109 @@ For list endpoints:
 
 ---
 
-## Task Workflow System
+## Common Request/Response Examples
 
-The task workflow system provides a structured approach to managing project tasks with review, approval, and revision capabilities.
+### Authentication - Login
 
-### Task Definitions (Admin)
-
-#### GET /api/admin/task-definitions
-List all task definitions.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
+**Request:**
 ```json
+POST /api/auth/login
 {
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "IRB Application",
-      "description": "Complete and submit IRB application form",
-      "task_type": "form_completion",
-      "auto_submit": false,
-      "default_required": true,
-      "display_order": 1,
-      "is_active": true,
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ]
+  "email": "user@example.com",
+  "password": "SecurePass123"
 }
 ```
 
----
-
-#### POST /api/admin/task-definitions
-Create a new task definition.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "name": "Document Upload",
-  "description": "Upload required supporting documents",
-  "task_type": "document_upload",
-  "auto_submit": false,
-  "default_required": true,
-  "display_order": 2,
-  "is_active": true
-}
-```
-
-**Task Types**:
-- `document_upload`: Task requires file uploads
-- `form_completion`: Task requires completing a form
-- `approval_required`: Task requires approval from reviewer
-
-**Response** (201 Created):
+**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "id": 2,
-    "name": "Document Upload",
-    "task_type": "document_upload",
-    "is_active": true
-  }
-}
-```
-
----
-
-#### PUT /api/admin/task-definitions/:id
-Update an existing task definition.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "name": "Updated Task Name",
-  "description": "Updated description",
-  "display_order": 3,
-  "is_active": true
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "name": "Updated Task Name",
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-#### DELETE /api/admin/task-definitions/:id
-Deactivate a task definition (soft delete).
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Task definition deactivated successfully"
-}
-```
-
----
-
-### Project Type Mappings (Admin)
-
-#### GET /api/admin/project-type-mappings
-List all project type to task definition mappings.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "project_type": "clinical_trial",
-      "task_definition_id": 1,
-      "task_definition_name": "IRB Application",
-      "is_required": true,
-      "display_order": 1
-    }
-  ]
-}
-```
-
----
-
-#### GET /api/admin/project-type-mappings/:projectType
-Get mappings for a specific project type.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "project_type": "clinical_trial",
-      "task_definition_id": 1,
-      "is_required": true,
-      "display_order": 1
-    }
-  ]
-}
-```
-
----
-
-#### POST /api/admin/project-type-mappings
-Create a new project type to task mapping.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "project_type": "clinical_trial",
-  "task_definition_id": 1,
-  "is_required": true,
-  "display_order": 1
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "project_type": "clinical_trial",
-    "task_definition_id": 1
-  }
-}
-```
-
----
-
-#### DELETE /api/admin/project-type-mappings/:id
-Delete a project type mapping.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Mapping deleted successfully"
-}
-```
-
----
-
-### Tasks
-
-#### GET /api/tasks
-List all tasks for the current user.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "project_id": "uuid",
-      "task_definition_id": 1,
-      "name": "IRB Application",
-      "status": "pending",
-      "is_required": true,
-      "assigned_to_id": "uuid",
-      "due_date": "2026-02-01T00:00:00Z",
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-#### POST /api/tasks
-Create a new task.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "project_id": "uuid",
-  "task_definition_id": 1,
-  "name": "Custom Task",
-  "assigned_to_id": "uuid",
-  "due_date": "2026-02-01T00:00:00Z"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Custom Task",
-    "status": "pending"
-  }
-}
-```
-
----
-
-#### GET /api/tasks/:id
-Get task details.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "project_id": "uuid",
-    "name": "IRB Application",
-    "status": "in_progress",
-    "assigned_to": {
-      "id": "uuid",
-      "name": "John Doe"
-    }
-  }
-}
-```
-
----
-
-#### PUT /api/tasks/:id
-Update a task.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "name": "Updated Task Name",
-  "status": "in_progress",
-  "due_date": "2026-02-15T00:00:00Z"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Updated Task Name",
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-#### DELETE /api/tasks/:id
-Delete a task.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Task deleted successfully"
-}
-```
-
----
-
-#### POST /api/tasks/:id/complete
-Mark a task as completed.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "completed",
-    "completed_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### Task Workflow Actions
-
-#### POST /api/tasks/:taskId/submit
-Submit a task for review.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "submitted",
-    "submitted_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-#### POST /api/tasks/:taskId/approve
-Approve a submitted task.
-
-**Headers**: Authorization required (Admin or Reviewer role)
-
-**Request Body**:
-```json
-{
-  "comments": "Approved. All requirements met."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "approved",
-    "approved_at": "2026-01-14T00:00:00Z",
-    "approved_by_id": "uuid"
-  }
-}
-```
-
----
-
-#### POST /api/tasks/:taskId/reject
-Reject a submitted task.
-
-**Headers**: Authorization required (Admin or Reviewer role)
-
-**Request Body**:
-```json
-{
-  "comments": "Missing required documentation. Please resubmit."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "rejected",
-    "rejected_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-#### POST /api/tasks/:taskId/request-revision
-Request revision on a submitted task.
-
-**Headers**: Authorization required (Admin or Reviewer role)
-
-**Request Body**:
-```json
-{
-  "comments": "Please update section 3 with more detail."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "revision_required"
-  }
-}
-```
-
----
-
-#### GET /api/tasks/pending-review
-Get all tasks awaiting review.
-
-**Headers**: Authorization required (Admin or Reviewer role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "IRB Application",
-      "status": "submitted",
-      "submitted_at": "2026-01-14T00:00:00Z",
-      "project": {
-        "id": "uuid",
-        "title": "Research Project"
-      },
-      "submitter": {
-        "id": "uuid",
-        "name": "John Doe"
-      }
-    }
-  ]
-}
-```
-
----
-
-#### GET /api/projects/:projectId/tasks
-Get all tasks for a specific project.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "IRB Application",
-      "status": "completed",
-      "is_required": true,
-      "display_order": 1
-    },
-    {
-      "id": 2,
-      "name": "Document Upload",
-      "status": "in_progress",
-      "is_required": true,
-      "display_order": 2
-    }
-  ]
-}
-```
-
----
-
-#### GET /api/projects/:projectId/task-progress
-Get task completion progress for a project.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "project_id": "uuid",
-    "total_tasks": 5,
-    "completed_tasks": 3,
-    "required_tasks": 4,
-    "required_completed": 2,
-    "progress_percentage": 60,
-    "tasks_by_status": {
-      "pending": 1,
-      "in_progress": 1,
-      "completed": 3
-    }
-  }
-}
-```
-
----
-
-## Notifications API
-
-### GET /api/notifications
-Get paginated list of notifications for the current user.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `page` (optional): Page number (default: 1)
-- `limit` (optional): Items per page (default: 20)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "type": "task_assigned",
-      "title": "New Task Assigned",
-      "message": "You have been assigned a new task: IRB Application",
-      "is_read": false,
-      "link": "/projects/uuid/tasks/1",
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 45,
-    "totalPages": 3
-  }
-}
-```
-
----
-
-### GET /api/notifications/unread-count
-Get the count of unread notifications (for badge display).
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "count": 5
-  }
-}
-```
-
----
-
-### POST /api/notifications/:id/read
-Mark a single notification as read.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Notification marked as read"
-}
-```
-
----
-
-### POST /api/notifications/read-all
-Mark all notifications as read.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "All notifications marked as read"
-}
-```
-
----
-
-### DELETE /api/notifications/:id
-Delete a notification.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Notification deleted"
-}
-```
-
----
-
-## File Management API
-
-### POST /api/files
-Upload a file.
-
-**Headers**:
-- Authorization required
-- Content-Type: multipart/form-data
-
-**Form Data**:
-- `file` (required): The file to upload
-- `project_id` (optional): Associate with a project
-- `form_id` (optional): Associate with a form
-- `category` (optional): File category
-
-**File Categories**:
-- `proposal`
-- `irb_document`
-- `consent_form`
-- `protocol`
-- `data`
-- `result`
-- `other`
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "original_file_name": "document.pdf",
-    "file_size": 1024000,
-    "mime_type": "application/pdf",
-    "category": "protocol",
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### GET /api/files/:id
-Download a file.
-
-**Headers**: Authorization required
-
-**Response**: Binary file download with appropriate Content-Type header
-
----
-
-### GET /api/files/:id/metadata
-Get file metadata without downloading.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "original_file_name": "document.pdf",
-    "file_size": 1024000,
-    "mime_type": "application/pdf",
-    "category": "protocol",
-    "uploaded_by": {
-      "id": "uuid",
-      "name": "John Doe",
-      "email": "john@example.com"
-    },
-    "project_id": "uuid",
-    "form_instance_id": 1,
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### DELETE /api/files/:id
-Soft delete a file.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "File deleted successfully"
-}
-```
-
----
-
-### GET /api/projects/:projectId/files
-List all files associated with a project.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `page` (optional): Page number
-- `limit` (optional): Items per page
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "original_file_name": "proposal.pdf",
-      "file_size": 2048000,
-      "mime_type": "application/pdf",
-      "category": "proposal",
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 5,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-### GET /api/forms/:formId/files
-List all files associated with a form.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `page` (optional): Page number
-- `limit` (optional): Items per page
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "original_file_name": "consent_form.pdf",
-      "category": "consent_form",
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 2,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-## Global Search API
-
-### GET /api/search
-Full-text search with pagination across all resource types.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `q` (required): Search query string
-- `type` (optional): Filter by type - `all`, `projects`, `forms`, `users`, `files` (default: `all`)
-- `page` (optional): Page number (default: 1)
-- `limit` (optional): Items per page (default: 20)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "type": "project",
-      "title": "Clinical Trial Research",
-      "description": "Phase 2 clinical trial for...",
-      "link": "/projects/uuid",
-      "rank": 0.95,
-      "created_at": "2026-01-14T00:00:00Z"
-    },
-    {
-      "id": "1",
-      "type": "form",
-      "title": "IRB Application",
-      "subtitle": "Draft",
-      "link": "/forms/1",
-      "rank": 0.85,
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 15,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-### GET /api/search/quick
-Quick search for autocomplete suggestions.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `q` (required): Search query (minimum 2 characters)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "projects": [
-      {
-        "id": "uuid",
-        "type": "project",
-        "title": "Clinical Trial",
-        "link": "/projects/uuid"
-      }
-    ],
-    "forms": [
-      {
-        "id": "1",
-        "type": "form",
-        "title": "IRB Application",
-        "link": "/forms/1"
-      }
-    ],
-    "users": [],
-    "files": []
-  }
-}
-```
-
----
-
-## Activity Feed API
-
-### GET /api/activity
-Get global activity feed (admin only).
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `page` (optional): Page number
-- `limit` (optional): Items per page
-- `action` (optional): Filter by action type
-- `resource_type` (optional): Filter by resource type
-- `start_date` (optional): Filter from date (ISO 8601)
-- `end_date` (optional): Filter to date (ISO 8601)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "actor": {
-        "id": "uuid",
-        "name": "John Doe",
-        "email": "john@example.com"
-      },
-      "action": "create",
-      "action_label": "Created",
-      "description": "Created project 'Clinical Trial Research'",
-      "resource_type": "project",
-      "resource_type_label": "Project",
-      "resource_id": "uuid",
-      "resource_link": "/projects/uuid",
-      "details": null,
-      "timestamp": "2026-01-14T00:00:00Z",
-      "source": "audit_log",
-      "icon": "plus",
-      "icon_color": "green"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150,
-    "totalPages": 8
-  }
-}
-```
-
----
-
-### GET /api/activity/me
-Get current user's own activity.
-
-**Headers**: Authorization required
-
-**Query Parameters**: Same as global activity
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {...}
-}
-```
-
----
-
-### GET /api/projects/:projectId/activity
-Get activity feed for a specific project.
-
-**Headers**: Authorization required
-
-**Query Parameters**: Same as global activity
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {...}
-}
-```
-
----
-
-### GET /api/forms/:formId/activity
-Get activity feed for a specific form.
-
-**Headers**: Authorization required
-
-**Query Parameters**: Same as global activity
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {...}
-}
-```
-
----
-
-### GET /api/admin/users/:userId/activity
-Get activity feed for a specific user (admin only).
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**: Same as global activity
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {...}
-}
-```
-
----
-
-## Editing Locks API
-
-The editing locks system prevents concurrent editing conflicts by allowing users to acquire exclusive locks on forms or individual sections.
-
-### GET /api/forms/:formId/lock
-Check lock status for a form.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `section_id` (optional): Check lock for a specific section
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "is_locked": true,
-    "lock_id": 1,
-    "locked_by_id": "uuid",
-    "locked_by_name": "John Doe",
-    "expires_at": "2026-01-14T00:05:00Z",
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### POST /api/forms/:formId/lock
-Acquire a lock on a form.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "section_id": "section_1",
-  "duration_minutes": 5
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "lock_id": 1,
-  "expires_at": "2026-01-14T00:05:00Z"
-}
-```
-
-**Response** (409 Conflict - Lock already held):
-```json
-{
-  "success": false,
-  "error": "Lock already held by another user",
-  "locked_by_id": "uuid"
-}
-```
-
----
-
-### DELETE /api/forms/:formId/lock
-Release a lock on a form.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `section_id` (optional): Release lock for a specific section
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Lock released"
-}
-```
-
----
-
-### POST /api/forms/:formId/lock/extend
-Extend an existing lock.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "section_id": "section_1",
-  "duration_minutes": 5
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "lock_id": 1,
-  "expires_at": "2026-01-14T00:10:00Z",
-  "extended": true
-}
-```
-
----
-
-### GET /api/forms/:formId/locks
-Get all active locks for a form.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "form_id": 1,
-    "locks": [
-      {
-        "is_locked": true,
-        "lock_id": 1,
-        "section_id": "section_1",
-        "locked_by_id": "uuid",
-        "locked_by_name": "John Doe",
-        "expires_at": "2026-01-14T00:05:00Z"
-      }
-    ]
-  }
-}
-```
-
----
-
-### POST /api/forms/:formId/lock/force-release
-Force release a lock (admin only or lock owner).
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "section_id": "section_1"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Lock force released"
-}
-```
-
----
-
-### Section-Level Lock Endpoints
-
-#### GET /api/forms/:formId/sections/:sectionId/lock
-Check lock status for a specific section.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "is_locked": false
-  }
-}
-```
-
----
-
-#### POST /api/forms/:formId/sections/:sectionId/lock
-Acquire a lock on a specific section.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `duration_minutes` (optional): Lock duration (default: 5)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "lock_id": 2,
-  "expires_at": "2026-01-14T00:05:00Z"
-}
-```
-
----
-
-#### DELETE /api/forms/:formId/sections/:sectionId/lock
-Release a section lock.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Section lock released"
-}
-```
-
----
-
-## Amendment System API
-
-The amendment system allows tracking and managing changes to approved forms through a structured workflow.
-
-### GET /api/forms/:formId/amendments
-List all amendments for a form.
-
-**Headers**: Authorization required
-
-**Query Parameters**:
-- `status` (optional): Filter by status - `draft`, `submitted`, `approved`, `rejected`, `withdrawn`
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "form_instance_id": 1,
-      "amendment_type": "protocol_change",
-      "status": "submitted",
-      "description": "Updated study protocol based on interim results",
-      "submitted_at": "2026-01-14T00:00:00Z",
-      "submitted_by_id": "uuid",
-      "created_at": "2026-01-13T00:00:00Z",
-      "field_changes_count": 3
-    }
-  ]
-}
-```
-
----
-
-### POST /api/forms/:formId/amendments
-Create a new amendment.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "amendment_type": "protocol_change",
-  "description": "Updated study protocol based on interim results"
-}
-```
-
-**Amendment Types**:
-- `protocol_change`
-- `personnel_change`
-- `funding_change`
-- `site_change`
-- `procedure_change`
-- `consent_update`
-- `other`
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "amendment_type": "protocol_change",
-    "status": "draft",
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### GET /api/amendments/:amendmentId
-Get amendment details with field changes.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "form_instance_id": 1,
-    "amendment_type": "protocol_change",
-    "status": "draft",
-    "description": "Updated study protocol",
-    "field_changes": [
-      {
-        "id": 1,
-        "amendment_id": 1,
-        "field_id": "study_duration",
-        "field_label": "Study Duration",
-        "old_value": "12 months",
-        "new_value": "18 months",
-        "justification": "Extended based on enrollment rate"
-      }
-    ],
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### PUT /api/amendments/:amendmentId
-Update a draft amendment.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "amendment_type": "procedure_change",
-  "description": "Updated description"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### DELETE /api/amendments/:amendmentId
-Delete a draft amendment.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Amendment deleted"
-}
-```
-
----
-
-### POST /api/amendments/:amendmentId/changes
-Add a field change to an amendment.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "field_id": "study_duration",
-  "field_label": "Study Duration",
-  "old_value": "12 months",
-  "new_value": "18 months",
-  "justification": "Extended based on enrollment rate"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "amendment_id": 1,
-    "field_id": "study_duration"
-  }
-}
-```
-
----
-
-### PUT /api/amendments/:amendmentId/changes/:changeId
-Update a field change.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "new_value": "24 months",
-  "justification": "Further extended based on new data"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### DELETE /api/amendments/:amendmentId/changes/:changeId
-Remove a field change.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Field change removed"
-}
-```
-
----
-
-### POST /api/amendments/:amendmentId/submit
-Submit an amendment for review.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "submitted",
-    "submitted_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### POST /api/amendments/:amendmentId/approve
-Approve a submitted amendment.
-
-**Headers**: Authorization required (Reviewer role)
-
-**Request Body**:
-```json
-{
-  "notes": "Amendment approved. Changes are acceptable."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "approved",
-    "reviewed_at": "2026-01-14T00:00:00Z",
-    "reviewed_by_id": "uuid"
-  }
-}
-```
-
----
-
-### POST /api/amendments/:amendmentId/reject
-Reject a submitted amendment.
-
-**Headers**: Authorization required (Reviewer role)
-
-**Request Body**:
-```json
-{
-  "notes": "Amendment rejected. Insufficient justification for changes."
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "rejected",
-    "review_notes": "Amendment rejected. Insufficient justification for changes."
-  }
-}
-```
-
----
-
-### POST /api/amendments/:amendmentId/withdraw
-Withdraw a submitted amendment (owner only).
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "status": "withdrawn"
-  }
-}
-```
-
----
-
-## Review Stages API
-
-The review stages system enables multi-stage review workflows with configurable stages and reviewer assignments.
-
-### Admin - Stage Management
-
-#### GET /api/admin/review-stages
-List all review stages.
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `active_only` (optional): Filter to active stages only (default: true)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "code": "initial_review",
-      "name": "Initial Review",
-      "description": "Initial screening by department",
-      "sequence_order": 1,
-      "default_deadline_days": 7,
-      "requires_all_previous": true,
-      "is_active": true,
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-#### POST /api/admin/review-stages
-Create a new review stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "code": "irb_review",
-  "name": "IRB Review",
-  "description": "Full IRB committee review",
-  "sequence_order": 2,
-  "default_deadline_days": 14,
-  "requires_all_previous": true,
-  "is_active": true
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "code": "irb_review",
-    "name": "IRB Review"
-  }
-}
-```
-
----
-
-#### GET /api/admin/review-stages/:stageId
-Get a specific review stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "code": "initial_review",
-    "name": "Initial Review",
-    "description": "Initial screening by department",
-    "sequence_order": 1,
-    "default_deadline_days": 7,
-    "requires_all_previous": true,
-    "is_active": true
-  }
-}
-```
-
----
-
-#### PUT /api/admin/review-stages/:stageId
-Update a review stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "name": "Updated Stage Name",
-  "default_deadline_days": 10
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-#### DELETE /api/admin/review-stages/:stageId
-Deactivate a review stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Review stage deactivated"
-}
-```
-
----
-
-#### POST /api/admin/review-stages/reorder
-Reorder review stages.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "stage_ids": [2, 1, 3]
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Stages reordered successfully"
-}
-```
-
----
-
-### Form Review Progress
-
-#### GET /api/review/forms/:formId/stages
-Get review progress for a form.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "form_id": 1,
-    "form_title": "IRB Application",
-    "form_status": "in_review",
-    "current_stage_id": 2,
-    "current_stage_name": "IRB Review",
-    "stages": [
-      {
-        "stage_id": 1,
-        "stage_code": "initial_review",
-        "stage_name": "Initial Review",
-        "sequence_order": 1,
-        "review_id": 1,
-        "reviewer_id": "uuid",
-        "reviewer_name": "Jane Smith",
-        "status": "approved",
-        "deadline": "2026-01-21T00:00:00Z",
-        "started_at": "2026-01-14T00:00:00Z",
-        "completed_at": "2026-01-15T00:00:00Z"
-      },
-      {
-        "stage_id": 2,
-        "stage_code": "irb_review",
-        "stage_name": "IRB Review",
-        "sequence_order": 2,
-        "status": "in_progress",
-        "reviewer_id": "uuid",
-        "reviewer_name": "Dr. Johnson",
-        "deadline": "2026-01-28T00:00:00Z",
-        "started_at": "2026-01-15T00:00:00Z"
-      }
-    ],
-    "completed_stages": 1,
-    "total_stages": 3,
-    "progress_percentage": 33
-  }
-}
-```
-
----
-
-#### POST /api/review/forms/:formId/stages/:stageId/assign
-Assign a reviewer to a stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "reviewer_id": "uuid",
-  "deadline": "2026-01-28T00:00:00Z"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "stage_id": 2,
-    "reviewer_id": "uuid",
-    "deadline": "2026-01-28T00:00:00Z"
-  }
-}
-```
-
----
-
-#### POST /api/review/forms/:formId/stages/:stageId/start
-Start review for a stage.
-
-**Headers**: Authorization required (Assigned reviewer)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "stage_id": 2,
-    "status": "in_progress",
-    "started_at": "2026-01-15T00:00:00Z"
-  }
-}
-```
-
----
-
-#### POST /api/review/forms/:formId/stages/:stageId/complete
-Complete a stage review.
-
-**Headers**: Authorization required (Assigned reviewer)
-
-**Request Body**:
-```json
-{
-  "status": "approved",
-  "comments": "All requirements met. Approved for next stage."
-}
-```
-
-**Status Options**:
-- `approved`
-- `rejected`
-- `revision_required`
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "stage_id": 2,
-    "status": "approved",
-    "completed_at": "2026-01-16T00:00:00Z"
-  }
-}
-```
-
----
-
-#### POST /api/review/forms/:formId/advance
-Advance form to the next review stage.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "reviewer_id": "uuid"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "previous_stage": "Initial Review",
-    "current_stage": "IRB Review",
-    "assigned_reviewer_id": "uuid"
-  }
-}
-```
-
----
-
-## Reports/Analytics API (Admin)
-
-All reports endpoints require Admin role.
-
-### GET /api/admin/reports/overview
-Get overview metrics dashboard.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "metrics": {
-      "totalUsers": 150,
-      "activeUsers": 120,
-      "totalProjects": 45,
-      "activeProjects": 30,
-      "totalForms": 200,
-      "formsInReview": 25,
-      "totalTasks": 500,
-      "pendingTasks": 75
-    },
-    "generatedAt": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### GET /api/admin/reports/projects-by-type
-Get projects grouped by type.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "Clinical Trial", "value": 15 },
-    { "name": "Basic Research", "value": 20 },
-    { "name": "Retrospective Study", "value": 10 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/projects-by-status
-Get projects grouped by status.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "Active", "value": 30 },
-    { "name": "Pending Approval", "value": 10 },
-    { "name": "Completed", "value": 5 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/forms-by-status
-Get forms grouped by status.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "Draft", "value": 50 },
-    { "name": "In Review", "value": 25 },
-    { "name": "Approved", "value": 100 },
-    { "name": "Rejected", "value": 25 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/forms-by-template
-Get forms grouped by template.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "IRB Application - Standard", "value": 80 },
-    { "name": "IRB Amendment", "value": 60 },
-    { "name": "Continuing Review", "value": 40 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/tasks-by-status
-Get tasks grouped by status.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "Pending", "value": 75 },
-    { "name": "In Progress", "value": 50 },
-    { "name": "Completed", "value": 350 },
-    { "name": "Submitted", "value": 25 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/tasks-by-priority
-Get tasks grouped by priority.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "High", "value": 30 },
-    { "name": "Medium", "value": 150 },
-    { "name": "Low", "value": 100 }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/activity-trends
-Get activity trends over time.
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `start_date` (optional): Start date (ISO 8601)
-- `end_date` (optional): End date (ISO 8601)
-- `interval` (optional): `day`, `week`, or `month` (default: `day`)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "date": "2026-01-01",
-      "forms": 5,
-      "reviews": 3,
-      "logins": 25
-    },
-    {
-      "date": "2026-01-02",
-      "forms": 8,
-      "reviews": 4,
-      "logins": 30
-    }
-  ],
-  "meta": {
-    "startDate": "2026-01-01",
-    "endDate": "2026-01-14",
-    "interval": "day"
-  }
-}
-```
-
----
-
-### GET /api/admin/reports/top-researchers
-Get top researchers by activity.
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `limit` (optional): Number of researchers to return (default: 10)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "userId": "uuid",
-      "fullName": "Dr. Jane Smith",
-      "email": "jane.smith@example.com",
-      "formsCreated": 25,
-      "formsApproved": 20,
-      "projectsCount": 5
-    }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/department-stats
-Get statistics by department.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "department": "Radiology",
-      "projectsCount": 15,
-      "formsCount": 45
-    },
-    {
-      "department": "Oncology",
-      "projectsCount": 10,
-      "formsCount": 30
-    }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/review-metrics
-Get review performance metrics.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "totalReviews": 500,
-    "avgReviewTimeHours": 48.5,
-    "approvalRate": 0.75,
-    "rejectionRate": 0.10,
-    "revisionRate": 0.15
-  }
-}
-```
-
----
-
-### GET /api/admin/reports/monthly-submissions
-Get monthly form submission statistics.
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `months` (optional): Number of months to return (default: 12)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "month": "2025-12",
-      "submitted": 30,
-      "approved": 25,
-      "rejected": 5
-    },
-    {
-      "month": "2026-01",
-      "submitted": 35,
-      "approved": 20,
-      "rejected": 3
-    }
-  ]
-}
-```
-
----
-
-### GET /api/admin/reports/users-by-role
-Get users grouped by role.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    { "name": "Researcher", "value": 100 },
-    { "name": "Reviewer", "value": 30 },
-    { "name": "Admin", "value": 10 }
-  ]
-}
-```
-
----
-
-## Email System API (Admin)
-
-### GET /api/admin/email/config
-Get current email configuration.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "host": "smtp.example.com",
-    "port": 587,
-    "secure": true,
-    "from": "noreply@example.com",
-    "configured": true
-  }
-}
-```
-
----
-
-### POST /api/admin/email/test
-Send a test email.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "email": "test@example.com"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Test email sent successfully",
-  "data": {
-    "messageId": "abc123"
-  }
-}
-```
-
----
-
-### POST /api/admin/email/verify
-Verify email server connection.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Email server connection verified",
-  "data": {
-    "connected": true
-  }
-}
-```
-
----
-
-## User Management API (Admin)
-
-### GET /api/admin/users
-List all users with pagination and filters.
-
-**Headers**: Authorization required (Admin role)
-
-**Query Parameters**:
-- `page` (optional): Page number
-- `limit` (optional): Items per page
-- `role` (optional): Filter by role
-- `is_active` (optional): Filter by active status
-- `search` (optional): Search by name or email
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
+    "user": {
       "id": "uuid",
       "email": "user@example.com",
-      "full_name": "John Doe",
-      "role": "researcher",
-      "is_active": true,
-      "created_at": "2026-01-14T00:00:00Z"
+      "fullName": "John Doe",
+      "role": "researcher"
+    },
+    "accessToken": "eyJhbG...",
+    "refreshToken": "eyJhbG..."
+  }
+}
+```
+
+### Create Form
+
+**Request:**
+```json
+POST /api/forms
+{
+  "template_id": 1,
+  "title": "My IRB Application",
+  "project_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "template_id": 1,
+  "title": "My IRB Application",
+  "status": "draft",
+  "completion_percentage": 0,
+  "current_version_number": 1
+}
+```
+
+### Update Form Data
+
+**Request:**
+```json
+POST /api/forms/:formId/data
+{
+  "changes": [
+    {
+      "field_id": "study_title",
+      "field_label": "Study Title",
+      "old_value": null,
+      "new_value": "My Research Study"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150,
-    "totalPages": 8
-  }
+  "section_id": "project_info",
+  "user_id": "uuid"
 }
 ```
 
----
-
-### GET /api/admin/users/:id
-Get user details.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
+**Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "full_name": "John Doe",
-    "role": "researcher",
-    "is_active": true,
-    "created_at": "2026-01-14T00:00:00Z",
-    "last_login_at": "2026-01-14T00:00:00Z"
-  }
+  "data": { ... },
+  "completion_percentage": 15
+}
+```
+
+### Submit Form for Review
+
+**Request:**
+```json
+POST /api/forms/:formId/submit
+{
+  "notes": "Ready for review"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "form_instance_id": 1,
+  "action_type": "submit_for_review",
+  "performed_by_id": "uuid",
+  "created_at": "2026-01-14T00:00:00Z"
 }
 ```
 
 ---
 
-### POST /api/admin/users
-Create a new user.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "email": "newuser@example.com",
-  "password": "SecurePass123",
-  "full_name": "New User",
-  "role": "researcher",
-  "is_active": true
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "newuser@example.com",
-    "full_name": "New User",
-    "role": "researcher"
-  }
-}
-```
-
----
-
-### PUT /api/admin/users/:id
-Update a user.
-
-**Headers**: Authorization required (Admin role)
-
-**Request Body**:
-```json
-{
-  "full_name": "Updated Name",
-  "role": "reviewer",
-  "is_active": true
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### DELETE /api/admin/users/:id
-Deactivate a user (soft delete).
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "User deactivated successfully"
-}
-```
-
----
-
-### POST /api/admin/users/:id/reset-password
-Reset a user's password.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Password reset email sent",
-  "data": {
-    "temporary_password": "TempPass123"
-  }
-}
-```
-
----
-
-### POST /api/admin/users/:id/unlock
-Unlock a locked user account.
-
-**Headers**: Authorization required (Admin role)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Account unlocked successfully"
-}
-```
-
----
-
-## Projects API
-
-### GET /api/projects
-List all projects for the current user.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "title": "Clinical Trial Research",
-      "description": "Phase 2 clinical trial...",
-      "project_type": "clinical_trial",
-      "status": "active",
-      "created_by_id": "uuid",
-      "created_at": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST /api/projects
-Create a new project.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "title": "New Research Project",
-  "description": "Project description",
-  "project_type": "basic_research"
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "title": "New Research Project",
-    "status": "draft"
-  }
-}
-```
-
----
-
-### GET /api/projects/:id
-Get project details.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "title": "Clinical Trial Research",
-    "description": "Phase 2 clinical trial...",
-    "project_type": "clinical_trial",
-    "status": "active",
-    "created_by": {
-      "id": "uuid",
-      "name": "John Doe"
-    },
-    "collaborators": [...],
-    "created_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### PUT /api/projects/:id
-Update a project.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "title": "Updated Title",
-  "description": "Updated description",
-  "status": "active"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "updated_at": "2026-01-14T00:00:00Z"
-  }
-}
-```
-
----
-
-### DELETE /api/projects/:id
-Delete a project.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Project deleted successfully"
-}
-```
-
----
-
-### GET /api/projects/:id/collaborators
-Get project collaborators.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "user_id": "uuid",
-      "user_name": "Jane Smith",
-      "user_email": "jane@example.com",
-      "role": "editor",
-      "added_at": "2026-01-14T00:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST /api/projects/:id/collaborators
-Add a collaborator to a project.
-
-**Headers**: Authorization required
-
-**Request Body**:
-```json
-{
-  "user_id": "uuid",
-  "role": "editor"
-}
-```
-
-**Collaborator Roles**:
-- `viewer`: Read-only access
-- `editor`: Can edit project and forms
-- `admin`: Full access including collaborator management
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "user_id": "uuid",
-    "role": "editor"
-  }
-}
-```
-
----
-
-### DELETE /api/projects/:id/collaborators/:userId
-Remove a collaborator from a project.
-
-**Headers**: Authorization required
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "message": "Collaborator removed"
-}
-```
-
----
-
-*Last Updated: January 15, 2026*
+*Last Updated: January 22, 2026*
