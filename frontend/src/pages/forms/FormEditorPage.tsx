@@ -14,6 +14,9 @@ import {
   Trash2,
   History,
   Eye,
+  CheckCircle2,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -494,6 +497,59 @@ export function FormEditorPage() {
     }
 
     return [];
+  };
+
+  // Check if all required fields in a section are filled
+  const isSectionComplete = (section: any): boolean => {
+    const sectionFields = getFieldsForSection(section);
+    const requiredFields = sectionFields.filter((f: ExtendedField) => f.required);
+
+    if (requiredFields.length === 0) return true; // No required fields = complete
+
+    return requiredFields.every((field: ExtendedField) => {
+      const value = getNestedValue(formData, field.id);
+      return value !== undefined && value !== null && value !== '' && value !== [] &&
+             !(Array.isArray(value) && value.length === 0) &&
+             !(typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
+    });
+  };
+
+  // Get count of completed sections
+  const getCompletedSectionsCount = (): number => {
+    if (!schema?.sections) return 0;
+    return schema.sections.filter((s: any) => {
+      const fields = getFieldsForSection(s);
+      return fields.length > 0 && isSectionComplete(s);
+    }).length;
+  };
+
+  // Collapse all completed sections
+  const collapseCompletedSections = () => {
+    if (!schema?.sections) return;
+
+    const newExpanded = new Set<string>();
+    schema.sections.forEach((section: any) => {
+      const fields = getFieldsForSection(section);
+      if (fields.length > 0 && !isSectionComplete(section)) {
+        // Keep incomplete sections expanded
+        newExpanded.add(section.id);
+      }
+    });
+    setExpandedSections(newExpanded);
+  };
+
+  // Expand all sections
+  const expandAllSections = () => {
+    if (!schema?.sections) return;
+    const allSectionIds = schema.sections
+      .filter((s: any) => getFieldsForSection(s).length > 0)
+      .map((s: any) => s.id);
+    setExpandedSections(new Set(allSectionIds));
+  };
+
+  // Collapse all sections
+  const collapseAllSections = () => {
+    setExpandedSections(new Set());
   };
 
   // Render a single field
@@ -1057,6 +1113,28 @@ export function FormEditorPage() {
       <div className="flex items-center gap-4">
         <Progress value={form.completionPercentage} className="flex-1" />
         <span className="text-sm font-medium">{form.completionPercentage}% complete</span>
+        <div className="flex items-center gap-1 border-l pl-4">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={collapseCompletedSections}>
+                  <ChevronsDownUp className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Collapse completed sections</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={expandAllSections}>
+                  <ChevronsUpDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Expand all sections</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -1084,10 +1162,15 @@ export function FormEditorPage() {
                           ) : (
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
                           )}
-                          <div>
-                            <CardTitle className="text-lg">{section.title}</CardTitle>
-                            {section.description && (
-                              <CardDescription>{section.description}</CardDescription>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <CardTitle className="text-lg">{section.title}</CardTitle>
+                              {section.description && (
+                                <CardDescription>{section.description}</CardDescription>
+                              )}
+                            </div>
+                            {isSectionComplete(section) && (
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
                             )}
                           </div>
                         </div>
