@@ -32,6 +32,7 @@ import {
   Edit,
   Unlock,
   Plus,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +77,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/useToast';
-import { api, filesApi, tasksApi } from '@/lib/api';
+import { api, filesApi, tasksApi, projectsApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { CollaboratorsManagement } from '@/components/admin/CollaboratorsManagement';
 import { FilePreviewModal } from '@/components/files/FilePreviewModal';
@@ -447,6 +448,22 @@ export function AdminProjectReviewPage() {
     },
   });
 
+  // Submit for approval mutation (for draft projects)
+  const submitForApprovalMutation = useMutation({
+    mutationFn: () => projectsApi.submitForApproval(projectId!),
+    onSuccess: async () => {
+      toast({ title: 'Project submitted for approval' });
+      await refetch();
+    },
+    onError: (err: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: err.response?.data?.error || 'Failed to submit project for approval',
+      });
+    },
+  });
+
   // Delete file mutation
   const deleteFileMutation = useMutation({
     mutationFn: (fileId: string) => filesApi.delete(fileId),
@@ -765,24 +782,41 @@ export function AdminProjectReviewPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => handleOpenReviewDialog('request_changes')}
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Request Changes
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => handleOpenReviewDialog('reject')}
-          >
-            <XCircle className="mr-2 h-4 w-4" />
-            Reject
-          </Button>
-          <Button onClick={() => handleOpenReviewDialog('approve')}>
-            <CheckCircle className="mr-2 h-4 w-4" />
-            Approve
-          </Button>
+          {project.status === 'draft' && (
+            <Button
+              onClick={() => submitForApprovalMutation.mutate()}
+              disabled={submitForApprovalMutation.isPending}
+            >
+              {submitForApprovalMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Submit for Approval
+            </Button>
+          )}
+          {project.status === 'pending_approval' && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenReviewDialog('request_changes')}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Request Changes
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleOpenReviewDialog('reject')}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Reject
+              </Button>
+              <Button onClick={() => handleOpenReviewDialog('approve')}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
