@@ -51,6 +51,13 @@ export function RegisterPage() {
     resolver: zodResolver(registerSchema),
   });
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(onSubmit)();
+    }
+  };
+
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
@@ -95,6 +102,7 @@ export function RegisterPage() {
               <Input
                 id="fullName"
                 placeholder="John Doe"
+                onKeyDown={handleKeyDown}
                 {...register('fullName')}
               />
               {errors.fullName && (
@@ -109,6 +117,7 @@ export function RegisterPage() {
                 id="email"
                 type="email"
                 placeholder="name@example.com"
+                onKeyDown={handleKeyDown}
                 {...register('email')}
               />
               {errors.email && (
@@ -122,6 +131,7 @@ export function RegisterPage() {
               <Input
                 id="password"
                 type="password"
+                onKeyDown={handleKeyDown}
                 {...register('password')}
               />
               {errors.password && (
@@ -135,6 +145,7 @@ export function RegisterPage() {
               <Input
                 id="confirmPassword"
                 type="password"
+                onKeyDown={handleKeyDown}
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
