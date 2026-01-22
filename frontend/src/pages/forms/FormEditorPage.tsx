@@ -169,12 +169,42 @@ export function FormEditorPage() {
       setSchema(formInstance.template?.schema || null);
       setFormData(formInstance.data || {});
 
-      // Expand first few sections by default
+      // Expand only incomplete sections (up to first 3)
       if (formInstance.template?.schema?.sections?.length > 0) {
-        const firstSections = formInstance.template.schema.sections
+        const schema = formInstance.template.schema;
+        const data = formInstance.data || {};
+
+        // Helper to check section completion inline
+        const checkSectionComplete = (section: any): boolean => {
+          const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
+          const requiredFields = fields.filter((f: any) => f.required);
+          if (requiredFields.length === 0) return true;
+
+          return requiredFields.every((field: any) => {
+            const keys = field.id.split('.');
+            let value: any = data;
+            for (const key of keys) {
+              value = value?.[key];
+            }
+            return value !== undefined && value !== null && value !== '' &&
+                   !(Array.isArray(value) && value.length === 0);
+          });
+        };
+
+        // Only expand incomplete sections (first 3)
+        const incompleteSections = schema.sections
+          .filter((s: any) => !checkSectionComplete(s))
           .slice(0, 3)
           .map((s: any) => s.id);
-        setExpandedSections(new Set(firstSections));
+
+        // Track already complete sections so they don't auto-collapse again
+        schema.sections.forEach((s: any) => {
+          if (checkSectionComplete(s)) {
+            previouslyCompleteSections.current.add(s.id);
+          }
+        });
+
+        setExpandedSections(new Set(incompleteSections));
       }
     } catch (error) {
       toast({
