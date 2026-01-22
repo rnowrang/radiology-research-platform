@@ -77,7 +77,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/useToast';
-import { api, filesApi, tasksApi, projectsApi } from '@/lib/api';
+import { api, filesApi, tasksApi, projectsApi, formsApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { CollaboratorsManagement } from '@/components/admin/CollaboratorsManagement';
 import { FilePreviewModal } from '@/components/files/FilePreviewModal';
@@ -375,6 +375,9 @@ export function AdminProjectReviewPage() {
   const [editTaskDialog, setEditTaskDialog] = useState<{ open: boolean; task: TaskSummary | null }>({ open: false, task: null });
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
 
+  // Form management state
+  const [formToReopen, setFormToReopen] = useState<FormSummary | null>(null);
+
   // Fetch project review summary
   const {
     data: summaryData,
@@ -460,6 +463,23 @@ export function AdminProjectReviewPage() {
         variant: 'destructive',
         title: 'Error',
         description: err.response?.data?.error || 'Failed to submit project for approval',
+      });
+    },
+  });
+
+  // Reopen form mutation
+  const reopenFormMutation = useMutation({
+    mutationFn: (formId: number) => formsApi.returnToDraft(formId),
+    onSuccess: async () => {
+      toast({ title: 'Form reopened for editing' });
+      setFormToReopen(null);
+      await refetch();
+    },
+    onError: (err: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: err.response?.data?.error || 'Failed to reopen form',
       });
     },
   });
@@ -999,12 +1019,24 @@ export function AdminProjectReviewPage() {
                           <span>{form.completion_percentage}% complete</span>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/forms/${form.id}/view`}>
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          View
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {(form.status === 'approved' || form.status === 'rejected') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFormToReopen(form)}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Reopen
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/forms/${form.id}/view`}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1674,6 +1706,29 @@ export function AdminProjectReviewPage() {
         onOpenChange={(open) => !open && setAssignTaskDialog({ open: false, taskId: null })}
         onSuccess={refetch}
       />
+
+      {/* Reopen Form Dialog */}
+      <AlertDialog open={!!formToReopen} onOpenChange={() => setFormToReopen(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reopen Form</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reopen "{formToReopen?.title}" for editing?
+              This will change its status back to draft.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => formToReopen && reopenFormMutation.mutate(formToReopen.id)}
+              disabled={reopenFormMutation.isPending}
+            >
+              {reopenFormMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reopen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

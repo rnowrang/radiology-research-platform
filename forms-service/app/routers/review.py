@@ -282,8 +282,8 @@ def return_to_draft(
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
 
-    if form.status not in ["in_review", "needs_changes"]:
-        raise HTTPException(status_code=400, detail="Can only return forms in review or needs_changes to draft")
+    if form.status not in ["in_review", "needs_changes", "approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Can only return forms in review, needs_changes, approved, or rejected status to draft")
 
     # Update form status
     form.status = "draft"
