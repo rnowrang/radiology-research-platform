@@ -288,44 +288,6 @@ export function FormEditorPage() {
     pendingChangesRef.current = pendingChanges;
   }, [pendingChanges]);
 
-  // Auto-collapse sections when they become complete
-  useEffect(() => {
-    if (!schema?.sections || !formData) return;
-
-    schema.sections.forEach((section: any) => {
-      const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
-      if (fields.length === 0) return;
-
-      const requiredFields = fields.filter((f: any) => f.required);
-      if (requiredFields.length === 0) return;
-
-      const isComplete = requiredFields.every((field: any) => {
-        const keys = field.id.split('.');
-        let value = formData;
-        for (const key of keys) {
-          value = value?.[key];
-        }
-        return value !== undefined && value !== null && value !== '' &&
-               !(Array.isArray(value) && value.length === 0);
-      });
-
-      const wasComplete = previouslyCompleteSections.current.has(section.id);
-
-      if (isComplete && !wasComplete) {
-        // Section just became complete - collapse it
-        setExpandedSections(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(section.id);
-          return newSet;
-        });
-        previouslyCompleteSections.current.add(section.id);
-      } else if (!isComplete && wasComplete) {
-        // Section is no longer complete
-        previouslyCompleteSections.current.delete(section.id);
-      }
-    });
-  }, [formData, schema]);
-
   const getSectionFromFieldId = useCallback((fieldId: string): string => {
     return fieldToSectionMap[fieldId] || 'sec_other';
   }, [fieldToSectionMap]);
@@ -352,6 +314,11 @@ export function FormEditorPage() {
       if (completionPct !== undefined) {
         setForm(prev => prev ? { ...prev, completionPercentage: completionPct } : null);
       }
+      // Auto-collapse section if it just became complete
+      // Use setTimeout to ensure formData state has updated
+      setTimeout(() => {
+        autoCollapseSectionIfComplete(sectionId);
+      }, 100);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Failed to save' });
     } finally {
@@ -589,6 +556,30 @@ export function FormEditorPage() {
   // Collapse all sections
   const collapseAllSections = () => {
     setExpandedSections(new Set());
+  };
+
+  // Auto-collapse a section if it just became complete
+  const autoCollapseSectionIfComplete = (sectionId: string) => {
+    if (!schema?.sections) return;
+
+    const section = schema.sections.find((s: any) => s.id === sectionId);
+    if (!section) return;
+
+    const wasComplete = previouslyCompleteSections.current.has(sectionId);
+    const isComplete = isSectionComplete(section);
+
+    if (isComplete && !wasComplete) {
+      // Section just became complete - collapse it
+      setExpandedSections(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(sectionId);
+        return newSet;
+      });
+      previouslyCompleteSections.current.add(sectionId);
+    } else if (!isComplete && wasComplete) {
+      // Section is no longer complete - update tracking
+      previouslyCompleteSections.current.delete(sectionId);
+    }
   };
 
   // Render a single field
