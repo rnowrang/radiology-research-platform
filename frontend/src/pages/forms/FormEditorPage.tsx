@@ -13,6 +13,7 @@ import {
   Plus,
   Trash2,
   History,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,7 @@ import {
 } from '@/components/ui/dialog';
 import { formsApi } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
+import { PdfPreviewModal } from '@/components/forms/PdfPreviewModal';
 import { cn } from '@/lib/utils';
 import type { FormInstance, FormField as FormFieldType, FormSchema } from '@/types';
 
@@ -133,6 +135,7 @@ export function FormEditorPage() {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionLabel, setVersionLabel] = useState('');
   const [creatingVersion, setCreatingVersion] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -1025,6 +1028,10 @@ export function FormEditorPage() {
             <History className="mr-2 h-4 w-4" />
             Save Version
           </Button>
+          <Button variant="outline" onClick={() => setShowPdfPreview(true)}>
+            <Eye className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
           <Button variant="outline" onClick={() => handleDownload('pdf')}>
             <Download className="mr-2 h-4 w-4" />
             PDF
@@ -1130,6 +1137,14 @@ export function FormEditorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        formId={formId}
+        formTitle={form?.title || 'Form'}
+        isOpen={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+      />
     </div>
   );
 }
