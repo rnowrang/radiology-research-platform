@@ -1010,31 +1010,21 @@ export function AdminProjectReviewPage() {
                       >
                         {/* Task Header - Clickable to expand */}
                         <div
-                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                          className="flex items-start gap-4 p-4 cursor-pointer hover:bg-accent/50 transition-colors"
                           onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
                         >
+                          {/* Left side - Title and metadata */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{task.title}</span>
-                              <Badge variant={getStatusBadgeVariant(task.status)}>
-                                {getStatusLabel(task.status)}
-                              </Badge>
-                              <Badge variant="outline" className={getPriorityBadgeClasses(task.priority)}>
-                                {getPriorityLabel(task.priority)}
-                              </Badge>
-                              {task.is_required && (
-                                <Badge variant="secondary">Required</Badge>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                              <span>{getTaskTypeLabel(task.task_type)}</span>
+                            <p className="font-medium text-base mb-1 truncate">{task.title}</p>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                              <span className="font-medium text-foreground/70">{getTaskTypeLabel(task.task_type)}</span>
                               {task.assigned_to && (
                                 <span className="flex items-center gap-1">
                                   <User className="h-3 w-3" />
                                   {task.assigned_to.name}
                                 </span>
                               )}
-                              {task.due_date && (
+                              {task.due_date && !task.completed_at && (
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
                                   Due {formatDate(task.due_date)}
@@ -1054,13 +1044,26 @@ export function AdminProjectReviewPage() {
                               )}
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon">
-                            {isExpanded ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
+
+                          {/* Right side - Badges and chevron */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant={getStatusBadgeVariant(task.status)}>
+                              {getStatusLabel(task.status)}
+                            </Badge>
+                            <Badge variant="outline" className={getPriorityBadgeClasses(task.priority)}>
+                              {getPriorityLabel(task.priority)}
+                            </Badge>
+                            {task.is_required && (
+                              <Badge variant="secondary">Required</Badge>
                             )}
-                          </Button>
+                            <Button variant="ghost" size="icon" className="ml-1">
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Expanded Details */}
