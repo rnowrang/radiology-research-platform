@@ -111,6 +111,12 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
+      // Invalidate project task queries if form has a project
+      const projectId = formData?.project_id || formData?.project?.id;
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
+      }
       setActionDialog(null);
       setActionNotes('');
     },
@@ -127,6 +133,12 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
+      // Invalidate project task queries if form has a project
+      const projectId = formData?.project_id || formData?.project?.id;
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
+      }
       setActionDialog(null);
       setActionNotes('');
     },
@@ -143,6 +155,12 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
+      // Invalidate project task queries if form has a project
+      const projectId = formData?.project_id || formData?.project?.id;
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
+      }
       setActionDialog(null);
       setActionNotes('');
     },
