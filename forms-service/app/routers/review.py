@@ -10,6 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import FormInstance, FormVersion, FormData
 from app.models.review import ReviewAction, CommentThread, Comment, FormReview
+from app.models.project import Project
 from app.schemas.review import (
     ReviewActionResponse,
     CommentCreate,
@@ -287,6 +288,12 @@ def return_to_draft(
 
     # Update form status
     form.status = "draft"
+
+    # Also update project status to draft if form has a project
+    if form.project_id:
+        project = db.query(Project).filter(Project.id == form.project_id).first()
+        if project:
+            project.status = "draft"
 
     # Create review action record
     action = ReviewAction(
