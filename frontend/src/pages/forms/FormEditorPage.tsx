@@ -1140,7 +1140,7 @@ export function FormEditorPage() {
 
       {/* PDF Preview Modal */}
       <PdfPreviewModal
-        formId={formId}
+        formId={parseInt(id!, 10)}
         formTitle={form?.title || 'Form'}
         isOpen={showPdfPreview}
         onClose={() => setShowPdfPreview(false)}
