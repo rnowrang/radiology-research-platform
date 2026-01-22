@@ -109,6 +109,8 @@ export function FormViewPage() {
       toast({ title: 'Form approved successfully' });
       queryClient.invalidateQueries({ queryKey: ['form', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
+      queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
       setActionDialog(null);
       setActionNotes('');
     },
@@ -123,6 +125,8 @@ export function FormViewPage() {
       toast({ title: 'Form rejected' });
       queryClient.invalidateQueries({ queryKey: ['form', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
+      queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
       setActionDialog(null);
       setActionNotes('');
     },
@@ -137,6 +141,8 @@ export function FormViewPage() {
       toast({ title: 'Changes requested' });
       queryClient.invalidateQueries({ queryKey: ['form', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
+      queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
       setActionDialog(null);
       setActionNotes('');
     },
