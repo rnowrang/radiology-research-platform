@@ -760,7 +760,7 @@ export const formsProxy = {
     userRole: string,
     notes?: string
   ): Promise<AxiosResponse> => {
-    return formsClient.post(`/api/tasks/${taskId}/approve`, { notes }, {
+    return formsClient.post(`/api/tasks/${taskId}/approve`, { comments: notes }, {
       headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
     });
   },
@@ -771,7 +771,7 @@ export const formsProxy = {
     userRole: string,
     notes: string
   ): Promise<AxiosResponse> => {
-    return formsClient.post(`/api/tasks/${taskId}/reject`, { notes }, {
+    return formsClient.post(`/api/tasks/${taskId}/reject`, { comments: notes }, {
       headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
     });
   },
@@ -782,7 +782,7 @@ export const formsProxy = {
     userRole: string,
     notes: string
   ): Promise<AxiosResponse> => {
-    return formsClient.post(`/api/tasks/${taskId}/request-revision`, { notes }, {
+    return formsClient.post(`/api/tasks/${taskId}/request-revision`, { comments: notes }, {
       headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
     });
   },
