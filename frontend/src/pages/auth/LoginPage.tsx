@@ -43,6 +43,13 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(onSubmit)();
+    }
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
@@ -86,6 +93,7 @@ export function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="name@example.com"
+                onKeyDown={handleKeyDown}
                 {...register('email')}
               />
               {errors.email && (
@@ -107,6 +115,7 @@ export function LoginPage() {
               <Input
                 id="password"
                 type="password"
+                onKeyDown={handleKeyDown}
                 {...register('password')}
               />
               {errors.password && (
