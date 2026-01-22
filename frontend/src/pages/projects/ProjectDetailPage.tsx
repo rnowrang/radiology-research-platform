@@ -158,10 +158,11 @@ interface CustomTaskFormData {
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
-  active: { label: 'Active', variant: 'default' },
-  pending_approval: { label: 'Pending Approval', variant: 'default' },
-  approved: { label: 'Approved', variant: 'outline' },
+  pending_approval: { label: 'Pending Approval', variant: 'outline' },
+  approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
+  needs_changes: { label: 'Needs Changes', variant: 'outline' },
+  active: { label: 'Active', variant: 'default' },
   completed: { label: 'Completed', variant: 'outline' },
   archived: { label: 'Archived', variant: 'outline' },
 };
