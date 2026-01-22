@@ -226,6 +226,7 @@ def transform_schema_for_frontend(schema: dict) -> dict:
         "title": schema.get("title", ""),
         "description": schema.get("description", ""),
         "sections": transformed_sections,
+        "rules": schema.get("rules", []),
     }
 
 

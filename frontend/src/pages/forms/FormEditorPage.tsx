@@ -600,13 +600,17 @@ export function FormEditorPage() {
     const section = schema.sections.find((s: any) => s.id === sectionId);
     if (!section) return;
 
-    // Check completion using the passed-in form data (most up-to-date)
-    const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
-    const requiredFields = fields.filter((f: any) => f.required);
+    // Use getFieldsForSection to get only VISIBLE fields
+    const fields = getFieldsForSection(section);
 
-    if (requiredFields.length === 0) return; // No required fields, don't auto-collapse
+    if (fields.length === 0) return; // No visible fields, don't auto-collapse
 
-    const isComplete = requiredFields.every((field: any) => {
+    // Check if ALL visible fields have values (not just required ones)
+    // This prevents premature collapse when optional fields are still empty
+    const allFieldsFilled = fields.every((field: any) => {
+      // Skip heading/info-only fields
+      if (field.type === 'heading' || field.type === 'info') return true;
+
       const keys = field.id.split('.');
       let value: any = currentFormData;
       for (const key of keys) {
@@ -616,8 +620,8 @@ export function FormEditorPage() {
              !(Array.isArray(value) && value.length === 0);
     });
 
-    // Only collapse if complete AND currently expanded
-    if (isComplete) {
+    // Only collapse if ALL fields are filled AND currently expanded
+    if (allFieldsFilled) {
       setExpandedSections(prev => {
         if (prev.has(sectionId)) {
           const newSet = new Set(prev);

@@ -18,6 +18,7 @@ from app.config import get_settings
 from app.models.template import Template
 from app.models.form import FormInstance, FormVersion, FormData
 from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 from lxml import etree
 
 settings = get_settings()
@@ -42,37 +43,88 @@ class DocumentService:
 
         Returns True if checkbox was found and updated.
         """
+        # First try using para.runs (standard approach)
         for run in para.runs:
-            # Find ffData element containing checkbox
             ffData = run._r.find('.//' + qn('w:ffData'))
             if ffData is not None:
                 checkbox = ffData.find(qn('w:checkBox'))
                 if checkbox is not None:
-                    # Remove existing checked element if present
                     existing_checked = checkbox.find(qn('w:checked'))
                     if existing_checked is not None:
                         checkbox.remove(existing_checked)
-
-                    # Add checked element if checking
                     if check:
-                        checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                        # Use OxmlElement for proper serialization by python-docx
+                        checked_elem = OxmlElement('w:checked')
                         checked_elem.set(qn('w:val'), '1')
-
+                        checkbox.append(checked_elem)
+                    print(f"[CHECKBOX] SUCCESS via para.runs: {para.text[:50]}...")
                     return True
+
+        # Fallback: Search the paragraph's raw XML directly (handles complex structures)
+        para_xml = para._p
+        for ffData in para_xml.iter(qn('w:ffData')):
+            checkbox = ffData.find(qn('w:checkBox'))
+            if checkbox is not None:
+                existing_checked = checkbox.find(qn('w:checked'))
+                if existing_checked is not None:
+                    checkbox.remove(existing_checked)
+                if check:
+                    # Use OxmlElement for proper serialization by python-docx
+                    checked_elem = OxmlElement('w:checked')
+                    checked_elem.set(qn('w:val'), '1')
+                    checkbox.append(checked_elem)
+                print(f"[CHECKBOX] SUCCESS via raw XML: {para.text[:50]}...")
+                return True
+
         return False
 
     @staticmethod
     def _check_checkbox_by_text(doc, search_text: str, check: bool = True) -> bool:
         """
         Find a paragraph containing search_text and check its FORMCHECKBOX.
+        Searches the matching paragraph AND adjacent paragraphs (checkbox may be
+        in a different paragraph than the label text).
 
         Returns True if checkbox was found and checked.
         """
         search_lower = search_text.lower()
-        for para in doc.paragraphs:
+
+        print(f"[CHECKBOX] Searching for: '{search_text}'")
+
+        # First search top-level paragraphs
+        all_paras = list(doc.paragraphs)
+        for i, para in enumerate(all_paras):
             if search_lower in para.text.lower():
+                print(f"[CHECKBOX] Found text in paragraph {i}: {para.text[:80]}...")
+                # Try this paragraph first
                 if DocumentService._check_legacy_checkbox(para, check):
                     return True
+                # Try 2 paragraphs before and after (checkbox often in adjacent paragraph)
+                for offset in [-2, -1, 1, 2]:
+                    adj_idx = i + offset
+                    if 0 <= adj_idx < len(all_paras):
+                        if DocumentService._check_legacy_checkbox(all_paras[adj_idx], check):
+                            return True
+
+        # Also search inside all tables
+        for table_idx, table in enumerate(doc.tables):
+            for row_idx, row in enumerate(table.rows):
+                for cell_idx, cell in enumerate(row.cells):
+                    cell_paras = list(cell.paragraphs)
+                    for i, para in enumerate(cell_paras):
+                        if search_lower in para.text.lower():
+                            print(f"[CHECKBOX] Found text in table {table_idx}, row {row_idx}, cell {cell_idx}, para {i}")
+                            # Try this paragraph first
+                            if DocumentService._check_legacy_checkbox(para, check):
+                                return True
+                            # Try adjacent paragraphs in cell
+                            for offset in [-2, -1, 1, 2]:
+                                adj_idx = i + offset
+                                if 0 <= adj_idx < len(cell_paras):
+                                    if DocumentService._check_legacy_checkbox(cell_paras[adj_idx], check):
+                                        return True
+
+        print(f"[CHECKBOX] WARNING: No checkbox found for text: '{search_text}'")
         return False
 
     @staticmethod
@@ -211,17 +263,17 @@ class DocumentService:
 
         # Handle Section C contact fields specially (row 9 is fully merged)
         # Combine contact_name, contact_ext, contact_email into one value
-        contact_fields = ['personnel.contact_name', 'personnel.contact_ext', 'personnel.contact_email']
+        contact_fields = ['investigator.contact_name', 'investigator.contact_ext', 'investigator.contact_email']
         contact_values = {f: flat_data.get(f, '') for f in contact_fields}
         if any(contact_values.values()):
             # Format: "Name | Ext: xxx | Email: xxx"
             parts = []
-            if contact_values['personnel.contact_name']:
-                parts.append(str(contact_values['personnel.contact_name']))
-            if contact_values['personnel.contact_ext']:
-                parts.append(f"Ext: {contact_values['personnel.contact_ext']}")
-            if contact_values['personnel.contact_email']:
-                parts.append(f"Email: {contact_values['personnel.contact_email']}")
+            if contact_values['investigator.contact_name']:
+                parts.append(str(contact_values['investigator.contact_name']))
+            if contact_values['investigator.contact_ext']:
+                parts.append(f"Ext: {contact_values['investigator.contact_ext']}")
+            if contact_values['investigator.contact_email']:
+                parts.append(f"Email: {contact_values['investigator.contact_email']}")
             combined_contact = " | ".join(parts)
 
             # Write to the merged row 9 cell
@@ -362,6 +414,8 @@ class DocumentService:
         # Handle Section V.A - Study Initiation (paragraphs 14-18)
         study_initiated_by = flat_data.get('study.initiated_by', '')
         study_initiated_other = flat_data.get('study.initiated_other', '')
+        print(f"[DEBUG] study_initiated_by = '{study_initiated_by}'")
+        print(f"[DEBUG] flat_data keys: {list(flat_data.keys())[:10]}...")
         if study_initiated_by:
             # Map form values to paragraph text patterns
             initiation_map = {
@@ -412,57 +466,53 @@ class DocumentService:
                                     should_check = (checkbox_count == 0 and is_student_project == 'no') or \
                                                    (checkbox_count == 1 and is_student_project == 'yes')
                                     if should_check:
-                                        checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                        checked_elem = OxmlElement('w:checked')
                                         checked_elem.set(qn('w:val'), '1')
+                                        checkbox.append(checked_elem)
                                     checkbox_count += 1
                         break
 
-        # Handle Section V.D - Ionizing Radiation (nested checkboxes in paragraphs 35-45)
-        # Structure:
-        # Para 35: No (main) / Para 36: Yes (main)
-        # Para 38: No (direct benefit) / Para 39: Yes (direct benefit)
-        # Para 41: No (routine) / Para 42: Yes (routine)
-        # Para 44: No (greater dose) / Para 45: Yes (greater dose)
+        # Handle Section V.D - Ionizing Radiation (use text-based search)
         ionizing_radiation = flat_data.get('study.ionizing_radiation', '')
         radiation_direct_benefit = flat_data.get('study.radiation_direct_benefit', '')
         radiation_routine = flat_data.get('study.radiation_routine', '')
         radiation_greater_dose = flat_data.get('study.radiation_greater_dose', '')
 
         if ionizing_radiation:
-            # Main question: Para 35 (No) or Para 36 (Yes)
+            # Main question: No or Yes
             if ionizing_radiation == 'no':
-                # Para 35: "No: Radiation Safety Committee (RSC) review not required"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[35], True)
+                # "No: Radiation Safety Committee (RSC) review not required"
+                DocumentService._check_checkbox_by_text(doc, 'No: Radiation Safety Committee', True)
             else:
-                # Para 36: "Yes: Will participants in this study receive direct medical benefits?"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[36], True)
+                # "Yes: Will participants in this study receive direct medical benefits?"
+                DocumentService._check_checkbox_by_text(doc, 'Yes: Will participants in this study receive direct medical benefits', True)
 
         if ionizing_radiation == 'yes' and radiation_direct_benefit:
-            # Direct benefit question: Para 38 (No) or Para 39 (Yes)
+            # Direct benefit question
             if radiation_direct_benefit == 'no':
-                # Para 38: "No: RSC review REQUIRED"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[38], True)
+                # "No: RSC review REQUIRED"
+                DocumentService._check_checkbox_by_text(doc, 'No: RSC review REQUIRED', True)
             else:
-                # Para 39: "Yes: Is the proposed use..."
-                DocumentService._check_legacy_checkbox(doc.paragraphs[39], True)
+                # "Yes: Is the proposed use..."
+                DocumentService._check_checkbox_by_text(doc, 'Yes: Is the proposed use', True)
 
         if ionizing_radiation == 'yes' and radiation_direct_benefit == 'yes' and radiation_routine:
-            # Routine question: Para 41 (No) or Para 42 (Yes)
+            # Routine question
             if radiation_routine == 'no':
-                # Para 41: "No: RSC review REQUIRED"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[41], True)
+                # Find the second "No: RSC review REQUIRED" (for routine question)
+                DocumentService._check_checkbox_by_text(doc, 'normally considered to be routine', True)
             else:
-                # Para 42: "Yes: Will subjects participating..."
-                DocumentService._check_legacy_checkbox(doc.paragraphs[42], True)
+                # "Yes: Will subjects participating..."
+                DocumentService._check_checkbox_by_text(doc, 'Yes: Will subjects participating', True)
 
         if ionizing_radiation == 'yes' and radiation_direct_benefit == 'yes' and radiation_routine == 'yes' and radiation_greater_dose:
-            # Greater dose question: Para 44 (No) or Para 45 (Yes)
+            # Greater dose question
             if radiation_greater_dose == 'no':
-                # Para 44: "No: RSC review not required"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[44], True)
+                # "No: RSC review not required" (lowercase 'not')
+                DocumentService._check_checkbox_by_text(doc, 'No: RSC review not required', True)
             else:
-                # Para 45: "Yes: RSC review REQUIRED"
-                DocumentService._check_legacy_checkbox(doc.paragraphs[45], True)
+                # "Yes: RSC review REQUIRED"
+                DocumentService._check_checkbox_by_text(doc, 'Yes: RSC review REQUIRED', True)
 
         # Handle Section V.E - SCRO (paragraph 48)
         scro_required = flat_data.get('study.scro_required', '')
@@ -482,8 +532,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and scro_required == 'no') or \
                                                (checkbox_count == 1 and scro_required == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -508,8 +559,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and ibc_infectious == 'no') or \
                                                (checkbox_count == 1 and ibc_infectious == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -529,8 +581,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and ibc_recombinant == 'no') or \
                                                (checkbox_count == 1 and ibc_recombinant == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -550,8 +603,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and ibc_hazardous == 'no') or \
                                                (checkbox_count == 1 and ibc_hazardous == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -572,8 +626,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and phs_submission == 'no') or \
                                                (checkbox_count == 1 and phs_submission == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -711,8 +766,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and flyers_used == 'no') or \
                                                (checkbox_count == 1 and flyers_used == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -732,8 +788,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and verbal_used == 'no') or \
                                                (checkbox_count == 1 and verbal_used == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
@@ -753,8 +810,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and electronic_used == 'no') or \
                                                (checkbox_count == 1 and electronic_used == 'yes')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                         # Fill description if yes
                         if electronic_used == 'yes' and electronic_description:
@@ -785,8 +843,9 @@ class DocumentService:
                                 should_check = (checkbox_count == 0 and consent_timing == 'conjunction') or \
                                                (checkbox_count == 1 and consent_timing == 'separate')
                                 if should_check:
-                                    checked_elem = etree.SubElement(checkbox, qn('w:checked'))
+                                    checked_elem = OxmlElement('w:checked')
                                     checked_elem.set(qn('w:val'), '1')
+                                    checkbox.append(checked_elem)
                                 checkbox_count += 1
                     break
 
