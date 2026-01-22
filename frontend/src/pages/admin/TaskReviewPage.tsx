@@ -276,6 +276,7 @@ export function TaskReviewPage() {
       taskReviewApi.approve(taskId, comments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       setSelectedTask(null);
       setReviewComments('');
       setReviewAction(null);
@@ -296,6 +297,7 @@ export function TaskReviewPage() {
       taskReviewApi.reject(taskId, comments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       setSelectedTask(null);
       setReviewComments('');
       setReviewAction(null);
@@ -316,6 +318,7 @@ export function TaskReviewPage() {
       taskReviewApi.requestRevision(taskId, comments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       setSelectedTask(null);
       setReviewComments('');
       setReviewAction(null);
@@ -965,6 +968,7 @@ export function TaskReviewPage() {
         showProjectSelector={true}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+          queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
         }}
       />
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronDown,
@@ -342,6 +342,7 @@ export function AdminProjectReviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // State
   const [activeTab, setActiveTab] = useState('overview');
@@ -464,6 +465,7 @@ export function AdminProjectReviewPage() {
     mutationFn: (taskId: number) => tasksApi.approve(taskId),
     onSuccess: async () => {
       toast({ title: 'Task approved' });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
@@ -479,6 +481,7 @@ export function AdminProjectReviewPage() {
       toast({ title: 'Task rejected' });
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
@@ -494,6 +497,7 @@ export function AdminProjectReviewPage() {
       toast({ title: 'Revision requested' });
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
@@ -506,6 +510,7 @@ export function AdminProjectReviewPage() {
     mutationFn: (taskId: number) => tasksApi.start(taskId),
     onSuccess: async () => {
       toast({ title: 'Task started' });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
@@ -519,6 +524,7 @@ export function AdminProjectReviewPage() {
     onSuccess: async () => {
       toast({ title: 'Task deleted' });
       setTaskToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: (err: any) => {
@@ -536,6 +542,7 @@ export function AdminProjectReviewPage() {
     mutationFn: (taskId: number) => tasksApi.reopen(taskId),
     onSuccess: async () => {
       toast({ title: 'Task reopened' });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
@@ -548,6 +555,7 @@ export function AdminProjectReviewPage() {
     mutationFn: (taskId: number) => tasksApi.unblock(taskId),
     onSuccess: async () => {
       toast({ title: 'Task unblocked' });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       await refetch();
     },
     onError: () => {
