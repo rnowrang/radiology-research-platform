@@ -313,10 +313,15 @@ export function FormEditorPage() {
   const sectionTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const pendingChangesRef = useRef(pendingChanges);
   const previouslyCompleteSections = useRef<Set<string>>(new Set());
+  const formDataRef = useRef(formData);
 
   useEffect(() => {
     pendingChangesRef.current = pendingChanges;
   }, [pendingChanges]);
+
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   const getSectionFromFieldId = useCallback((fieldId: string): string => {
     return fieldToSectionMap[fieldId] || 'sec_other';
@@ -344,11 +349,11 @@ export function FormEditorPage() {
       if (completionPct !== undefined) {
         setForm(prev => prev ? { ...prev, completionPercentage: completionPct } : null);
       }
-      // Auto-collapse section if it just became complete
-      // Use setTimeout to ensure formData state has updated
+      // Auto-collapse section if it's now complete
+      // Use setTimeout to ensure state has settled, then use ref for latest data
       setTimeout(() => {
-        autoCollapseSectionIfComplete(sectionId);
-      }, 100);
+        autoCollapseSectionIfComplete(sectionId, formDataRef.current);
+      }, 150);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Failed to save' });
     } finally {
@@ -588,27 +593,39 @@ export function FormEditorPage() {
     setExpandedSections(new Set());
   };
 
-  // Auto-collapse a section if it just became complete
-  const autoCollapseSectionIfComplete = (sectionId: string) => {
+  // Auto-collapse a section if it's complete and currently expanded
+  const autoCollapseSectionIfComplete = (sectionId: string, currentFormData: Record<string, any>) => {
     if (!schema?.sections) return;
 
     const section = schema.sections.find((s: any) => s.id === sectionId);
     if (!section) return;
 
-    const wasComplete = previouslyCompleteSections.current.has(sectionId);
-    const isComplete = isSectionComplete(section);
+    // Check completion using the passed-in form data (most up-to-date)
+    const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
+    const requiredFields = fields.filter((f: any) => f.required);
 
-    if (isComplete && !wasComplete) {
-      // Section just became complete - collapse it
+    if (requiredFields.length === 0) return; // No required fields, don't auto-collapse
+
+    const isComplete = requiredFields.every((field: any) => {
+      const keys = field.id.split('.');
+      let value: any = currentFormData;
+      for (const key of keys) {
+        value = value?.[key];
+      }
+      return value !== undefined && value !== null && value !== '' &&
+             !(Array.isArray(value) && value.length === 0);
+    });
+
+    // Only collapse if complete AND currently expanded
+    if (isComplete) {
       setExpandedSections(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(sectionId);
-        return newSet;
+        if (prev.has(sectionId)) {
+          const newSet = new Set(prev);
+          newSet.delete(sectionId);
+          return newSet;
+        }
+        return prev;
       });
-      previouslyCompleteSections.current.add(sectionId);
-    } else if (!isComplete && wasComplete) {
-      // Section is no longer complete - update tracking
-      previouslyCompleteSections.current.delete(sectionId);
     }
   };
 
