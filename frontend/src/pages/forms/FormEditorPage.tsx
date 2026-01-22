@@ -282,10 +282,49 @@ export function FormEditorPage() {
   const [pendingChanges, setPendingChanges] = useState<Map<string, any[]>>(new Map());
   const sectionTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const pendingChangesRef = useRef(pendingChanges);
+  const previouslyCompleteSections = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     pendingChangesRef.current = pendingChanges;
   }, [pendingChanges]);
+
+  // Auto-collapse sections when they become complete
+  useEffect(() => {
+    if (!schema?.sections || !formData) return;
+
+    schema.sections.forEach((section: any) => {
+      const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
+      if (fields.length === 0) return;
+
+      const requiredFields = fields.filter((f: any) => f.required);
+      if (requiredFields.length === 0) return;
+
+      const isComplete = requiredFields.every((field: any) => {
+        const keys = field.id.split('.');
+        let value = formData;
+        for (const key of keys) {
+          value = value?.[key];
+        }
+        return value !== undefined && value !== null && value !== '' &&
+               !(Array.isArray(value) && value.length === 0);
+      });
+
+      const wasComplete = previouslyCompleteSections.current.has(section.id);
+
+      if (isComplete && !wasComplete) {
+        // Section just became complete - collapse it
+        setExpandedSections(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(section.id);
+          return newSet;
+        });
+        previouslyCompleteSections.current.add(section.id);
+      } else if (!isComplete && wasComplete) {
+        // Section is no longer complete
+        previouslyCompleteSections.current.delete(section.id);
+      }
+    });
+  }, [formData, schema]);
 
   const getSectionFromFieldId = useCallback((fieldId: string): string => {
     return fieldToSectionMap[fieldId] || 'sec_other';
