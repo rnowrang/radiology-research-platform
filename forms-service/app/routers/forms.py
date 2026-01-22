@@ -22,6 +22,27 @@ from app.schemas.form import (
 router = APIRouter(prefix="/api/forms", tags=["forms"])
 
 
+def get_nested_value(data: dict, key: str):
+    """
+    Get a value from nested dict using dot notation.
+
+    Example: get_nested_value({"a": {"b": 1}}, "a.b") returns 1
+    """
+    if not data or not key:
+        return None
+
+    keys = key.split(".")
+    value = data
+
+    for k in keys:
+        if isinstance(value, dict) and k in value:
+            value = value[k]
+        else:
+            return None
+
+    return value
+
+
 def calculate_completion_percentage(template_schema: dict, form_data: dict) -> int:
     """
     Calculate completion percentage based on required fields.
@@ -33,7 +54,10 @@ def calculate_completion_percentage(template_schema: dict, form_data: dict) -> i
     Returns:
         Completion percentage (0-100)
     """
-    if not template_schema or not form_data:
+    if not template_schema:
+        return 0
+
+    if not form_data:
         return 0
 
     required_fields = []
@@ -50,7 +74,7 @@ def calculate_completion_percentage(template_schema: dict, form_data: dict) -> i
                 if field.get("required", False):
                     required_fields.append(field.get("id"))
     else:
-        # Fields are flat
+        # Fields are flat with section_id references
         for field in fields:
             if field.get("required", False):
                 required_fields.append(field.get("id"))
@@ -61,7 +85,9 @@ def calculate_completion_percentage(template_schema: dict, form_data: dict) -> i
     # Count filled required fields
     filled_count = 0
     for field_id in required_fields:
-        value = form_data.get(field_id)
+        # Use nested lookup for dot notation field IDs (e.g., "investigator.pi_name")
+        value = get_nested_value(form_data, field_id)
+
         # Check if field has a meaningful value
         if value is not None and value != "" and value != [] and value != {}:
             filled_count += 1

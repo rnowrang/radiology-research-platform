@@ -305,9 +305,10 @@ export function FormEditorPage() {
         return updated;
       });
       setLastSaved(new Date());
-      // Update completion percentage from API response
-      if (response.data?.completion_percentage !== undefined) {
-        setForm(prev => prev ? { ...prev, completionPercentage: response.data.completion_percentage } : null);
+      // Update completion percentage from API response (gateway wraps in data.data)
+      const completionPct = response.data?.data?.completion_percentage;
+      if (completionPct !== undefined) {
+        setForm(prev => prev ? { ...prev, completionPercentage: completionPct } : null);
       }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Failed to save' });
