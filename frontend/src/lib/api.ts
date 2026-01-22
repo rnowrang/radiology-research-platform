@@ -222,11 +222,11 @@ export const tasksApi = {
   // Enhanced task workflow methods
   submit: (id: number) => api.post(`/tasks/${id}/submit`),
   approve: (id: number, comments?: string) =>
-    api.post(`/tasks/${id}/approve`, { comments }),
+    api.post(`/tasks/${id}/approve`, { notes: comments }),
   reject: (id: number, comments: string) =>
-    api.post(`/tasks/${id}/reject`, { comments }),
+    api.post(`/tasks/${id}/reject`, { notes: comments }),
   requestRevision: (id: number, comments: string) =>
-    api.post(`/tasks/${id}/request-revision`, { comments }),
+    api.post(`/tasks/${id}/request-revision`, { notes: comments }),
   getPendingReview: () => api.get('/tasks/pending-review'),
   getProjectTasks: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
   getProjectTaskProgress: (projectId: string) =>
