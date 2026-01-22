@@ -1163,20 +1163,20 @@ export function FormEditorPage() {
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
                           )}
                           <div>
-                              <CardTitle className="text-lg">{section.title}</CardTitle>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg">{section.title}</CardTitle>
+                                {isSectionComplete(section) && (
+                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                )}
+                              </div>
                               {section.description && (
                                 <CardDescription>{section.description}</CardDescription>
                               )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            {sectionFields.length} field{sectionFields.length !== 1 ? 's' : ''}
-                          </span>
-                          {isSectionComplete(section) && (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          )}
-                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {sectionFields.length} field{sectionFields.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
