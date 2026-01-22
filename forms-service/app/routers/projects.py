@@ -651,11 +651,11 @@ def submit_project_for_approval(
         # Find incomplete required tasks
         incomplete_required = []
         for task_info in progress.tasks:
-            if task_info.get("is_required", True):
-                task_status = task_info.get("status")
+            # task_info is a Pydantic model, use attribute access
+            if task_info.is_required:
                 # Required tasks must be 'completed' or 'approved'
-                if task_status not in ["completed", "approved"]:
-                    incomplete_required.append(task_info.get("title", f"Task {task_info.get('id')}"))
+                if task_info.status not in ["completed", "approved"]:
+                    incomplete_required.append(task_info.title or f"Task {task_info.task_id}")
 
         if incomplete_required:
             raise HTTPException(
