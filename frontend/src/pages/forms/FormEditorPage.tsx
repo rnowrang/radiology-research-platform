@@ -294,7 +294,7 @@ export function FormEditorPage() {
 
     try {
       setSaving(true);
-      await formsApi.updateData(form!.id, {
+      const response = await formsApi.updateData(form!.id, {
         section_id: sectionId,
         changes: changes,
         user_id: form!.ownerId,
@@ -305,6 +305,10 @@ export function FormEditorPage() {
         return updated;
       });
       setLastSaved(new Date());
+      // Update completion percentage from API response
+      if (response.data?.completion_percentage !== undefined) {
+        setForm(prev => prev ? { ...prev, completionPercentage: response.data.completion_percentage } : null);
+      }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Failed to save' });
     } finally {

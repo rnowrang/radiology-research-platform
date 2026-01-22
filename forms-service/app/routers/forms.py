@@ -22,6 +22,53 @@ from app.schemas.form import (
 router = APIRouter(prefix="/api/forms", tags=["forms"])
 
 
+def calculate_completion_percentage(template_schema: dict, form_data: dict) -> int:
+    """
+    Calculate completion percentage based on required fields.
+
+    Args:
+        template_schema: The template schema containing sections and fields
+        form_data: The current form data
+
+    Returns:
+        Completion percentage (0-100)
+    """
+    if not template_schema or not form_data:
+        return 0
+
+    required_fields = []
+
+    # Extract required fields from schema
+    sections = template_schema.get("sections", [])
+    fields = template_schema.get("fields", [])
+
+    # Check if fields are nested in sections or flat
+    if sections and sections[0].get("fields"):
+        # Fields are nested in sections
+        for section in sections:
+            for field in section.get("fields", []):
+                if field.get("required", False):
+                    required_fields.append(field.get("id"))
+    else:
+        # Fields are flat
+        for field in fields:
+            if field.get("required", False):
+                required_fields.append(field.get("id"))
+
+    if not required_fields:
+        return 100  # No required fields means 100% complete
+
+    # Count filled required fields
+    filled_count = 0
+    for field_id in required_fields:
+        value = form_data.get(field_id)
+        # Check if field has a meaningful value
+        if value is not None and value != "" and value != [] and value != {}:
+            filled_count += 1
+
+    return int((filled_count / len(required_fields)) * 100)
+
+
 @router.get("", response_model=List[FormListResponse])
 async def get_forms(
     owner_id: Optional[UUID] = None,
@@ -319,12 +366,20 @@ async def update_form_data(
 
     form_data.data = current_data
     flag_modified(form_data, "data")  # Tell SQLAlchemy the JSONB column was modified
+
+    # Recalculate completion percentage
+    if form.template and form.template.schema:
+        new_completion = calculate_completion_percentage(form.template.schema, current_data)
+        form.completion_percentage = new_completion
+
     db.commit()
     db.refresh(form_data)
+    db.refresh(form)
 
     return {
         "success": True,
         "data": form_data.data,
+        "completion_percentage": form.completion_percentage,
     }
 
 
