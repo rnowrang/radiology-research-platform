@@ -239,6 +239,7 @@ export function TaskDetailPage() {
       toast({ title: 'Task submitted for review' });
       setShowSubmitDialog(false);
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       // Also invalidate project-level queries so ProjectDetailPage updates
       if (task?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
@@ -260,6 +261,7 @@ export function TaskDetailPage() {
       toast({ title: 'Task approved' });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       // Also invalidate project-level queries so ProjectDetailPage updates
       if (task?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
@@ -283,6 +285,7 @@ export function TaskDetailPage() {
       setReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       // Also invalidate project-level queries so ProjectDetailPage updates
       if (task?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
@@ -306,6 +309,7 @@ export function TaskDetailPage() {
       setReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
       queryClient.invalidateQueries({ queryKey: ['pendingReviewTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       // Also invalidate project-level queries so ProjectDetailPage updates
       if (task?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
@@ -326,6 +330,7 @@ export function TaskDetailPage() {
     onSuccess: () => {
       toast({ title: 'Task reopened for revision' });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       // Also invalidate project-level queries so ProjectDetailPage updates
       if (task?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
