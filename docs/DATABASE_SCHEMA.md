@@ -440,6 +440,7 @@ CREATE TABLE form_instances (
     status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'needs_changes', 'approved', 'rejected', 'locked')),
     current_version_number INTEGER DEFAULT 1,
     completion_percentage INTEGER DEFAULT 0,
+    version INTEGER DEFAULT 1,
     submitted_at TIMESTAMP WITH TIME ZONE,
     approved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -463,12 +464,15 @@ CREATE INDEX idx_form_instances_created_at ON form_instances(created_at DESC);
 | status | VARCHAR(50) | CHECK | 'draft' | Form status (see constraint) |
 | current_version_number | INTEGER | - | 1 | Current version number |
 | completion_percentage | INTEGER | - | 0 | Form completion percentage (0-100) |
+| version | INTEGER | - | 1 | Optimistic locking version (incremented on each save) |
 | submitted_at | TIMESTAMP WITH TIME ZONE | - | NULL | Submission timestamp |
 | approved_at | TIMESTAMP WITH TIME ZONE | - | NULL | Approval timestamp |
 | created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
 | updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp (auto-updated via trigger) |
 
 **Status Values:** `draft`, `in_review`, `needs_changes`, `approved`, `rejected`, `locked`
+
+**Optimistic Locking:** The `version` column is used to prevent concurrent edit conflicts. When saving form data, the client must provide the expected version number. If the server's version differs (indicating another save occurred), the save is rejected with a conflict error, prompting the user to refresh and re-apply their changes.
 
 **Foreign Keys:**
 - `template_id` -> `templates(id)`

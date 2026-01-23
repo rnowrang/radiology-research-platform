@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   ChevronsDownUp,
   ChevronsUpDown,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -171,13 +173,126 @@ export function FormEditorPage() {
 
       // Expand only incomplete sections (up to first 3)
       if (formInstance.template?.schema?.sections?.length > 0) {
-        const schema = formInstance.template.schema;
+        const loadedSchema = formInstance.template.schema;
         const data = formInstance.data || {};
 
-        // Helper to check section completion inline
+        // Helper to compute hidden fields at load time (same logic as hiddenFields memo)
+        const computeHiddenFields = (): Set<string> => {
+          const hidden = new Set<string>();
+          // First, hide fields that have visible: false by default
+          (loadedSchema.fields || []).forEach((field: any) => {
+            if (field.visible === false) hidden.add(field.id);
+          });
+          (loadedSchema.sections || []).forEach((section: any) => {
+            (section.fields || []).forEach((field: any) => {
+              if (field.visible === false) hidden.add(field.id);
+            });
+          });
+
+          // Evaluate rules
+          if (!loadedSchema.rules) return hidden;
+
+          loadedSchema.rules.forEach((rule: any) => {
+            let conditionsMet = true;
+            for (const condition of rule.conditions || []) {
+              const fieldValue = condition.field.split('.').reduce((curr: any, key: string) => curr?.[key], data);
+              switch (condition.operator) {
+                case 'equals':
+                  conditionsMet = conditionsMet && fieldValue === condition.value;
+                  break;
+                case 'not_equals':
+                  conditionsMet = conditionsMet && fieldValue !== condition.value;
+                  break;
+                case 'contains':
+                  if (Array.isArray(fieldValue)) {
+                    conditionsMet = conditionsMet && fieldValue.includes(condition.value);
+                  } else if (typeof fieldValue === 'string') {
+                    conditionsMet = conditionsMet && fieldValue.toLowerCase().includes(String(condition.value).toLowerCase());
+                  } else {
+                    conditionsMet = false;
+                  }
+                  break;
+                case 'is_empty':
+                  conditionsMet = conditionsMet && (!fieldValue || fieldValue === '' || (Array.isArray(fieldValue) && fieldValue.length === 0));
+                  break;
+                case 'is_not_empty':
+                case 'not_empty':
+                  conditionsMet = conditionsMet && fieldValue && fieldValue !== '' && (!Array.isArray(fieldValue) || fieldValue.length > 0);
+                  break;
+              }
+            }
+            const actions = conditionsMet ? rule.then_actions : rule.else_actions;
+            actions?.forEach((action: any) => {
+              if (action.action === 'hide') hidden.add(action.field);
+              else if (action.action === 'show') hidden.delete(action.field);
+            });
+          });
+          return hidden;
+        };
+
+        // Helper to check if field is conditionally required at load time
+        const isFieldConditionallyRequiredAtLoad = (fieldId: string): boolean => {
+          if (!loadedSchema.rules) return false;
+          for (const rule of loadedSchema.rules) {
+            const hasRequireAction = (actions: any[] | undefined) => {
+              return actions?.some((a: any) => a.action === 'require' && a.field === fieldId);
+            };
+            const requireInThen = hasRequireAction(rule.then_actions);
+            const requireInElse = hasRequireAction(rule.else_actions);
+            if (!requireInThen && !requireInElse) continue;
+
+            let conditionsMet = true;
+            for (const condition of rule.conditions || []) {
+              const fieldValue = condition.field.split('.').reduce((curr: any, key: string) => curr?.[key], data);
+              switch (condition.operator) {
+                case 'equals':
+                  conditionsMet = conditionsMet && fieldValue === condition.value;
+                  break;
+                case 'not_equals':
+                  conditionsMet = conditionsMet && fieldValue !== condition.value;
+                  break;
+                case 'contains':
+                  if (Array.isArray(fieldValue)) {
+                    conditionsMet = conditionsMet && fieldValue.includes(condition.value);
+                  } else if (typeof fieldValue === 'string') {
+                    conditionsMet = conditionsMet && fieldValue.toLowerCase().includes(String(condition.value).toLowerCase());
+                  } else {
+                    conditionsMet = false;
+                  }
+                  break;
+                case 'is_empty':
+                  conditionsMet = conditionsMet && (!fieldValue || fieldValue === '' || (Array.isArray(fieldValue) && fieldValue.length === 0));
+                  break;
+                case 'is_not_empty':
+                case 'not_empty':
+                  conditionsMet = conditionsMet && fieldValue && fieldValue !== '' && (!Array.isArray(fieldValue) || fieldValue.length > 0);
+                  break;
+              }
+            }
+            if (conditionsMet && requireInThen) return true;
+            if (!conditionsMet && requireInElse) return true;
+          }
+          return false;
+        };
+
+        const hiddenAtLoad = computeHiddenFields();
+
+        // Helper to check section completion inline (unified with isSectionComplete)
         const checkSectionComplete = (section: any): boolean => {
-          const fields = schema.fields?.filter((f: any) => f.section_id === section.id) || section.fields || [];
-          const requiredFields = fields.filter((f: any) => f.required);
+          // Get fields for section, filtering out hidden fields
+          let fields: any[] = [];
+          if (section.fields && section.fields.length > 0) {
+            fields = section.fields.filter((f: any) => !hiddenAtLoad.has(f.id));
+          } else if (loadedSchema.fields) {
+            fields = loadedSchema.fields.filter((f: any) =>
+              f.section_id === section.id && !hiddenAtLoad.has(f.id)
+            );
+          }
+
+          // Filter to required fields (including conditionally required ones)
+          const requiredFields = fields.filter((f: any) =>
+            f.required || isFieldConditionallyRequiredAtLoad(f.id)
+          );
           if (requiredFields.length === 0) return true;
 
           return requiredFields.every((field: any) => {
@@ -187,18 +302,19 @@ export function FormEditorPage() {
               value = value?.[key];
             }
             return value !== undefined && value !== null && value !== '' &&
-                   !(Array.isArray(value) && value.length === 0);
+                   !(Array.isArray(value) && value.length === 0) &&
+                   !(typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
           });
         };
 
         // Only expand incomplete sections (first 3)
-        const incompleteSections = schema.sections
+        const incompleteSections = loadedSchema.sections
           .filter((s: any) => !checkSectionComplete(s))
           .slice(0, 3)
           .map((s: any) => s.id);
 
         // Track already complete sections so they don't auto-collapse again
-        schema.sections.forEach((s: any) => {
+        loadedSchema.sections.forEach((s: any) => {
           if (checkSectionComplete(s)) {
             previouslyCompleteSections.current.add(s.id);
           }
@@ -297,10 +413,72 @@ export function FormEditorPage() {
     return newHidden;
   }, [schema, formData, getNestedValue]);
 
+  // Check if a field is conditionally required based on rules
+  const isFieldConditionallyRequired = useCallback((fieldId: string, currentFormData: Record<string, any>): boolean => {
+    if (!schema?.rules) return false;
+
+    for (const rule of schema.rules) {
+      // Check for 'require' actions in then_actions or else_actions
+      const hasRequireAction = (actions: { action: string; field: string }[] | undefined) => {
+        return actions?.some(a => a.action === 'require' && a.field === fieldId);
+      };
+
+      const requireInThen = hasRequireAction(rule.then_actions as any);
+      const requireInElse = hasRequireAction(rule.else_actions as any);
+
+      if (!requireInThen && !requireInElse) continue;
+
+      // Evaluate rule conditions
+      let conditionsMet = true;
+      for (const condition of rule.conditions || []) {
+        const fieldValue = getNestedValue(currentFormData, condition.field);
+
+        switch (condition.operator) {
+          case 'equals':
+            conditionsMet = conditionsMet && fieldValue === condition.value;
+            break;
+          case 'not_equals':
+            conditionsMet = conditionsMet && fieldValue !== condition.value;
+            break;
+          case 'contains':
+            if (Array.isArray(fieldValue)) {
+              conditionsMet = conditionsMet && fieldValue.includes(condition.value);
+            } else if (typeof fieldValue === 'string') {
+              conditionsMet = conditionsMet && fieldValue.toLowerCase().includes(String(condition.value).toLowerCase());
+            } else {
+              conditionsMet = false;
+            }
+            break;
+          case 'is_empty':
+            conditionsMet = conditionsMet && (!fieldValue || fieldValue === '' || (Array.isArray(fieldValue) && fieldValue.length === 0));
+            break;
+          case 'is_not_empty':
+          case 'not_empty':
+            conditionsMet = conditionsMet && fieldValue && fieldValue !== '' && (!Array.isArray(fieldValue) || fieldValue.length > 0);
+            break;
+        }
+      }
+
+      // Check if this field should be required based on conditions
+      if (conditionsMet && requireInThen) return true;
+      if (!conditionsMet && requireInElse) return true;
+    }
+
+    return false;
+  }, [schema, getNestedValue]);
+
   // Build field-to-section map from template schema
   const fieldToSectionMap = useMemo(() => {
     const map: Record<string, string> = {};
-    form?.template?.schema?.sections?.forEach((section: any) => {
+    const templateSchema = form?.template?.schema as ExtendedSchema | undefined;
+    // Check flat fields array with section_id property (primary source)
+    templateSchema?.fields?.forEach((field: any) => {
+      if (field.section_id) {
+        map[field.id] = field.section_id;
+      }
+    });
+    // Also check nested fields as fallback
+    templateSchema?.sections?.forEach((section: any) => {
       section.fields?.forEach((field: any) => {
         map[field.id] = field.section_id || section.id;
       });
@@ -310,10 +488,14 @@ export function FormEditorPage() {
 
   // Pending changes by section + independent timers
   const [pendingChanges, setPendingChanges] = useState<Map<string, any[]>>(new Map());
-  const sectionTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const sectionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const pendingChangesRef = useRef(pendingChanges);
   const previouslyCompleteSections = useRef<Set<string>>(new Set());
   const formDataRef = useRef(formData);
+
+  // Failed saves queue for error recovery
+  const failedSavesRef = useRef<Map<string, any[]>>(new Map());
+  const [hasFailedSaves, setHasFailedSaves] = useState(false);
 
   useEffect(() => {
     pendingChangesRef.current = pendingChanges;
@@ -343,23 +525,52 @@ export function FormEditorPage() {
         updated.delete(sectionId);
         return updated;
       });
+
+      // Remove from failed saves if it was there (successful retry)
+      if (failedSavesRef.current.has(sectionId)) {
+        failedSavesRef.current.delete(sectionId);
+        setHasFailedSaves(failedSavesRef.current.size > 0);
+      }
+
       setLastSaved(new Date());
       // Update completion percentage from API response (gateway wraps in data.data)
       const completionPct = response.data?.data?.completion_percentage;
       if (completionPct !== undefined) {
         setForm(prev => prev ? { ...prev, completionPercentage: completionPct } : null);
       }
-      // Auto-collapse section if it's now complete
-      // Use setTimeout to ensure state has settled, then use ref for latest data
-      setTimeout(() => {
-        autoCollapseSectionIfComplete(sectionId, formDataRef.current);
-      }, 150);
+      // Auto-collapse section if it's now complete (after save resolves successfully)
+      autoCollapseSectionIfComplete(sectionId, formDataRef.current);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Failed to save' });
+      // Add changes to failed saves queue for error recovery
+      failedSavesRef.current.set(sectionId, changes);
+      setHasFailedSaves(true);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to save',
+        description: 'Changes will be retried. Click "Retry" to save now.',
+      });
     } finally {
       setSaving(false);
     }
   }, [form?.id, form?.ownerId, toast]);
+
+  // Retry failed saves
+  const retryFailedSaves = useCallback(async () => {
+    const failedSections = Array.from(failedSavesRef.current.keys());
+    for (const sectionId of failedSections) {
+      const changes = failedSavesRef.current.get(sectionId);
+      if (changes && changes.length > 0) {
+        // Re-add to pending changes and trigger save
+        setPendingChanges(prev => {
+          const updated = new Map(prev);
+          updated.set(sectionId, changes);
+          return updated;
+        });
+        pendingChangesRef.current.set(sectionId, changes);
+        await saveSectionChanges(sectionId);
+      }
+    }
+  }, [saveSectionChanges]);
 
   const handleFieldChange = useCallback((fieldId: string, value: any, label?: string) => {
     // Update local state immediately
@@ -415,6 +626,14 @@ export function FormEditorPage() {
       saveAllPending();
     };
   }, [saveSectionChanges]);
+
+  // Clean up timers on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      sectionTimers.current.forEach((timer) => clearTimeout(timer));
+      sectionTimers.current.clear();
+    };
+  }, []);
 
   const handleSubmitForReview = async () => {
     if (!form) return;
@@ -542,14 +761,19 @@ export function FormEditorPage() {
 
   // Check if all required fields in a section are filled
   const isSectionComplete = (section: any): boolean => {
+    // getFieldsForSection already filters out hidden fields
     const sectionFields = getFieldsForSection(section);
-    const requiredFields = sectionFields.filter((f: ExtendedField) => f.required);
+
+    // Filter to required fields (including conditionally required ones)
+    const requiredFields = sectionFields.filter((f: ExtendedField) =>
+      f.required || isFieldConditionallyRequired(f.id, formData)
+    );
 
     if (requiredFields.length === 0) return true; // No required fields = complete
 
     return requiredFields.every((field: ExtendedField) => {
       const value = getNestedValue(formData, field.id);
-      return value !== undefined && value !== null && value !== '' && value !== [] &&
+      return value !== undefined && value !== null && value !== '' &&
              !(Array.isArray(value) && value.length === 0) &&
              !(typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
     });
@@ -1156,10 +1380,27 @@ export function FormEditorPage() {
                 Saving...
               </span>
             )}
-            {lastSaved && !saving && (
+            {lastSaved && !saving && !hasFailedSaves && (
               <span className="flex items-center text-sm text-muted-foreground">
                 <Clock className="mr-1 h-4 w-4" />
                 Saved {lastSaved.toLocaleTimeString()}
+              </span>
+            )}
+            {hasFailedSaves && !saving && (
+              <span className="flex items-center gap-2">
+                <span className="flex items-center text-sm text-destructive">
+                  <AlertTriangle className="mr-1 h-4 w-4" />
+                  Unsaved changes
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={retryFailedSaves}
+                  className="h-6 px-2 text-xs"
+                >
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Retry
+                </Button>
               </span>
             )}
           </div>

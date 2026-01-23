@@ -43,6 +43,7 @@ class FormData(Base):
     form_instance_id = Column(Integer, ForeignKey("form_instances.id", ondelete="CASCADE"), unique=True, nullable=False)
     data = Column(JSONB, default=dict)
     conditional_state = Column(JSONB, default=dict)
+    version = Column(Integer, default=1, nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships

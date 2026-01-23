@@ -299,6 +299,7 @@ async def get_form(
         "created_at": form.created_at,
         "updated_at": form.updated_at,
         "data": form_data.data if form_data else {},
+        "version": form_data.version if form_data else 1,
         "conditional_state": form_data.conditional_state if form_data else {},
         "template": template_obj,
         "template_name": form.template.name if form.template else None,
@@ -341,7 +342,7 @@ async def update_form_data(
     data_update: FormDataUpdate,
     db: Session = Depends(get_db),
 ):
-    """Update form field data (autosave)."""
+    """Update form field data (autosave) with optimistic locking."""
     form = db.query(FormInstance).filter(FormInstance.id == form_id).first()
     if not form:
         raise HTTPException(
@@ -356,11 +357,29 @@ async def update_form_data(
             detail="Form is not editable in current status",
         )
 
-    # Get or create form data
-    form_data = db.query(FormData).filter(FormData.form_instance_id == form_id).first()
+    # Get or create form data with row-level locking (SELECT ... FOR UPDATE)
+    form_data = db.query(FormData).filter(
+        FormData.form_instance_id == form_id
+    ).with_for_update().first()
+
     if not form_data:
-        form_data = FormData(form_instance_id=form_id, data={})
+        form_data = FormData(form_instance_id=form_id, data={}, version=1)
         db.add(form_data)
+        db.flush()
+    else:
+        # Optimistic locking: check version if provided
+        if data_update.version is not None:
+            if form_data.version != data_update.version:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "error": "Version conflict",
+                        "message": "The form has been modified by another user. Please refresh and try again.",
+                        "current_version": form_data.version,
+                        "your_version": data_update.version,
+                        "form_data": form_data.data,
+                    }
+                )
 
     current_data = form_data.data or {}
 
@@ -394,6 +413,9 @@ async def update_form_data(
     form_data.data = current_data
     flag_modified(form_data, "data")  # Tell SQLAlchemy the JSONB column was modified
 
+    # Increment version for optimistic locking
+    form_data.version += 1
+
     # Recalculate completion percentage
     if form.template and form.template.schema:
         new_completion = calculate_completion_percentage(form.template.schema, current_data)
@@ -406,6 +428,7 @@ async def update_form_data(
     return {
         "success": True,
         "data": form_data.data,
+        "version": form_data.version,
         "completion_percentage": form.completion_percentage,
     }
 

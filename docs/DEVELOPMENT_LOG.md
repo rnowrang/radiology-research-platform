@@ -15,6 +15,48 @@ This document tracks all development work completed on the Radiology Research Pl
 
 ## Development Timeline
 
+### January 22, 2026: Form Saving and Section Collapse Bug Fixes
+
+#### Summary
+
+Critical bugs were identified and fixed in the form editor component related to form saving, section collapse behavior, and concurrent edit handling.
+
+#### Bugs Fixed
+
+1. **Fixed fieldToSectionMap Population**
+   - **Issue**: The `fieldToSectionMap` was always empty because the code was looking for nested `section.fields` arrays, but the schema uses a flat `schema.fields` array where each field has a `section_id` property.
+   - **Solution**: Updated the field-to-section mapping logic to iterate over the flat `schema.fields` array and read each field's `section_id` property.
+
+2. **Added Optimistic Locking for Concurrent Edit Prevention**
+   - **Issue**: No mechanism existed to prevent data loss when multiple users or browser tabs edited the same form simultaneously, leading to silent overwrites.
+   - **Solution**: Added a `version` column (Integer, default 1) to the `form_instances` table. The save operation now includes version checking - if the version on the server doesn't match the client's expected version, a conflict error is returned prompting the user to refresh.
+   - **Migration**: `004_add_form_version_column.py`
+
+3. **Unified Section Completion Logic**
+   - **Issue**: Inconsistent section completion calculation between `loadForm` and `isSectionComplete` functions caused sections to show incorrect completion status.
+   - **Solution**: Consolidated section completion logic into a single reusable function that is called consistently throughout the component.
+
+4. **Fixed Timer Memory Leak**
+   - **Issue**: The auto-collapse timer was not being properly cleaned up on component unmount, causing memory leaks and potential state updates on unmounted components.
+   - **Solution**: Added proper cleanup in the `useEffect` cleanup function to clear all timers when the component unmounts.
+
+5. **Improved Auto-Collapse Timing**
+   - **Issue**: Section auto-collapse behavior was inconsistent and could trigger prematurely during user interaction.
+   - **Solution**: Refined the timing logic for auto-collapse to ensure smoother user experience.
+
+6. **Added Error Recovery for Failed Saves**
+   - **Issue**: When a save operation failed, the user had no clear indication or recovery path.
+   - **Solution**: Added proper error handling with user-friendly error messages and recovery options, including handling for version conflict errors.
+
+#### Files Modified
+
+- `frontend/src/pages/FormEditorPage.tsx` - Form editor component with section collapse and save logic
+- `backend/app/models/form.py` - Added version column to FormInstance model
+- `backend/app/routers/forms.py` - Added version checking in save endpoint
+- `backend/alembic/versions/004_add_form_version_column.py` - New migration for version column
+
+---
+
 ### Phase 1: Foundation Setup (January 14, 2026)
 
 #### 1.1 Project Initialization
@@ -543,4 +585,4 @@ frontend/src/
 
 ---
 
-*Last Updated: January 15, 2026*
+*Last Updated: January 22, 2026*

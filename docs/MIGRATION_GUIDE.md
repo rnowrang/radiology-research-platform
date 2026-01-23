@@ -23,6 +23,7 @@ docker exec radiology-forms alembic upgrade head
 1. **001_add_task_definition_columns.py** - Adds `template_id` and `file_category` to task_definitions table
 2. **002_add_project_approval_columns.py** - Adds approval workflow columns (submitted_for_approval_at, approved_at, approved_by_id, rejected_at, rejected_by_id, rejection_notes) to projects table
 3. **003_add_section_id_to_field_changes.py** - Adds `section_id` column to field_changes table with index
+4. **004_add_form_version_column.py** - Adds `version` column (Integer, default 1) to form_instances table for optimistic locking to prevent concurrent edit conflicts
 
 ## SQL Migrations (Database)
 

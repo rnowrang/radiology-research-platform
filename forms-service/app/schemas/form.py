@@ -19,6 +19,7 @@ class FormDataUpdate(BaseModel):
     section_id: Optional[str] = None
     changes: List[FieldChange]
     user_id: UUID
+    version: Optional[int] = None  # For optimistic locking - client sends current version
 
 
 class FormInstanceCreate(BaseModel):
