@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import FormInstance, FormVersion, FormData
 from app.models.review import ReviewAction, CommentThread, Comment, FormReview
 from app.models.project import Project
+from app.models.task import Task
 from app.schemas.review import (
     ReviewActionResponse,
     CommentCreate,
@@ -144,11 +145,18 @@ def submit_for_review(
         notes=request.notes if request else None,
     )
     db.add(action)
+
+    # Update linked task status to "submitted" (within same transaction)
+    linked_task = db.query(Task).filter(Task.form_instance_id == form_id).first()
+    if linked_task:
+        linked_task.status = "submitted"
+        linked_task.submitted_at = datetime.utcnow()
+        # Clear previous review data when resubmitting
+        linked_task.reviewed_at = None
+        linked_task.reviewed_by_id = None
+
     db.commit()
     db.refresh(action)
-
-    # Sync linked task status (form in_review -> task submitted)
-    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 
@@ -183,11 +191,18 @@ def request_changes(
         notes=request.notes,
     )
     db.add(action)
+
+    # Update linked task status to "revision_required" (within same transaction)
+    linked_task = db.query(Task).filter(Task.form_instance_id == form_id).first()
+    if linked_task:
+        linked_task.status = "revision_required"
+        linked_task.reviewed_at = datetime.utcnow()
+        linked_task.reviewed_by_id = user_id
+        linked_task.reviewer_comments = request.notes
+        linked_task.revision_count = (linked_task.revision_count or 0) + 1
+
     db.commit()
     db.refresh(action)
-
-    # Sync linked task status (form needs_changes -> task revision_required)
-    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 
@@ -223,11 +238,18 @@ def approve_form(
         notes=request.notes if request else None,
     )
     db.add(action)
+
+    # Update linked task status to "approved" (within same transaction)
+    linked_task = db.query(Task).filter(Task.form_instance_id == form_id).first()
+    if linked_task:
+        linked_task.status = "approved"
+        linked_task.completed_at = datetime.utcnow()
+        linked_task.reviewed_at = datetime.utcnow()
+        linked_task.reviewed_by_id = user_id
+        linked_task.reviewer_comments = request.notes if request else None
+
     db.commit()
     db.refresh(action)
-
-    # Sync linked task status (form approved -> task approved)
-    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 
@@ -262,11 +284,17 @@ def reject_form(
         notes=request.notes,
     )
     db.add(action)
+
+    # Update linked task status to "rejected" (within same transaction)
+    linked_task = db.query(Task).filter(Task.form_instance_id == form_id).first()
+    if linked_task:
+        linked_task.status = "rejected"
+        linked_task.reviewed_at = datetime.utcnow()
+        linked_task.reviewed_by_id = user_id
+        linked_task.reviewer_comments = request.notes
+
     db.commit()
     db.refresh(action)
-
-    # Sync linked task status (form rejected -> task rejected)
-    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 
@@ -303,11 +331,19 @@ def return_to_draft(
         notes=request.notes if request else None,
     )
     db.add(action)
+
+    # Update linked task status to "in_progress" (within same transaction)
+    linked_task = db.query(Task).filter(Task.form_instance_id == form_id).first()
+    if linked_task:
+        linked_task.status = "in_progress"
+        # Reset submission/review data
+        linked_task.submitted_at = None
+        linked_task.reviewed_at = None
+        linked_task.reviewed_by_id = None
+        linked_task.completed_at = None
+
     db.commit()
     db.refresh(action)
-
-    # Sync linked task status (form draft -> task in_progress)
-    sync_task_status_from_form(db, form_id, form.status)
 
     return action
 

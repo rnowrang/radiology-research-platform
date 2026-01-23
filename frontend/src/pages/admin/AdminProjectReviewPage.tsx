@@ -517,6 +517,10 @@ export function AdminProjectReviewPage() {
     onSuccess: async () => {
       toast({ title: 'Task approved' });
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      // Also invalidate form queries since form status changes with task approval
+      queryClient.invalidateQueries({ queryKey: ['form'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
       await refetch();
     },
     onError: () => {
@@ -533,6 +537,9 @@ export function AdminProjectReviewPage() {
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
       await refetch();
     },
     onError: () => {
@@ -549,6 +556,9 @@ export function AdminProjectReviewPage() {
       setTaskReviewDialog({ open: false, taskId: null, action: null });
       setTaskReviewNotes('');
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
       await refetch();
     },
     onError: () => {
@@ -562,6 +572,8 @@ export function AdminProjectReviewPage() {
     onSuccess: async () => {
       toast({ title: 'Task started' });
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
       await refetch();
     },
     onError: () => {
@@ -576,6 +588,8 @@ export function AdminProjectReviewPage() {
       toast({ title: 'Task deleted' });
       setTaskToDelete(null);
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
       await refetch();
     },
     onError: (err: any) => {
@@ -594,6 +608,9 @@ export function AdminProjectReviewPage() {
     onSuccess: async () => {
       toast({ title: 'Task reopened' });
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
       await refetch();
     },
     onError: () => {
@@ -607,6 +624,8 @@ export function AdminProjectReviewPage() {
     onSuccess: async () => {
       toast({ title: 'Task unblocked' });
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
       await refetch();
     },
     onError: () => {
@@ -623,6 +642,9 @@ export function AdminProjectReviewPage() {
       setReopenApprovedTaskDialog({ open: false, taskId: null, taskTitle: '' });
       setReopenApprovedTaskNotes('');
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['form'] });
+      queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
       await refetch();
     },
     onError: (err: any) => {

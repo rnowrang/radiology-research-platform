@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.task import Task
 from app.models.project import Project, ProjectCollaborator
 from app.models.form import FormInstance
+from app.models.review import ReviewAction
 from app.schemas.task import (
     TaskCreate,
     TaskUpdate,
@@ -447,6 +448,22 @@ def submit_task_for_review(
     task.reviewed_at = None
     task.reviewed_by_id = None
 
+    # If this is a form_completion task, also set the linked form to in_review and create review action
+    if task.form_instance_id and user_id:
+        form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
+        if form_instance:
+            form_instance.status = "in_review"
+            form_instance.submitted_at = datetime.utcnow()
+
+            # Create review action for audit trail
+            review_action = ReviewAction(
+                form_instance_id=task.form_instance_id,
+                performed_by_id=user_id,
+                action_type="submit_for_review",
+                notes="Submitted via task"
+            )
+            db.add(review_action)
+
     db.commit()
     db.refresh(task)
 
@@ -483,12 +500,21 @@ def approve_task(
     task.reviewer_comments = request.comments
     task.completed_at = datetime.utcnow()
 
-    # If this is a form_completion task, also approve the linked form
+    # If this is a form_completion task, also approve the linked form and create review action
     if task.form_instance_id:
         form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
         if form_instance:
             form_instance.status = "approved"
             form_instance.approved_at = datetime.utcnow()
+
+            # Create review action for audit trail
+            review_action = ReviewAction(
+                form_instance_id=task.form_instance_id,
+                performed_by_id=user_id,
+                action_type="approve",
+                notes=request.comments or "Approved via task review"
+            )
+            db.add(review_action)
 
     db.commit()
     db.refresh(task)
@@ -525,11 +551,20 @@ def reject_task(
     task.reviewed_by_id = user_id
     task.reviewer_comments = request.comments
 
-    # If this is a form_completion task, also reject the linked form
+    # If this is a form_completion task, also reject the linked form and create review action
     if task.form_instance_id:
         form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
         if form_instance:
             form_instance.status = "rejected"
+
+            # Create review action for audit trail
+            review_action = ReviewAction(
+                form_instance_id=task.form_instance_id,
+                performed_by_id=user_id,
+                action_type="reject",
+                notes=request.comments or "Rejected via task review"
+            )
+            db.add(review_action)
 
     db.commit()
     db.refresh(task)
@@ -567,11 +602,20 @@ def request_task_revision(
     task.reviewer_comments = request.comments
     task.revision_count = (task.revision_count or 0) + 1
 
-    # If this is a form_completion task, also set the linked form to needs_changes
+    # If this is a form_completion task, also set the linked form to needs_changes and create review action
     if task.form_instance_id:
         form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
         if form_instance:
             form_instance.status = "needs_changes"
+
+            # Create review action for audit trail
+            review_action = ReviewAction(
+                form_instance_id=task.form_instance_id,
+                performed_by_id=user_id,
+                action_type="request_changes",
+                notes=request.comments or "Changes requested via task review"
+            )
+            db.add(review_action)
 
     db.commit()
     db.refresh(task)
@@ -735,12 +779,21 @@ def reopen_approved_task(
     task.revision_count = (task.revision_count or 0) + 1
     task.completed_at = None
 
-    # If this is a form_completion task, also set the linked form to needs_changes
+    # If this is a form_completion task, also set the linked form to needs_changes and create review action
     if task.form_instance_id:
         form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
         if form_instance:
             form_instance.status = "needs_changes"
             form_instance.approved_at = None
+
+            # Create review action for audit trail
+            review_action = ReviewAction(
+                form_instance_id=task.form_instance_id,
+                performed_by_id=user_id,
+                action_type="request_changes",
+                notes=f"Reopened for revision: {request.notes}"
+            )
+            db.add(review_action)
 
     db.commit()
     db.refresh(task)
