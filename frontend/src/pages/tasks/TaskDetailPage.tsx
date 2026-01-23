@@ -774,11 +774,11 @@ export function TaskDetailPage() {
         </Alert>
       )}
 
-      {/* Main Content - Full Width */}
+      {/* Main Content - Full Width (only show after task started) */}
       <div className="space-y-6">
 
           {/* Form Completion Task - Form Link */}
-          {isFormCompletionTask && (
+          {isFormCompletionTask && task.status !== 'pending' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -826,7 +826,7 @@ export function TaskDetailPage() {
           )}
 
           {/* Document Upload Task - File Upload */}
-          {isDocumentUploadTask && task.project_id && (
+          {isDocumentUploadTask && task.project_id && task.status !== 'pending' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
