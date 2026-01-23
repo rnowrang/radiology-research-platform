@@ -523,244 +523,6 @@ export function TaskDetailPage() {
         </div>
       </div>
 
-      {/* ACTION REQUIRED CARD - Compact horizontal layout */}
-      <Card className={`border-2 ${getActionCardStyle()}`}>
-        <CardContent className="py-4">
-          {/* Pending State - Start Task */}
-          {task.status === 'pending' && isOwner && (
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Target className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Ready to Begin</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-1">
-                    {task.description || 'Start working on this task'}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => startTaskMutation.mutate()}
-                disabled={startTaskMutation.isPending}
-              >
-                {startTaskMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="mr-2 h-4 w-4" />
-                )}
-                Start Task
-              </Button>
-            </div>
-          )}
-
-          {/* In Progress State */}
-          {task.status === 'in_progress' && isOwner && (
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">In Progress</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-1">
-                    {task.description || 'Complete the work and submit when ready'}
-                  </p>
-                </div>
-              </div>
-              {!isFormCompletionTask && !isDocumentUploadTask && (
-                <Button
-                  onClick={() => setShowSubmitDialog(true)}
-                  disabled={submitTaskMutation.isPending}
-                >
-                  {submitTaskMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Submit for Review
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Submitted State */}
-          {task.status === 'submitted' && !canReview && (
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-yellow-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Awaiting Review</h3>
-                <p className="text-sm text-muted-foreground">
-                  Your submission is being reviewed
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Revision Required State */}
-          {task.status === 'revision_required' && isOwner && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                    <RotateCcw className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-amber-700">Revision Requested</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {task.reviewed_by_name ? `Feedback from ${task.reviewed_by_name}` : 'Review feedback below'}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => reviseTaskMutation.mutate()}
-                  disabled={reviseTaskMutation.isPending}
-                >
-                  {reviseTaskMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Edit className="mr-2 h-4 w-4" />
-                  )}
-                  Start Revision
-                </Button>
-              </div>
-              {task.reviewer_comments && (
-                <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 text-sm">
-                  {task.reviewer_comments}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Rejected State */}
-          {task.status === 'rejected' && isOwner && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
-                    <XCircle className="h-5 w-5 text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-destructive">Task Rejected</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {task.reviewed_by_name ? `Reason from ${task.reviewed_by_name}` : 'See rejection reason below'}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => reviseTaskMutation.mutate()}
-                  disabled={reviseTaskMutation.isPending}
-                >
-                  {reviseTaskMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Edit className="mr-2 h-4 w-4" />
-                  )}
-                  Start Revision
-                </Button>
-              </div>
-              {task.reviewer_comments && (
-                <div className="bg-destructive/5 rounded-lg p-3 text-sm">
-                  {task.reviewer_comments}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Approved/Completed State */}
-          {(task.status === 'approved' || task.status === 'completed') && (
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-green-700">
-                  {task.status === 'approved' ? 'Approved' : 'Completed'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {task.status === 'approved'
-                    ? 'This task has been reviewed and approved'
-                    : 'This task has been completed successfully'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Reviewer Actions */}
-          {canReview && (
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Review Required</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Review the submission and take action
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => approveTaskMutation.mutate(undefined)}
-                  disabled={approveTaskMutation.isPending}
-                >
-                  {approveTaskMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ThumbsUp className="mr-2 h-4 w-4" />
-                  )}
-                  Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRevisionDialog(true)}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Revise
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowRejectDialog(true)}
-                >
-                  <ThumbsDown className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Not owner/reviewer viewing */}
-          {!isOwner && !canReview && task.status !== 'approved' && task.status !== 'completed' && (
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <StatusIcon className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{config.label}</h3>
-                <p className="text-sm text-muted-foreground line-clamp-1">
-                  {task.description || 'You are viewing this task'}
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Overdue Warning - Only show if not already in header badge */}
-      {overdue && task.due_date && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Overdue</AlertTitle>
-          <AlertDescription>
-            This task was due on {formatDate(task.due_date)}. Please complete it as soon as possible.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Two-Column Info Grid */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Task Details Card */}
@@ -884,6 +646,133 @@ export function TaskDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ACTION REQUIRED CARD - Below info grid for logical flow (read → act) */}
+      <Card className={`border-2 ${getActionCardStyle()}`}>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left side: Icon and message */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className={`flex-shrink-0 rounded-full p-2 ${
+                task.status === 'pending' ? 'bg-primary/10' :
+                task.status === 'in_progress' ? 'bg-blue-500/10' :
+                task.status === 'submitted' ? 'bg-yellow-500/10' :
+                task.status === 'revision_required' ? 'bg-amber-500/10' :
+                task.status === 'rejected' ? 'bg-destructive/10' :
+                'bg-green-500/10'
+              }`}>
+                <Target className={`h-5 w-5 ${
+                  task.status === 'pending' ? 'text-primary' :
+                  task.status === 'in_progress' ? 'text-blue-500' :
+                  task.status === 'submitted' ? 'text-yellow-500' :
+                  task.status === 'revision_required' ? 'text-amber-500' :
+                  task.status === 'rejected' ? 'text-destructive' :
+                  'text-green-500'
+                }`} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm">
+                  {task.status === 'pending' && 'Action Required'}
+                  {task.status === 'in_progress' && 'In Progress'}
+                  {task.status === 'submitted' && 'Awaiting Review'}
+                  {task.status === 'revision_required' && 'Revision Required'}
+                  {task.status === 'rejected' && 'Task Rejected'}
+                  {(task.status === 'approved' || task.status === 'completed') && 'Task Complete'}
+                </p>
+                <p className="text-sm text-muted-foreground truncate">
+                  {task.status === 'pending' && (task.description || 'Start working on this task')}
+                  {task.status === 'in_progress' && (task.description || 'Continue working on this task')}
+                  {task.status === 'submitted' && 'Your submission is being reviewed'}
+                  {task.status === 'revision_required' && (task.reviewer_comments || 'Please address the reviewer feedback')}
+                  {task.status === 'rejected' && (task.reviewer_comments || 'Task has been rejected')}
+                  {(task.status === 'approved' || task.status === 'completed') && 'No further action needed'}
+                </p>
+              </div>
+            </div>
+
+            {/* Right side: Action button */}
+            <div className="flex-shrink-0">
+              {canStart && (
+                <Button
+                  onClick={() => startTaskMutation.mutate()}
+                  disabled={startTaskMutation.isPending}
+                  size="default"
+                >
+                  {startTaskMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  Start Task
+                </Button>
+              )}
+              {canRevise && (
+                <Button
+                  onClick={() => reviseTaskMutation.mutate()}
+                  disabled={reviseTaskMutation.isPending}
+                  size="default"
+                >
+                  {reviseTaskMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Edit className="mr-2 h-4 w-4" />
+                  )}
+                  Start Revision
+                </Button>
+              )}
+              {canReview && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRevisionDialog(true)}
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    Request Revision
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowRejectDialog(true)}
+                  >
+                    <ThumbsDown className="mr-1 h-3 w-3" />
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => approveTaskMutation.mutate()}
+                    disabled={approveTaskMutation.isPending}
+                  >
+                    {approveTaskMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <ThumbsUp className="mr-1 h-3 w-3" />
+                    )}
+                    Approve
+                  </Button>
+                </div>
+              )}
+              {(task.status === 'approved' || task.status === 'completed') && (
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500">
+                  <CheckCircle className="mr-1 h-3 w-3" />
+                  Complete
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Overdue Warning */}
+      {overdue && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Overdue</AlertTitle>
+          <AlertDescription>
+            This task was due on {formatDate(task.due_date)}. Please complete it as soon as possible.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Main Content - Full Width */}
       <div className="space-y-6">
