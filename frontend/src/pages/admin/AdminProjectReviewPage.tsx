@@ -521,6 +521,10 @@ export function AdminProjectReviewPage() {
       // Also invalidate form queries since form status changes with task approval
       queryClient.invalidateQueries({ queryKey: ['form'] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -540,6 +544,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -559,6 +567,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -574,6 +586,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -590,6 +606,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: (err: any) => {
@@ -611,6 +631,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -626,6 +650,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: () => {
@@ -645,6 +673,10 @@ export function AdminProjectReviewPage() {
       queryClient.invalidateQueries({ queryKey: ['projectReviewSummary', projectId] });
       queryClient.invalidateQueries({ queryKey: ['form'] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory'] });
+      // Invalidate project queries so ProjectDetailPage updates
+      queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       await refetch();
     },
     onError: (err: any) => {

@@ -111,9 +111,10 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
-      // Invalidate project task queries if form has a project
+      // Invalidate project queries so ProjectDetailPage updates
       const projectId = formData?.project_id || formData?.project?.id;
       if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       }
@@ -133,9 +134,10 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
-      // Invalidate project task queries if form has a project
+      // Invalidate project queries so ProjectDetailPage updates
       const projectId = formData?.project_id || formData?.project?.id;
       if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       }
@@ -155,9 +157,10 @@ export function FormViewPage() {
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['adminReviewQueueCount'] });
-      // Invalidate project task queries if form has a project
+      // Invalidate project queries so ProjectDetailPage updates
       const projectId = formData?.project_id || formData?.project?.id;
       if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
         queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
       }
@@ -241,6 +244,13 @@ export function FormViewPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['form', formId] });
       queryClient.invalidateQueries({ queryKey: ['reviewHistory', formId] });
+      // Invalidate project queries so ProjectDetailPage updates
+      const projectId = formData?.project_id || formData?.project?.id;
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectForms', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', projectId] });
+      }
     } catch {
       toast({ variant: 'destructive', title: 'Failed to submit form for review' });
     }
