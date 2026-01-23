@@ -20,6 +20,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   XCircle,
+  Info,
+  ListTodo,
+  Activity,
+  File,
+  Eye,
+  Download,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import {
   Card,
   CardContent,
@@ -70,10 +78,11 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
-import { projectsApi, formsApi, api, tasksApi } from '@/lib/api';
+import { projectsApi, formsApi, api, tasksApi, filesApi } from '@/lib/api';
 import { ActivityFeed } from '@/components/activity';
 import { AssignTaskDialog } from '@/components/admin/AssignTaskDialog';
 import { AddTaskToProjectDialog } from '@/components/admin/AddTaskToProjectDialog';
+import { FilePreviewModal } from '@/components/files/FilePreviewModal';
 
 interface ProjectResponse {
   id: string;
@@ -156,6 +165,19 @@ interface CustomTaskFormData {
   is_required: boolean;
 }
 
+interface ProjectFile {
+  id: string;
+  original_file_name: string;
+  file_size: number;
+  mime_type: string;
+  category: string;
+  uploaded_by_name?: string;
+  created_at: string;
+  task_id?: number;
+  task_status?: string;
+  task_title?: string;
+}
+
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
   pending_approval: { label: 'Pending Approval', variant: 'outline' },
@@ -220,6 +242,66 @@ const projectTasksApi = {
   complete: (taskId: number) => api.post(`/tasks/${taskId}/complete`),
 };
 
+// Helper functions
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return 'Not set';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getCategoryLabel = (category: string): string => {
+  const labels: Record<string, string> = {
+    proposal: 'Proposal',
+    irb_document: 'IRB Document',
+    consent_form: 'Consent Form',
+    protocol: 'Protocol',
+    data: 'Data',
+    result: 'Result',
+    other: 'Other',
+  };
+  return labels[category] || category;
+};
+
+const getTaskStatusBadgeVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  switch (status) {
+    case 'submitted':
+      return 'default';
+    case 'approved':
+    case 'completed':
+      return 'outline';
+    case 'rejected':
+    case 'revision_required':
+      return 'destructive';
+    case 'in_progress':
+      return 'default';
+    default:
+      return 'secondary';
+  }
+};
+
+const getTaskStatusLabel = (status?: string): string => {
+  if (!status) return '-';
+  const labels: Record<string, string> = {
+    pending: 'Pending',
+    in_progress: 'In Progress',
+    submitted: 'Submitted',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    revision_required: 'Revision Required',
+    completed: 'Completed',
+  };
+  return labels[status] || status;
+};
+
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -227,7 +309,7 @@ export function ProjectDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState('overview');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
@@ -244,6 +326,10 @@ export function ProjectDetailPage() {
     due_date: '',
     is_required: false,
   });
+
+  // File preview state
+  const [previewFile, setPreviewFile] = useState<{ id: string; filename: string; mime_type: string } | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
@@ -277,6 +363,15 @@ export function ProjectDetailPage() {
     queryFn: async () => {
       const response = await projectTasksApi.getProgress(id!);
       return response.data.data as TaskProgress;
+    },
+    enabled: !!id,
+  });
+
+  const { data: filesData, isLoading: filesLoading } = useQuery({
+    queryKey: ['projectFiles', id],
+    queryFn: async () => {
+      const response = await filesApi.listProjectFiles(id!);
+      return response.data.data as ProjectFile[];
     },
     enabled: !!id,
   });
@@ -480,19 +575,11 @@ export function ProjectDetailPage() {
     }
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return 'Not set';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   const isOwner = user?.id === project?.principal_investigator_id;
   const isAdmin = user?.role === 'admin';
   const canManageTasks = isOwner || isAdmin;
   const projectTasks = tasks || [];
+  const projectFiles = filesData || [];
   const progress = taskProgress || {
     project_id: '',
     total_tasks: 0,
@@ -739,77 +826,155 @@ export function ProjectDetailPage() {
         </Card>
       )}
 
-      {/* Project Info Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasks</CardTitle>
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{projectTasks.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {projectTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length} completed
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Collaborators</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{project.collaborators.length}</div>
-            <p className="text-xs text-muted-foreground">Team members</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Start Date</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{formatDate(project.start_date)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">End Date</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{formatDate(project.end_date)}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Description */}
-      {project.description && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {project.description}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Progress Bar Section */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1 max-w-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Progress</span>
+                <span className="text-sm text-muted-foreground">
+                  {progress.completion_percentage}%
+                </span>
+              </div>
+              <Progress value={progress.completion_percentage} className="h-2" />
+            </div>
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <ListTodo className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  <strong>{progress.completed_tasks + progress.approved_tasks}</strong>/{progress.total_tasks} Tasks
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  <strong>{projectForms.length}</strong> Forms
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <File className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  <strong>{projectFiles.length}</strong> Files
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="tasks">
+          <TabsTrigger value="overview" className="gap-2">
+            <Info className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="gap-2">
+            <ListTodo className="h-4 w-4" />
             Tasks ({projectTasks.length})
           </TabsTrigger>
-          <TabsTrigger value="forms">Forms ({projectForms.length})</TabsTrigger>
-          <TabsTrigger value="collaborators">
+          <TabsTrigger value="forms" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Forms ({projectForms.length})
+          </TabsTrigger>
+          <TabsTrigger value="files" className="gap-2">
+            <File className="h-4 w-4" />
+            Files ({projectFiles.length})
+          </TabsTrigger>
+          <TabsTrigger value="collaborators" className="gap-2">
+            <Users className="h-4 w-4" />
             Collaborators ({project.collaborators.length})
           </TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="activity" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Activity
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
         </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Project Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Project Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Description</label>
+                  <p className="mt-1">
+                    {project.description || 'No description provided'}
+                  </p>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Project Type</span>
+                    <p className="font-medium">{project.project_type ? projectTypes[project.project_type] : '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Department</span>
+                    <p className="font-medium">{project.department || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Start Date</span>
+                    <p className="font-medium">{formatDate(project.start_date)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">End Date</span>
+                    <p className="font-medium">{formatDate(project.end_date)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Created</span>
+                    <p className="font-medium">{formatDate(project.created_at)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Last Updated</span>
+                    <p className="font-medium">{formatDate(project.updated_at)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Review Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Review Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Tasks Completion</span>
+                  <span className={`font-bold ${progress.completion_percentage === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+                    {progress.completed_tasks + progress.approved_tasks}/{progress.total_tasks}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Forms Submitted</span>
+                  <span className="font-bold">
+                    {projectForms.filter(f => f.status !== 'draft').length}/{projectForms.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Documents Uploaded</span>
+                  <span className="font-bold">{projectFiles.length}</span>
+                </div>
+                {progress.completion_percentage < 100 && progress.total_tasks > 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <p className="text-sm text-amber-700">
+                      Some tasks are still incomplete. Complete all required tasks before submitting for approval.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="forms" className="mt-6">
           <Card>
@@ -880,224 +1045,279 @@ export function ProjectDetailPage() {
         </TabsContent>
 
         <TabsContent value="tasks" className="mt-6">
-          <div className="space-y-4">
-            {/* Task Progress Bar */}
-            {projectTasks.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Task Progress</CardTitle>
-                    <span className="text-sm text-muted-foreground">
-                      {progress.completed_tasks + progress.approved_tasks} of {progress.total_tasks} complete
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Progress value={progress.completion_percentage} className="h-2" />
-                  <div className="flex gap-4 mt-3 text-sm">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-gray-300" />
-                      Pending: {progress.pending_tasks}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      In Progress: {progress.in_progress_tasks}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      Submitted: {progress.submitted_tasks}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      Completed: {progress.completed_tasks + progress.approved_tasks}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Tasks List */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Project Tasks</CardTitle>
-                  <CardDescription>Tasks and requirements for this project</CardDescription>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Project Tasks</CardTitle>
+                <CardDescription>Tasks and requirements for this project</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Button variant="outline" onClick={() => setShowAssignTaskDialog(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Assign Task
+                  </Button>
+                )}
+                {canManageTasks && (
+                  <Button onClick={() => setShowAddTaskDialog(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Task
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {tasksLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 </div>
-                <div className="flex items-center gap-2">
-                  {isAdmin && (
-                    <Button variant="outline" onClick={() => setShowAssignTaskDialog(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Assign Task
-                    </Button>
-                  )}
-                  {canManageTasks && (
-                    <Button onClick={() => setShowAddTaskDialog(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Task
-                    </Button>
-                  )}
+              ) : projectTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No tasks yet</h3>
+                  <p className="text-muted-foreground mt-1">
+                    Tasks will be created automatically when the project is set up
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {tasksLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                  </div>
-                ) : projectTasks.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No tasks yet</h3>
-                    <p className="text-muted-foreground mt-1">
-                      Tasks will be created automatically when the project is set up
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {projectTasks.map((task) => {
-                      const taskConfig = taskStatusConfig[task.status] || taskStatusConfig.pending;
-                      const StatusIcon = taskConfig.icon;
-                      const isOverdue = task.due_date &&
-                        !['completed', 'approved', 'cancelled'].includes(task.status) &&
-                        new Date(task.due_date) < new Date();
+              ) : (
+                <div className="space-y-3">
+                  {projectTasks.map((task) => {
+                    const taskConfig = taskStatusConfig[task.status] || taskStatusConfig.pending;
+                    const StatusIcon = taskConfig.icon;
+                    const isOverdue = task.due_date &&
+                      !['completed', 'approved', 'cancelled'].includes(task.status) &&
+                      new Date(task.due_date) < new Date();
 
-                      return (
-                        <div
-                          key={task.id}
-                          className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                            isOverdue ? 'border-destructive bg-destructive/5' : ''
-                          }`}
-                          onClick={() => handleTaskClick(task)}
-                        >
-                          <Checkbox
-                            checked={['completed', 'approved'].includes(task.status)}
-                            onCheckedChange={(checked) => {
-                              if (checked && !['completed', 'approved'].includes(task.status)) {
-                                completeTaskMutation.mutate(task.id);
-                              }
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            disabled={['completed', 'approved', 'submitted'].includes(task.status)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-medium ${
-                                ['completed', 'approved'].includes(task.status) ? 'line-through text-muted-foreground' : ''
-                              }`}>
-                                {task.title}
-                              </span>
-                              {task.is_required && (
-                                <Badge variant="secondary" className="text-xs">Required</Badge>
-                              )}
-                              {task.task_type && (
-                                <Badge variant="outline" className="text-xs">
-                                  {taskTypeLabels[task.task_type] || task.task_type}
-                                </Badge>
-                              )}
-                              {task.revision_count > 0 && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Revision #{task.revision_count}
-                                </Badge>
-                              )}
-                            </div>
-                            {task.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                                {task.description}
-                              </p>
+                    return (
+                      <div
+                        key={task.id}
+                        className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors ${
+                          isOverdue ? 'border-destructive bg-destructive/5' : ''
+                        }`}
+                        onClick={() => handleTaskClick(task)}
+                      >
+                        <Checkbox
+                          checked={['completed', 'approved'].includes(task.status)}
+                          onCheckedChange={(checked) => {
+                            if (checked && !['completed', 'approved'].includes(task.status)) {
+                              completeTaskMutation.mutate(task.id);
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={['completed', 'approved', 'submitted'].includes(task.status)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${
+                              ['completed', 'approved'].includes(task.status) ? 'line-through text-muted-foreground' : ''
+                            }`}>
+                              {task.title}
+                            </span>
+                            {task.is_required && (
+                              <Badge variant="secondary" className="text-xs">Required</Badge>
                             )}
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              {task.assigned_to_name && (
-                                <span className="flex items-center gap-1">
-                                  <User className="h-3 w-3" />
-                                  {task.assigned_to_name}
-                                </span>
-                              )}
-                              {task.due_date && (
-                                <span className={`flex items-center gap-1 ${isOverdue ? 'text-destructive' : ''}`}>
-                                  <Calendar className="h-3 w-3" />
-                                  {isOverdue ? 'Overdue: ' : 'Due: '}
-                                  {formatDate(task.due_date)}
-                                </span>
-                              )}
-                            </div>
-                            {task.reviewer_comments && (
-                              <p className="text-xs text-amber-600 mt-2">
-                                Reviewer: {task.reviewer_comments}
-                              </p>
+                            {task.task_type && (
+                              <Badge variant="outline" className="text-xs">
+                                {taskTypeLabels[task.task_type] || task.task_type}
+                              </Badge>
+                            )}
+                            {task.revision_count > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                Revision #{task.revision_count}
+                              </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={taskConfig.variant}>
-                              <StatusIcon className="mr-1 h-3 w-3" />
-                              {taskConfig.label}
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
+                              {task.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {task.assigned_to_name && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {task.assigned_to_name}
+                              </span>
+                            )}
+                            {task.due_date && (
+                              <span className={`flex items-center gap-1 ${isOverdue ? 'text-destructive' : ''}`}>
+                                <Calendar className="h-3 w-3" />
+                                {isOverdue ? 'Overdue: ' : 'Due: '}
+                                {formatDate(task.due_date)}
+                              </span>
+                            )}
+                          </div>
+                          {task.reviewer_comments && (
+                            <p className="text-xs text-amber-600 mt-2">
+                              Reviewer: {task.reviewer_comments}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={taskConfig.variant}>
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                            {taskConfig.label}
+                          </Badge>
+                          {task.status === 'in_progress' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                submitTaskMutation.mutate(task.id);
+                              }}
+                              disabled={submitTaskMutation.isPending}
+                            >
+                              Submit
+                            </Button>
+                          )}
+                          {task.status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTaskMutation.mutate({
+                                  taskId: task.id,
+                                  data: { status: 'in_progress' },
+                                });
+                              }}
+                              disabled={updateTaskMutation.isPending}
+                            >
+                              Start
+                            </Button>
+                          )}
+                          {task.status === 'revision_required' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTaskMutation.mutate({
+                                  taskId: task.id,
+                                  data: { status: 'in_progress' },
+                                });
+                              }}
+                              disabled={updateTaskMutation.isPending}
+                            >
+                              Revise
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTask(task);
+                              }}
+                              disabled={deleteTaskMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Project Files</CardTitle>
+              <CardDescription>
+                All files uploaded for this project
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filesLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                </div>
+              ) : projectFiles.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <File className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No Files</h3>
+                  <p className="text-muted-foreground mt-1">
+                    No files have been uploaded to this project yet
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {projectFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      {/* Left side - File info */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <File className="h-8 w-8 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            {file.original_file_name}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <Badge variant="outline">
+                              {getCategoryLabel(file.category)}
                             </Badge>
-                            {task.status === 'in_progress' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  submitTaskMutation.mutate(task.id);
-                                }}
-                                disabled={submitTaskMutation.isPending}
-                              >
-                                Submit
-                              </Button>
+                            <span>{formatFileSize(file.file_size)}</span>
+                            {file.uploaded_by_name && (
+                              <span>by {file.uploaded_by_name}</span>
                             )}
-                            {task.status === 'pending' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateTaskMutation.mutate({
-                                    taskId: task.id,
-                                    data: { status: 'in_progress' },
-                                  });
-                                }}
-                                disabled={updateTaskMutation.isPending}
-                              >
-                                Start
-                              </Button>
-                            )}
-                            {task.status === 'revision_required' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateTaskMutation.mutate({
-                                    taskId: task.id,
-                                    data: { status: 'in_progress' },
-                                  });
-                                }}
-                                disabled={updateTaskMutation.isPending}
-                              >
-                                Revise
-                              </Button>
-                            )}
-                            {isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteTask(task);
-                                }}
-                                disabled={deleteTaskMutation.isPending}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <span>{formatDate(file.created_at)}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                      </div>
+
+                      {/* Right side - Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Task status badge */}
+                        {file.task_id && file.task_status && (
+                          <Badge variant={getTaskStatusBadgeVariant(file.task_status)}>
+                            {getTaskStatusLabel(file.task_status)}
+                          </Badge>
+                        )}
+
+                        {/* Preview button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setPreviewFile({
+                              id: file.id,
+                              filename: file.original_file_name,
+                              mime_type: file.mime_type,
+                            });
+                            setIsPreviewOpen(true);
+                          }}
+                          title="Preview"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        {/* Download button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="collaborators" className="mt-6">
@@ -1466,6 +1686,16 @@ export function ProjectDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFile(null);
+        }}
+      />
     </div>
   );
 }
