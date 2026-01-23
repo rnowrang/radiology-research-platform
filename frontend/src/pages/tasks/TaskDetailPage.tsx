@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Calendar,
   User,
   Clock,
@@ -22,6 +24,8 @@ import {
   MessageSquare,
   History,
   AlertTriangle,
+  Target,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +59,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
 import { tasksApi, filesApi } from '@/lib/api';
@@ -191,6 +200,9 @@ export function TaskDetailPage() {
   // File preview states
   const [previewFile, setPreviewFile] = useState<FilePreviewModalFile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Activity log collapsible state
+  const [activityLogOpen, setActivityLogOpen] = useState(false);
 
   // Fetch task details
   const { data: task, isLoading: taskLoading, error: taskError } = useQuery({
@@ -456,260 +468,419 @@ export function TaskDetailPage() {
         { label: task.title, current: true },
       ];
 
+  // Helper function to get action card styling based on status
+  const getActionCardStyle = () => {
+    switch (task.status) {
+      case 'pending':
+        return 'border-primary bg-primary/5';
+      case 'in_progress':
+        return 'border-blue-500 bg-blue-500/5';
+      case 'submitted':
+        return 'border-yellow-500 bg-yellow-500/5';
+      case 'revision_required':
+        return 'border-amber-500 bg-amber-500/5';
+      case 'rejected':
+        return 'border-destructive bg-destructive/5';
+      case 'approved':
+      case 'completed':
+        return 'border-green-500 bg-green-500/5';
+      default:
+        return 'border-muted';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbItems} />
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{task.title}</h1>
-              <Badge variant={config.variant}>
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {config.label}
+      {/* Simplified Header - No action buttons */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold">{task.title}</h1>
+            <Badge variant={config.variant}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {config.label}
+            </Badge>
+            {task.is_required && (
+              <Badge variant="secondary">Required</Badge>
+            )}
+            {overdue && (
+              <Badge variant="destructive">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Overdue
               </Badge>
-              {task.is_required && (
-                <Badge variant="secondary">Required</Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-1">
-              Task #{task.id}
-              {task.project_title && ` | ${task.project_title}`}
-            </p>
+            )}
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* Owner Actions */}
-          {canStart && (
-            <Button
-              onClick={() => startTaskMutation.mutate()}
-              disabled={startTaskMutation.isPending}
-            >
-              {startTaskMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-2 h-4 w-4" />
-              )}
-              Start Task
-            </Button>
-          )}
-
-          {canSubmit && !isFormCompletionTask && !isDocumentUploadTask && (
-            <Button
-              onClick={() => setShowSubmitDialog(true)}
-              disabled={submitTaskMutation.isPending}
-            >
-              {submitTaskMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              Submit for Review
-            </Button>
-          )}
-
-          {canRevise && (
-            <Button
-              variant="outline"
-              onClick={() => reviseTaskMutation.mutate()}
-              disabled={reviseTaskMutation.isPending}
-            >
-              {reviseTaskMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Edit className="mr-2 h-4 w-4" />
-              )}
-              Start Revision
-            </Button>
-          )}
-
-          {/* Reviewer Actions */}
-          {canReview && (
-            <>
-              <Button
-                variant="default"
-                onClick={() => approveTaskMutation.mutate(undefined)}
-                disabled={approveTaskMutation.isPending}
-              >
-                {approveTaskMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <ThumbsUp className="mr-2 h-4 w-4" />
-                )}
-                Approve
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowRevisionDialog(true)}
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Request Revision
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setShowRejectDialog(true)}
-              >
-                <ThumbsDown className="mr-2 h-4 w-4" />
-                Reject
-              </Button>
-            </>
-          )}
+          <p className="text-muted-foreground mt-1">
+            Task #{task.id}
+            {task.project_title && ` | ${task.project_title}`}
+          </p>
         </div>
       </div>
 
-      {/* Overdue Warning */}
-      {overdue && (
-        <Card className="border-destructive bg-destructive/5">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="font-medium">This task is overdue</span>
-              <span className="text-sm text-muted-foreground ml-2">
-                Due date was {formatDate(task.due_date)}
-              </span>
+      {/* ACTION REQUIRED CARD - Prominent at top */}
+      <Card className={`border-2 ${getActionCardStyle()}`}>
+        <CardContent className="pt-6">
+          {/* Pending State - Start Task */}
+          {task.status === 'pending' && isOwner && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                <Target className="h-8 w-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Ready to Begin</h2>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                {task.description || 'Click the button below to start working on this task.'}
+              </p>
+              <Button
+                size="lg"
+                className="px-8"
+                onClick={() => startTaskMutation.mutate()}
+                disabled={startTaskMutation.isPending}
+              >
+                {startTaskMutation.isPending ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-5 w-5" />
+                )}
+                Start Task
+              </Button>
+            </div>
+          )}
+
+          {/* In Progress State */}
+          {task.status === 'in_progress' && isOwner && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-4">
+                <Clock className="h-8 w-8 text-blue-500" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">In Progress</h2>
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                {task.description || 'Complete the required work below and submit when ready.'}
+              </p>
+              {!isFormCompletionTask && !isDocumentUploadTask && (
+                <Button
+                  size="lg"
+                  className="px-8"
+                  onClick={() => setShowSubmitDialog(true)}
+                  disabled={submitTaskMutation.isPending}
+                >
+                  {submitTaskMutation.isPending ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-5 w-5" />
+                  )}
+                  Submit for Review
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Submitted State */}
+          {task.status === 'submitted' && !canReview && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 mb-4">
+                <Clock className="h-8 w-8 text-yellow-500" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Awaiting Review</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Your submission is being reviewed. You'll be notified when there's an update.
+              </p>
+            </div>
+          )}
+
+          {/* Revision Required State */}
+          {task.status === 'revision_required' && isOwner && (
+            <div className="py-4">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/10">
+                    <RotateCcw className="h-6 w-6 text-amber-500" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold mb-2 text-amber-700">Revision Requested</h2>
+                  {task.reviewer_comments && (
+                    <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Feedback from {task.reviewed_by_name || 'reviewer'}:
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{task.reviewer_comments}</p>
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => reviseTaskMutation.mutate()}
+                    disabled={reviseTaskMutation.isPending}
+                  >
+                    {reviseTaskMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Edit className="mr-2 h-4 w-4" />
+                    )}
+                    Start Revision
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rejected State */}
+          {task.status === 'rejected' && isOwner && (
+            <div className="py-4">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10">
+                    <XCircle className="h-6 w-6 text-destructive" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold mb-2 text-destructive">Task Rejected</h2>
+                  {task.reviewer_comments && (
+                    <div className="bg-destructive/5 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Reason from {task.reviewed_by_name || 'reviewer'}:
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{task.reviewer_comments}</p>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => reviseTaskMutation.mutate()}
+                    disabled={reviseTaskMutation.isPending}
+                  >
+                    {reviseTaskMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Edit className="mr-2 h-4 w-4" />
+                    )}
+                    Start Revision
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Approved/Completed State */}
+          {(task.status === 'approved' || task.status === 'completed') && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2 text-green-700">
+                {task.status === 'approved' ? 'Approved' : 'Completed'}
+              </h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                {task.status === 'approved'
+                  ? 'This task has been reviewed and approved.'
+                  : 'This task has been completed successfully.'}
+              </p>
+            </div>
+          )}
+
+          {/* Reviewer Actions Card */}
+          {canReview && (
+            <div className="py-4">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                  <MessageSquare className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">Review Required</h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  This task has been submitted for your review. Please review the work and take action.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  size="lg"
+                  onClick={() => approveTaskMutation.mutate(undefined)}
+                  disabled={approveTaskMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  {approveTaskMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                  )}
+                  Approve
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setShowRevisionDialog(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Request Revision
+                </Button>
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  onClick={() => setShowRejectDialog(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <ThumbsDown className="mr-2 h-4 w-4" />
+                  Reject
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Not owner/reviewer viewing */}
+          {!isOwner && !canReview && task.status !== 'approved' && task.status !== 'completed' && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <StatusIcon className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">{config.label}</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                {task.description || 'You are viewing this task.'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Overdue Warning - Only show if not already in header badge */}
+      {overdue && task.due_date && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Overdue</AlertTitle>
+          <AlertDescription>
+            This task was due on {formatDate(task.due_date)}. Please complete it as soon as possible.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Two-Column Info Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Task Details Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Task Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4">
+              {/* Task Type */}
+              {typeConfig && TypeIcon && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Type</span>
+                  <div className="flex items-center gap-2">
+                    <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                    <span className="font-medium">{typeConfig.label}</span>
+                  </div>
+                </div>
+              )}
+              <Separator />
+              {/* Priority */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Priority</span>
+                <Badge variant={priorityConf.variant}>{priorityConf.label}</Badge>
+              </div>
+              <Separator />
+              {/* Due Date */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Due Date</span>
+                <span className={`font-medium ${overdue ? 'text-destructive' : ''}`}>
+                  {formatDate(task.due_date)}
+                </span>
+              </div>
+              <Separator />
+              {/* Assigned To */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Assigned To</span>
+                <span className="font-medium">{task.assigned_to_name || 'Unassigned'}</span>
+              </div>
+              {/* Revision Count */}
+              {task.revision_count > 0 && (
+                <>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Revisions</span>
+                    <span className="font-medium text-amber-600">{task.revision_count}</span>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Reviewer Comments Alert - Show when there are comments */}
-      {task.reviewer_comments && (task.status === 'rejected' || task.status === 'revision_required') && (
-        <Card className={task.status === 'rejected' ? 'border-destructive bg-destructive/5' : 'border-amber-500 bg-amber-500/5'}>
-          <CardHeader className="pb-2">
-            <CardTitle className={`flex items-center gap-2 text-lg ${task.status === 'rejected' ? 'text-destructive' : 'text-amber-700'}`}>
-              <MessageSquare className="h-5 w-5" />
-              {task.status === 'rejected' ? 'Task Rejected' : 'Revision Required'}
-            </CardTitle>
+        {/* Quick Info Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Quick Info</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">
-              {task.reviewed_by_name && `Reviewed by ${task.reviewed_by_name} on `}
-              {formatDateTime(task.reviewed_at)}
-            </p>
-            <p className="text-sm whitespace-pre-wrap">{task.reviewer_comments}</p>
-            {canRevise && (
-              <p className="text-sm text-muted-foreground mt-3">
-                Please address the feedback and {task.status === 'rejected' ? 'resubmit' : 'revise'} your task.
-              </p>
-            )}
+          <CardContent className="space-y-4">
+            <div className="grid gap-4">
+              {/* Project Link */}
+              {task.project_id && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Project</span>
+                    <Link
+                      to={`/projects/${task.project_id}`}
+                      className="font-medium text-primary hover:underline flex items-center gap-1"
+                    >
+                      {task.project_title || 'View Project'}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                  <Separator />
+                </>
+              )}
+              {/* Linked Form */}
+              {task.form_instance_id && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Linked Form</span>
+                    <Link
+                      to={`/forms/${task.form_instance_id}`}
+                      className="font-medium text-primary hover:underline flex items-center gap-1"
+                    >
+                      {task.form_title || 'View Form'}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                  <Separator />
+                </>
+              )}
+              {/* Created By */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Created By</span>
+                <span className="font-medium">{task.created_by_name || 'Unknown'}</span>
+              </div>
+              <Separator />
+              {/* Created Date */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Created</span>
+                <span className="font-medium">{formatDate(task.created_at)}</span>
+              </div>
+              <Separator />
+              {/* Required */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Required</span>
+                <span className="font-medium">{task.is_required ? 'Yes' : 'No'}</span>
+              </div>
+              {/* Reviewed By */}
+              {task.reviewed_by_name && (
+                <>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Reviewed By</span>
+                    <span className="font-medium">{task.reviewed_by_name}</span>
+                  </div>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column - Task Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Task Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Task Details</CardTitle>
-              {task.description && (
-                <CardDescription>{task.description}</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Task Type */}
-                {typeConfig && TypeIcon && (
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-muted ${typeConfig.color}`}>
-                      <TypeIcon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Task Type</p>
-                      <p className="font-medium">{typeConfig.label}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Priority */}
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <AlertCircle className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Priority</p>
-                    <Badge variant={priorityConf.variant}>{priorityConf.label}</Badge>
-                  </div>
-                </div>
-
-                {/* Due Date */}
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-muted ${overdue ? 'text-destructive' : ''}`}>
-                    <Calendar className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Due Date</p>
-                    <p className={`font-medium ${overdue ? 'text-destructive' : ''}`}>
-                      {formatDate(task.due_date)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Assigned To */}
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <User className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Assigned To</p>
-                    <p className="font-medium">
-                      {task.assigned_to_name || 'Unassigned'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Revision Count */}
-                {task.revision_count > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted text-amber-500">
-                      <RotateCcw className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Revisions</p>
-                      <p className="font-medium">{task.revision_count}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Timestamps */}
-              <Separator />
-              <div className="grid gap-2 sm:grid-cols-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Created: </span>
-                  <span>{formatDateTime(task.created_at)}</span>
-                </div>
-                {task.updated_at && (
-                  <div>
-                    <span className="text-muted-foreground">Updated: </span>
-                    <span>{formatDateTime(task.updated_at)}</span>
-                  </div>
-                )}
-                {task.submitted_at && (
-                  <div>
-                    <span className="text-muted-foreground">Submitted: </span>
-                    <span>{formatDateTime(task.submitted_at)}</span>
-                  </div>
-                )}
-                {task.completed_at && (
-                  <div>
-                    <span className="text-muted-foreground">Completed: </span>
-                    <span>{formatDateTime(task.completed_at)}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+      {/* Main Content - Full Width */}
+      <div className="space-y-6">
 
           {/* Form Completion Task - Form Link */}
           {isFormCompletionTask && (
@@ -895,175 +1066,79 @@ export function TaskDetailPage() {
             </Card>
           )}
 
-          {/* Status History / Activity Log */}
+        {/* Activity Log - Collapsible */}
+        <Collapsible open={activityLogOpen} onOpenChange={setActivityLogOpen}>
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Activity Log
-              </CardTitle>
-              <CardDescription>
-                Timeline of status changes and updates
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {statusHistory.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No activity recorded yet
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {statusHistory.map((item, index) => {
-                    const itemConfig = statusConfig[item.status as TaskStatus] || {
-                      label: item.status === 'created' ? 'Created' : item.status,
-                      icon: Clock,
-                      color: 'text-gray-500',
-                    };
-                    const ItemIcon = itemConfig.icon;
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <History className="h-5 w-5" />
+                    Activity Log
+                    <span className="text-sm font-normal text-muted-foreground">
+                      ({statusHistory.length} {statusHistory.length === 1 ? 'entry' : 'entries'})
+                    </span>
+                  </CardTitle>
+                  {activityLogOpen ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {statusHistory.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No activity recorded yet
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {statusHistory.map((item, index) => {
+                      const itemConfig = statusConfig[item.status as TaskStatus] || {
+                        label: item.status === 'created' ? 'Created' : item.status,
+                        icon: Clock,
+                        color: 'text-gray-500',
+                      };
+                      const ItemIcon = itemConfig.icon;
 
-                    return (
-                      <div key={index} className="flex gap-4">
-                        <div className={`mt-1 ${itemConfig.color}`}>
-                          <ItemIcon className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 pb-4 border-b last:border-0 last:pb-0">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium capitalize">
-                              {item.status === 'revision_required'
-                                ? 'Revision Requested'
-                                : itemConfig.label || item.status}
-                            </p>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDateTime(item.timestamp)}
-                            </span>
+                      return (
+                        <div key={index} className="flex gap-4">
+                          <div className={`mt-1 ${itemConfig.color}`}>
+                            <ItemIcon className="h-4 w-4" />
                           </div>
-                          {item.performed_by_name && (
-                            <p className="text-sm text-muted-foreground">
-                              by {item.performed_by_name}
-                            </p>
-                          )}
-                          {item.comments && (
-                            <p className="text-sm mt-2 p-2 rounded bg-muted">
-                              {item.comments}
-                            </p>
-                          )}
+                          <div className="flex-1 pb-4 border-b last:border-0 last:pb-0">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium capitalize">
+                                {item.status === 'revision_required'
+                                  ? 'Revision Requested'
+                                  : itemConfig.label || item.status}
+                              </p>
+                              <span className="text-sm text-muted-foreground">
+                                {formatDateTime(item.timestamp)}
+                              </span>
+                            </div>
+                            {item.performed_by_name && (
+                              <p className="text-sm text-muted-foreground">
+                                by {item.performed_by_name}
+                              </p>
+                            )}
+                            {item.comments && (
+                              <p className="text-sm mt-2 p-2 rounded bg-muted">
+                                {item.comments}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Related Information */}
-        <div className="space-y-6">
-          {/* Parent Project */}
-          {task.project_id && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FolderKanban className="h-5 w-5" />
-                  Project
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  to={`/projects/${task.project_id}`}
-                  className="block p-4 rounded-lg border hover:bg-accent transition-colors"
-                >
-                  <p className="font-medium">{task.project_title || 'View Project'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click to view project details
-                  </p>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Linked Form (if form_completion) */}
-          {task.form_instance_id && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Linked Form
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  to={`/forms/${task.form_instance_id}`}
-                  className="block p-4 rounded-lg border hover:bg-accent transition-colors"
-                >
-                  <p className="font-medium">{task.form_title || 'View Form'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Form ID: {task.form_instance_id}
-                  </p>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Task Status Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-full bg-muted ${config.color}`}>
-                  <StatusIcon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">{config.label}</p>
-                  {task.status === 'submitted' && (
-                    <p className="text-sm text-muted-foreground">
-                      Awaiting review
-                    </p>
-                  )}
-                  {task.status === 'in_progress' && (
-                    <p className="text-sm text-muted-foreground">
-                      Task is being worked on
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created by</span>
-                <span>{task.created_by_name || 'Unknown'}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Assigned to</span>
-                <span>{task.assigned_to_name || 'Unassigned'}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Required</span>
-                <span>{task.is_required ? 'Yes' : 'No'}</span>
-              </div>
-              {task.reviewed_by_name && (
-                <>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reviewed by</span>
-                    <span>{task.reviewed_by_name}</span>
+                      );
+                    })}
                   </div>
-                </>
-              )}
-            </CardContent>
+                )}
+              </CardContent>
+            </CollapsibleContent>
           </Card>
-        </div>
+        </Collapsible>
       </div>
 
       {/* Submit Confirmation Dialog */}
