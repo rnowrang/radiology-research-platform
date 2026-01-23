@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FileText,
   FolderKanban,
@@ -25,6 +25,7 @@ import type { FormInstance, Project, Task } from '@/types';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalForms: 0,
     drafts: 0,
@@ -197,15 +198,13 @@ export function DashboardPage() {
                 {recentTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-start justify-between rounded-lg border p-3"
+                    className="flex items-start justify-between rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/tasks/${task.id}`)}
                   >
                     <div className="flex-1">
-                      <Link
-                        to={`/tasks`}
-                        className="font-medium hover:underline"
-                      >
+                      <span className="font-medium">
                         {task.title}
-                      </Link>
+                      </span>
                       {task.description && (
                         <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
                           {task.description}
@@ -266,15 +265,13 @@ export function DashboardPage() {
                 {recentProjects.map((project) => (
                   <div
                     key={project.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    className="flex items-center justify-between rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/projects/${project.id}`)}
                   >
                     <div className="flex-1">
-                      <Link
-                        to={`/projects/${project.id}`}
-                        className="font-medium hover:underline"
-                      >
+                      <span className="font-medium">
                         {project.title}
-                      </Link>
+                      </span>
                       <div className="mt-1 flex items-center gap-2">
                         <Badge variant="outline">{project.project_type?.replace('_', ' ') || 'No type'}</Badge>
                         <Badge variant={project.status === 'active' ? 'success' : 'secondary'}>
