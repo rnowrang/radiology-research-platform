@@ -483,6 +483,13 @@ def approve_task(
     task.reviewer_comments = request.comments
     task.completed_at = datetime.utcnow()
 
+    # If this is a form_completion task, also approve the linked form
+    if task.form_instance_id:
+        form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
+        if form_instance:
+            form_instance.status = "approved"
+            form_instance.approved_at = datetime.utcnow()
+
     db.commit()
     db.refresh(task)
 
@@ -517,6 +524,12 @@ def reject_task(
     task.reviewed_at = datetime.utcnow()
     task.reviewed_by_id = user_id
     task.reviewer_comments = request.comments
+
+    # If this is a form_completion task, also reject the linked form
+    if task.form_instance_id:
+        form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
+        if form_instance:
+            form_instance.status = "rejected"
 
     db.commit()
     db.refresh(task)
@@ -553,6 +566,12 @@ def request_task_revision(
     task.reviewed_by_id = user_id
     task.reviewer_comments = request.comments
     task.revision_count = (task.revision_count or 0) + 1
+
+    # If this is a form_completion task, also set the linked form to needs_changes
+    if task.form_instance_id:
+        form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
+        if form_instance:
+            form_instance.status = "needs_changes"
 
     db.commit()
     db.refresh(task)
@@ -715,6 +734,13 @@ def reopen_approved_task(
     task.reviewer_comments = request.notes
     task.revision_count = (task.revision_count or 0) + 1
     task.completed_at = None
+
+    # If this is a form_completion task, also set the linked form to needs_changes
+    if task.form_instance_id:
+        form_instance = db.query(FormInstance).filter(FormInstance.id == task.form_instance_id).first()
+        if form_instance:
+            form_instance.status = "needs_changes"
+            form_instance.approved_at = None
 
     db.commit()
     db.refresh(task)
