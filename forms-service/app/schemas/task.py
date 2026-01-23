@@ -111,6 +111,11 @@ class TaskRevisionRequest(BaseModel):
     comments: str = Field(..., min_length=1)
 
 
+class TaskReopenApprovedRequest(BaseModel):
+    """Schema for reopening an approved/completed task."""
+    notes: str = Field(..., min_length=1, description="Notes explaining why the task is being reopened")
+
+
 class PendingReviewItem(BaseModel):
     """Schema for a task pending review."""
     id: int

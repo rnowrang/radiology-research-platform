@@ -439,6 +439,21 @@ export const formsProxy = {
     });
   },
 
+  reopenApprovedTask: async (
+    taskId: number,
+    userId: string,
+    userRole: string,
+    notes: string
+  ): Promise<AxiosResponse> => {
+    return formsClient.post(
+      `/api/tasks/${taskId}/reopen-approved`,
+      { notes },
+      {
+        headers: { 'X-User-ID': userId, 'X-User-Role': userRole },
+      }
+    );
+  },
+
   // Amendments
   getFormAmendments: async (formId: number, status?: string): Promise<AxiosResponse> => {
     return formsClient.get(`/api/forms/${formId}/amendments`, {

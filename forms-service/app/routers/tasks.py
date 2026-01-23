@@ -19,6 +19,7 @@ from app.schemas.task import (
     TaskApproveRequest,
     TaskRejectRequest,
     TaskRevisionRequest,
+    TaskReopenApprovedRequest,
     PendingReviewItem,
     CreateFormForTaskRequest,
     CreateFormForTaskResponse,
@@ -665,6 +666,55 @@ def reopen_task(
     task.reviewed_at = None
     task.reviewed_by_id = None
     task.reviewer_comments = None
+
+    db.commit()
+    db.refresh(task)
+
+    return _build_task_response(task)
+
+
+@router.post("/{task_id}/reopen-approved", response_model=TaskResponse)
+def reopen_approved_task(
+    task_id: int,
+    request: TaskReopenApprovedRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+    _role: str = Depends(require_reviewer_role),
+):
+    """
+    Reopen an approved or completed task for revision.
+
+    This is an admin/reviewer action that:
+    - Sets status to 'revision_required'
+    - Stores the provided notes in reviewer_comments
+    - Increments revision_count
+    - Sets reviewed_at to current timestamp
+    - Sets reviewed_by_id to the admin user
+    - Clears completed_at
+
+    Requires admin or reviewer role.
+    """
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Can only reopen approved or completed tasks
+    if task.status not in ("approved", "completed"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reopen task with status '{task.status}'. Must be 'approved' or 'completed'."
+        )
+
+    task.status = "revision_required"
+    task.reviewed_at = datetime.utcnow()
+    task.reviewed_by_id = user_id
+    task.reviewer_comments = request.notes
+    task.revision_count = (task.revision_count or 0) + 1
+    task.completed_at = None
 
     db.commit()
     db.refresh(task)

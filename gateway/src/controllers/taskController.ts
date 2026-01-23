@@ -8,6 +8,7 @@ import { ValidationError, ForbiddenError } from '../utils/errors.js';
 import { notificationService } from '../services/notificationService.js';
 import { userQueries } from '../database/queries/userQueries.js';
 import { projectQueries } from '../database/queries/projectQueries.js';
+import taskQueries from '../database/queries/taskQueries.js';
 import { logger } from '../utils/logger.js';
 
 export const taskController = {
@@ -276,6 +277,56 @@ export const taskController = {
         resourceType: 'task',
         resourceId: req.params.id,
         details: { action: 'reopen', new_status: 'pending' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Reopen an approved or completed task for revision
+   * POST /api/tasks/:id/reopen-approved
+   *
+   * Admin/Reviewer only action that:
+   * - Sets status to 'revision_required'
+   * - Stores notes in reviewer_comments
+   * - Increments revision_count
+   * - Records to task_status_history and audit_logs
+   */
+  reopenApproved: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (req.user?.role !== USER_ROLES.ADMIN && req.user?.role !== USER_ROLES.REVIEWER) {
+        throw new ForbiddenError('Admin or reviewer access required');
+      }
+
+      const taskId = parseInt(req.params.id);
+      const { notes } = req.body;
+
+      if (!notes) {
+        throw new ValidationError('Notes are required when reopening an approved task');
+      }
+
+      const response = await formsProxy.reopenApprovedTask(taskId, req.user.id, req.user.role, notes);
+
+      // AUDIT: Record to task_status_history table (shown in UI)
+      try {
+        await taskQueries.addTaskStatusHistory(taskId, 'revision_required', req.user.id, notes);
+      } catch (historyError) {
+        logger.warn('Failed to record task status history:', historyError);
+      }
+
+      // AUDIT: Record to audit_logs table
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'task',
+        resourceId: req.params.id,
+        details: {
+          action: 'reopen_approved',
+          new_status: 'revision_required',
+          notes,
+        },
       });
 
       res.json({ success: true, data: response.data });

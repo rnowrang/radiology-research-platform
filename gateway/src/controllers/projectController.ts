@@ -726,6 +726,8 @@ export const projectController = {
         created_by_id?: string;
         reviewer_comments?: string;
         revision_count?: number;
+        form_instance_id?: number;
+        form_title?: string;
       }
 
       // Collect all unique user IDs from tasks (assigned_to_id and created_by_id)
@@ -874,6 +876,8 @@ export const projectController = {
                 performed_by: h.performed_by_name || null,
                 comments: h.comments || null,
               })),
+              form_instance_id: t.form_instance_id || null,
+              form_title: t.form_title || null,
             };
           }),
           files: files.map((f) => ({

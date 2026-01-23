@@ -499,6 +499,8 @@ def list_project_tasks(
     if status:
         query = query.filter(Task.status == status)
 
+    query = query.options(joinedload(Task.form_instance))
+
     tasks = query.order_by(Task.id).all()
 
     return [
@@ -522,6 +524,8 @@ def list_project_tasks(
             "completed_at": task.completed_at,
             "created_at": task.created_at,
             "updated_at": task.updated_at,
+            "form_instance_id": task.form_instance_id,
+            "form_title": task.form_instance.title if task.form_instance else None,
         }
         for task in tasks
     ]

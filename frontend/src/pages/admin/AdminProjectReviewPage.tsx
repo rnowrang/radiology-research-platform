@@ -151,6 +151,8 @@ interface TaskSummary {
   };
   reviewer_comments?: string;
   revision_count: number;
+  form_instance_id?: number;
+  form_title?: string;
   files: Array<{
     id: string;
     original_file_name: string;
@@ -378,6 +380,14 @@ export function AdminProjectReviewPage() {
   // Form management state
   const [formToReopen, setFormToReopen] = useState<FormSummary | null>(null);
 
+  // Reopen approved task dialog state
+  const [reopenApprovedTaskDialog, setReopenApprovedTaskDialog] = useState<{
+    open: boolean;
+    taskId: number | null;
+    taskTitle: string;
+  }>({ open: false, taskId: null, taskTitle: '' });
+  const [reopenApprovedTaskNotes, setReopenApprovedTaskNotes] = useState('');
+
   // Fetch project review summary
   const {
     data: summaryData,
@@ -604,6 +614,26 @@ export function AdminProjectReviewPage() {
     },
   });
 
+  // Reopen approved task mutation
+  const reopenApprovedTaskMutation = useMutation({
+    mutationFn: ({ taskId, notes }: { taskId: number; notes: string }) =>
+      tasksApi.reopenApproved(taskId, notes),
+    onSuccess: async () => {
+      toast({ title: 'Task reopened for revision' });
+      setReopenApprovedTaskDialog({ open: false, taskId: null, taskTitle: '' });
+      setReopenApprovedTaskNotes('');
+      queryClient.invalidateQueries({ queryKey: ['adminTaskReviewCount'] });
+      await refetch();
+    },
+    onError: (err: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to reopen task',
+        description: err.response?.data?.error || 'An error occurred',
+      });
+    },
+  });
+
   const handleOpenReviewDialog = (action: 'approve' | 'reject' | 'request_changes') => {
     setReviewAction(action);
     setReviewNotes('');
@@ -651,7 +681,7 @@ export function AdminProjectReviewPage() {
         return ['approve', 'requestChanges', 'reject'];
       case 'approved':
       case 'completed':
-        return []; // No actions - view only
+        return ['reopen']; // Was: return []
       case 'rejected':
         return ['reopen', 'edit', 'delete'];
       case 'revision_required':
@@ -711,7 +741,22 @@ export function AdminProjectReviewPage() {
           </Button>
         )}
         {actions.includes('reopen') && (
-          <Button size="sm" variant="outline" onClick={() => reopenTaskMutation.mutate(task.id)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (task.status === 'approved' || task.status === 'completed') {
+                setReopenApprovedTaskDialog({
+                  open: true,
+                  taskId: task.id,
+                  taskTitle: task.title,
+                });
+              } else {
+                reopenTaskMutation.mutate(task.id);
+              }
+            }}
+            disabled={reopenTaskMutation.isPending || reopenApprovedTaskMutation.isPending}
+          >
             <RotateCcw className="mr-1 h-4 w-4" /> Reopen
           </Button>
         )}
@@ -1275,6 +1320,31 @@ export function AdminProjectReviewPage() {
                                 </div>
                               )}
 
+                              {/* View Form Link - for form_completion tasks */}
+                              {task.task_type === 'form_completion' && task.form_instance_id && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Associated Form
+                                  </h4>
+                                  <div className="flex items-center gap-2 p-2 bg-background rounded border">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm flex-1">{task.form_title || 'Form'}</span>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      asChild
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Link to={`/forms/${task.form_instance_id}/view`}>
+                                        <ExternalLink className="mr-1 h-4 w-4" />
+                                        View Form
+                                      </Link>
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Reviewer Comments Section */}
                               {task.reviewer_comments && (
                                 <div>
@@ -1733,6 +1803,68 @@ export function AdminProjectReviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reopen Approved Task Dialog */}
+      <Dialog
+        open={reopenApprovedTaskDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReopenApprovedTaskDialog({ open: false, taskId: null, taskTitle: '' });
+            setReopenApprovedTaskNotes('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reopen Approved Task</DialogTitle>
+            <DialogDescription>
+              You are about to reopen the task "{reopenApprovedTaskDialog.taskTitle}".
+              This will set the status to "Revision Required". Please provide a reason.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="reopenApprovedTaskNotes">
+              Reason for Reopening <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="reopenApprovedTaskNotes"
+              value={reopenApprovedTaskNotes}
+              onChange={(e) => setReopenApprovedTaskNotes(e.target.value)}
+              placeholder="Explain why this approved task needs to be reopened..."
+              rows={4}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReopenApprovedTaskDialog({ open: false, taskId: null, taskTitle: '' });
+                setReopenApprovedTaskNotes('');
+              }}
+              disabled={reopenApprovedTaskMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (reopenApprovedTaskDialog.taskId && reopenApprovedTaskNotes.trim()) {
+                  reopenApprovedTaskMutation.mutate({
+                    taskId: reopenApprovedTaskDialog.taskId,
+                    notes: reopenApprovedTaskNotes,
+                  });
+                }
+              }}
+              disabled={!reopenApprovedTaskNotes.trim() || reopenApprovedTaskMutation.isPending}
+            >
+              {reopenApprovedTaskMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Reopen Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

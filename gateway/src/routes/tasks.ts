@@ -40,6 +40,9 @@ router.post('/:id/assign', taskController.assign);
 // POST /api/tasks/:id/reopen - Reopen rejected/cancelled task
 router.post('/:id/reopen', taskController.reopen);
 
+// POST /api/tasks/:id/reopen-approved - Reopen approved/completed task for revision (admin/reviewer only)
+router.post('/:id/reopen-approved', taskController.reopenApproved);
+
 // POST /api/tasks/:id/unblock - Unblock a blocked task
 router.post('/:id/unblock', taskController.unblock);
 

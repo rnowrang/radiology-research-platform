@@ -243,6 +243,7 @@ export const tasksApi = {
   // Task management actions
   start: (id: number) => api.post(`/tasks/${id}/start`),
   reopen: (id: number) => api.post(`/tasks/${id}/reopen`),
+  reopenApproved: (id: number, notes: string) => api.post(`/tasks/${id}/reopen-approved`, { notes }),
   unblock: (id: number) => api.post(`/tasks/${id}/unblock`),
   // Assign or reassign a task to a user
   assign: (id: number, assignedToId: string) =>
