@@ -364,6 +364,12 @@ export function TaskDetailPage() {
       toast({ title: 'File deleted' });
       queryClient.invalidateQueries({ queryKey: ['taskFiles', taskId] });
       queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      // Also invalidate project-level queries so ProjectDetailPage updates
+      if (task?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projectFiles', task.project_id] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -886,6 +892,7 @@ export function TaskDetailPage() {
                       if (task?.project_id) {
                         queryClient.invalidateQueries({ queryKey: ['projectTasks', task.project_id] });
                         queryClient.invalidateQueries({ queryKey: ['projectTaskProgress', task.project_id] });
+                        queryClient.invalidateQueries({ queryKey: ['projectFiles', task.project_id] });
                       }
                     }}
                     disabled={!isOwner}
