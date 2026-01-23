@@ -532,10 +532,13 @@ export function ProjectDetailPage() {
   };
 
   const handleTaskClick = (task: ProjectTask) => {
-    // Don't navigate if task is completed/approved
+    // For completed/approved tasks, allow viewing associated content
     if (['completed', 'approved'].includes(task.status)) {
-      if (task.form_instance_id) {
-        navigate(`/forms/${task.form_instance_id}`);
+      if (task.task_type === 'form_completion' && task.form_instance_id) {
+        navigate(`/forms/${task.form_instance_id}/view`);
+      } else if (task.task_type === 'document_upload') {
+        // Allow viewing uploaded files for completed document upload tasks
+        navigate(`/tasks/${task.id}`);
       }
       return;
     }
