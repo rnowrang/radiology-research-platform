@@ -1233,7 +1233,19 @@ export function AdminProjectReviewPage() {
                             {task.is_required && (
                               <Badge variant="secondary">Required</Badge>
                             )}
-                            <Button variant="ghost" size="icon" className="ml-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-1 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTaskToDelete(task.id);
+                              }}
+                              title="Delete task"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon">
                               {isExpanded ? (
                                 <ChevronUp className="h-4 w-4" />
                               ) : (
