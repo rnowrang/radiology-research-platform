@@ -889,10 +889,10 @@ export const projectController = {
             task_title: f.task_title || null,
           })),
           progress: {
-            tasks_completed: completedTasks,
-            tasks_total: totalTasks,
+            completed_tasks: completedTasks,
+            total_tasks: totalTasks,
             forms_count: forms.length,
-            percentage,
+            completion_percentage: percentage,
           },
         },
       });
