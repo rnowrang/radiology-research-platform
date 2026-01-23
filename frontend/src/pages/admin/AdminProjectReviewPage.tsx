@@ -987,13 +987,13 @@ export function AdminProjectReviewPage() {
             <Info className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="forms" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Forms
-          </TabsTrigger>
           <TabsTrigger value="tasks" className="gap-2">
             <ListTodo className="h-4 w-4" />
             Tasks
+          </TabsTrigger>
+          <TabsTrigger value="forms" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Forms
           </TabsTrigger>
           <TabsTrigger value="files" className="gap-2">
             <File className="h-4 w-4" />
