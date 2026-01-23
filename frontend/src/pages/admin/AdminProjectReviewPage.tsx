@@ -404,6 +404,7 @@ export function AdminProjectReviewPage() {
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Project approved successfully' });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
       await refetch();
     },
     onError: (err: any) => {
@@ -422,6 +423,7 @@ export function AdminProjectReviewPage() {
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Project rejected' });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
       await refetch();
     },
     onError: (err: any) => {
@@ -440,6 +442,7 @@ export function AdminProjectReviewPage() {
       setReviewNotes('');
       setReviewAction(null);
       toast({ title: 'Changes requested' });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
       await refetch();
     },
     onError: (err: any) => {
@@ -456,6 +459,7 @@ export function AdminProjectReviewPage() {
     mutationFn: () => projectsApi.submitForApproval(projectId!),
     onSuccess: async () => {
       toast({ title: 'Project submitted for approval' });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
       await refetch();
     },
     onError: (err: any) => {

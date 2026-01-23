@@ -323,6 +323,7 @@ export function ProjectDetailPage() {
         description: 'Your project has been submitted for admin review',
       });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
     },
     onError: (error: any) => {
       toast({
@@ -341,6 +342,7 @@ export function ProjectDetailPage() {
         description: 'The project has been approved successfully',
       });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
     },
     onError: (error: any) => {
       toast({
@@ -361,6 +363,7 @@ export function ProjectDetailPage() {
       setShowRejectDialog(false);
       setRejectionNotes('');
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['adminProjectReviewCount'] });
     },
     onError: (error: any) => {
       toast({
