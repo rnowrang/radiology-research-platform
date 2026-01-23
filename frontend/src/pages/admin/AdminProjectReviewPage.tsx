@@ -1562,16 +1562,18 @@ export function AdminProjectReviewPage() {
                           <Download className="h-4 w-4" />
                         </Button>
 
-                        {/* Delete button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setFileToDelete(file.id)}
-                          title="Delete"
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {/* Delete button - hidden for files belonging to approved/completed tasks */}
+                        {(!file.task_status || !['approved', 'completed'].includes(file.task_status)) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setFileToDelete(file.id)}
+                            title="Delete"
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
 
                         {/* Task review actions - only show for submitted tasks */}
                         {file.task_id && file.task_status === 'submitted' && (

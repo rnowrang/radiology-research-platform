@@ -68,9 +68,11 @@ export const fileQueries = {
 
   findFileById: async (id: string): Promise<FileWithUploader | null> => {
     const result = await query<FileWithUploader>(
-      `SELECT f.*, u.full_name as uploaded_by_name, u.email as uploaded_by_email
+      `SELECT f.*, u.full_name as uploaded_by_name, u.email as uploaded_by_email,
+              t.status as task_status, t.title as task_title
        FROM files f
        LEFT JOIN users u ON f.uploaded_by_id = u.id
+       LEFT JOIN tasks t ON f.task_id = t.id
        WHERE f.id = $1 AND f.is_deleted = false`,
       [id]
     );

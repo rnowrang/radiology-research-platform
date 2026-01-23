@@ -219,6 +219,11 @@ export const fileService = {
       throw new NotFoundError('File not found');
     }
 
+    // Prevent deletion of files belonging to approved/completed tasks
+    if (file.task_status && ['approved', 'completed'].includes(file.task_status)) {
+      throw new ForbiddenError('Cannot delete files belonging to approved or completed tasks');
+    }
+
     // Check access - only owner or admin can delete
     if (!isAdmin) {
       const { isOwner } = await fileQueries.checkFileAccess(fileId, userId);
