@@ -843,7 +843,7 @@ export function ProjectDetailPage() {
               <div className="flex items-center gap-2">
                 <ListTodo className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  <strong>{progress.completed_tasks + progress.approved_tasks}</strong>/{progress.total_tasks} Tasks
+                  <strong>{progress.completed_tasks}</strong>/{progress.total_tasks} Tasks
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -950,7 +950,7 @@ export function ProjectDetailPage() {
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="text-sm font-medium">Tasks Completion</span>
                   <span className={`font-bold ${progress.completion_percentage === 100 ? 'text-green-600' : 'text-amber-600'}`}>
-                    {progress.completed_tasks + progress.approved_tasks}/{progress.total_tasks}
+                    {progress.completed_tasks}/{progress.total_tasks}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
