@@ -27,6 +27,7 @@ import {
   Eye,
   Download,
   Settings,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -699,6 +700,14 @@ export function ProjectDetailPage() {
               Submit for Approval
             </Button>
           )}
+
+          {/* Protocol Assistant Button */}
+          <Button variant="outline" asChild>
+            <Link to={`/projects/${id}/protocol-assistant`}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Protocol Assistant
+            </Link>
+          </Button>
 
           {/* Admin Review Buttons */}
           {canAdminReview && (

@@ -1,8 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { query } from '../database/connection.js';
-import { AuditAction } from '../config/constants.js';
+import { AuditAction, AUDIT_ACTIONS } from '../config/constants.js';
 import { logger } from '../utils/logger.js';
+
+// Re-export for convenience
+export { AUDIT_ACTIONS };
 
 interface AuditContext {
   action: AuditAction;

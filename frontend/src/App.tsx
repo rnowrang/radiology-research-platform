@@ -15,6 +15,7 @@ import { ReviewQueuePage } from '@/pages/review/ReviewQueuePage';
 import { ProjectsPage } from '@/pages/projects/ProjectsPage';
 import { ProjectDetailPage } from '@/pages/projects/ProjectDetailPage';
 import { CreateProjectPage } from '@/pages/projects/CreateProjectPage';
+import { ProtocolAssistantPage } from '@/pages/projects/ProtocolAssistantPage';
 import { TasksPage } from '@/pages/tasks/TasksPage';
 import { SelectFormPage } from '@/pages/tasks/SelectFormPage';
 import { TaskDetailPage } from '@/pages/tasks/TaskDetailPage';
@@ -104,6 +105,7 @@ function App() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/new" element={<CreateProjectPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
+        <Route path="/projects/:projectId/protocol-assistant" element={<ProtocolAssistantPage />} />
 
         {/* Review routes */}
         <Route

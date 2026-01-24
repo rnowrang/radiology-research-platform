@@ -40,6 +40,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       FORMS_SERVICE_URL: http://forms-service:8000
+      PROTOCOL_ASSISTANT_URL: http://protocol-assistant:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
     volumes:
@@ -77,6 +78,43 @@ services:
       - ./forms-service/app:/app/app
       - ./forms-service/alembic:/app/alembic
       - ./forms-service/alembic.ini:/app/alembic.ini
+      - ./storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - radiology-network
+
+  # Python FastAPI Protocol Assistant Service
+  protocol-assistant:
+    build:
+      context: ./protocol-assistant
+      dockerfile: Dockerfile
+    container_name: radiology-protocol-assistant
+    ports:
+      - "${PROTOCOL_ASSISTANT_PORT:-8002}:8000"
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-radiology}:${DB_PASSWORD:-radiology_secret}@db:5432/${DB_NAME:-radiology_research}
+      SECRET_KEY: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
+      GATEWAY_URL: http://gateway:3000
+      STORAGE_PATH: /app/storage
+      # LLM Configuration
+      DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      # Compliance
+      HIPAA_COMPLIANCE_ENABLED: "true"
+      AUDIT_LOGGING_ENABLED: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: "true"
+    volumes:
+      - ./protocol-assistant/app:/app/app
+      - ./protocol-assistant/alembic:/app/alembic
+      - ./protocol-assistant/alembic.ini:/app/alembic.ini
       - ./storage:/app/storage
     depends_on:
       db:

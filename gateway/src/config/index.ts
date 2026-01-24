@@ -21,6 +21,11 @@ export const config = {
     apiKey: process.env.INTERNAL_API_KEY || 'internal-service-key',
   },
 
+  protocolAssistant: {
+    url: process.env.PROTOCOL_ASSISTANT_URL || 'http://localhost:8002',
+    apiKey: process.env.INTERNAL_API_KEY || 'internal-service-key',
+  },
+
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },

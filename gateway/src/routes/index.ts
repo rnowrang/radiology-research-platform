@@ -15,6 +15,7 @@ import reviewStagesRoutes from './review-stages.js';
 import reportsRoutes from './reports.js';
 import emailRoutes from './email.js';
 import taskDefinitionsRoutes from './task-definitions.js';
+import protocolAssistantRoutes from './protocol-assistant.js';
 
 const router = Router();
 
@@ -44,6 +45,8 @@ router.use('/users/me/notification-preferences', notificationPreferencesRoutes);
 router.use('/files', filesRoutes);
 router.use('/search', searchRoutes);
 router.use('/activity', activityRoutes);
+router.use('/protocol-assistant', protocolAssistantRoutes);
+// Catch-all routes (must be last)
 router.use('/', reviewStagesRoutes);
 router.use('/', amendmentRoutes);
 router.use('/', formsRoutes);
