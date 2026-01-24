@@ -10,7 +10,8 @@ This document provides solutions for common issues encountered in the Radiology 
 2. [Section Collapse Issues](#section-collapse-issues)
 3. [Version Conflict Errors](#version-conflict-errors)
 4. [Migration Troubleshooting](#migration-troubleshooting)
-5. [General Issues](#general-issues)
+5. [Protocol Assistant Issues](#protocol-assistant-issues)
+6. [General Issues](#general-issues)
 
 ---
 
@@ -290,6 +291,114 @@ SQL migrations do not have automatic rollback. Create manual rollback scripts or
 
 ---
 
+## Protocol Assistant Issues
+
+The Protocol Assistant is an AI-powered service that helps researchers draft and refine research protocols. This section covers common issues specific to this service.
+
+### 1. "Protocol assistant service unavailable" (503)
+
+**Cause:** The Protocol Assistant container is not running or not accessible.
+
+**Solution:**
+- Check if the protocol-assistant container is running: `docker ps`
+- Check container logs: `docker logs radiology-protocol-assistant`
+- Verify DATABASE_URL format uses `postgresql+asyncpg://` (not `postgresql://`)
+
+### 2. "LLM provider not configured"
+
+**Cause:** No API key is configured for the LLM provider.
+
+**Solution:**
+- Ensure `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set in your `.env` file
+- Restart the protocol-assistant container after adding keys: `docker restart radiology-protocol-assistant`
+- Verify key format:
+  - Anthropic keys start with `sk-ant-...`
+  - OpenAI keys start with `sk-proj-...`
+
+### 3. "Document upload failed" (404)
+
+**Cause:** Gateway routing is not correctly configured for Protocol Assistant endpoints.
+
+**Solution:**
+- Check gateway route ordering in `routes/index.ts`
+- Protocol Assistant routes must come before catch-all forms routes
+- Verify the `/api/protocol-assistant` prefix is properly configured
+
+### 4. "Session not found" (404)
+
+**Cause:** The session ID is invalid or the session has expired.
+
+**Solution:**
+- Verify the session ID is correct
+- Check if the session has expired (sessions have a 24-hour limit)
+- Ensure the `X-User-ID` header is being passed correctly through the gateway
+
+### 5. Database Migration Errors
+
+**Cause:** Protocol Assistant tables or columns are missing from the database.
+
+**Solution:**
+```bash
+# Apply Protocol Assistant migrations
+docker exec radiology-protocol-assistant alembic upgrade head
+
+# Check for SQLAlchemy metadata column conflicts
+docker logs radiology-protocol-assistant | grep -i "metadata"
+
+# Verify DATABASE_URL uses correct port (5432 inside Docker network)
+docker exec radiology-protocol-assistant env | grep DATABASE_URL
+```
+
+### 6. "Port already in use"
+
+**Cause:** Another service is using the same port as the Protocol Assistant.
+
+**Default Ports:**
+| Service | Port |
+|---------|------|
+| Frontend | 5174 |
+| Gateway | 3001 |
+| Forms Service | 8001 |
+| Protocol Assistant | 8002 |
+| Database (host) | 5434 |
+
+**Solution:**
+- Check `.env` for port configuration
+- Stop conflicting services: `lsof -i :<port>` to find the process
+- Adjust port mappings in `docker-compose.yml` if needed
+
+### 7. LLM Rate Limiting
+
+**Cause:** Too many requests to the LLM provider in a short period.
+
+**Symptoms:**
+- Responses failing intermittently
+- "Rate limit exceeded" errors in logs
+
+**Solution:**
+- The service has built-in retry logic with exponential backoff
+- Check logs for rate limit messages: `docker logs radiology-protocol-assistant | grep -i "rate"`
+- Consider upgrading your API plan for higher limits
+- Space out large batch operations
+
+### 8. Streaming Not Working
+
+**Cause:** Server-Sent Events (SSE) are not being properly passed through the gateway.
+
+**Symptoms:**
+- Chat responses appear all at once instead of streaming
+- Browser console shows connection errors
+- Timeout errors during long responses
+
+**Solution:**
+- SSE requires proper headers (`Content-Type: text/event-stream`)
+- Check browser console for connection errors
+- Verify gateway proxy configuration passes through streams correctly
+- Ensure no middleware is buffering the response
+- Check that the client is using `EventSource` or proper SSE handling
+
+---
+
 ## General Issues
 
 ### Services Not Starting
@@ -338,4 +447,4 @@ docker compose ps
 
 ---
 
-*Last Updated: January 22, 2026*
+*Last Updated: January 23, 2026*

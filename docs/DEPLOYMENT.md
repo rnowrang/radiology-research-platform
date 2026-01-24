@@ -72,6 +72,8 @@ This document provides instructions for deploying the Radiology Research Platfor
    - Gateway API: http://localhost:3001/api
    - Forms Service API: http://localhost:8001
    - Forms Service Docs: http://localhost:8001/docs
+   - Protocol Assistant API: http://localhost:8002
+   - Protocol Assistant Docs: http://localhost:8002/docs
 
 > **Note**: Steps 4-7 are CRITICAL for first-time deployment. Skipping these will result in missing tables, columns, or empty form templates.
 
@@ -92,6 +94,7 @@ This document provides instructions for deploying the Radiology Research Platfor
 | PostgreSQL | 5434 | Internal only |
 | Gateway | 3001 | 443 (via LB) |
 | Forms Service | 8001 | Internal only |
+| Protocol Assistant | 8002 | Internal only |
 | Frontend | 5174 | 443 (via CDN) |
 
 ---
@@ -244,25 +247,34 @@ REPORT_MIN_SAMPLE_SIZE=5
 ### Production Architecture
 
 ```
-                    ┌─────────────────┐
-                    │  Load Balancer  │
-                    │    (HTTPS)      │
-                    └────────┬────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         │                   │                   │
-         ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│    Frontend     │ │    Gateway      │ │  Forms Service  │
-│   (CDN/NGINX)   │ │    (x2+)        │ │     (x2+)       │
-└─────────────────┘ └────────┬────────┘ └────────┬────────┘
-                             │                   │
-                             └─────────┬─────────┘
-                                       │
-                             ┌─────────▼─────────┐
-                             │    PostgreSQL     │
-                             │  (Primary/Replica)│
-                             └───────────────────┘
+                         ┌─────────────────┐
+                         │  Load Balancer  │
+                         │    (HTTPS)      │
+                         └────────┬────────┘
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         │                        │                        │
+         ▼                        ▼                        ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│    Frontend     │    │    Gateway      │    │  Forms Service  │
+│   (CDN/NGINX)   │    │    (x2+)        │    │     (x2+)       │
+└─────────────────┘    └────────┬────────┘    └────────┬────────┘
+                                │                      │
+                                │    ┌─────────────────┤
+                                │    │                 │
+                                │    ▼                 │
+                                │ ┌─────────────────┐  │
+                                │ │    Protocol     │  │
+                                │ │   Assistant     │  │
+                                │ │     (x2+)       │  │
+                                │ └────────┬────────┘  │
+                                │          │           │
+                                └──────────┼───────────┘
+                                           │
+                                 ┌─────────▼─────────┐
+                                 │    PostgreSQL     │
+                                 │  (Primary/Replica)│
+                                 └───────────────────┘
 ```
 
 ### Production Docker Compose
@@ -621,6 +633,7 @@ docker-compose logs --tail 100 forms-service
 |---------|----------|-------------------|
 | Gateway | GET /api/health | 200 OK |
 | Forms Service | GET / | 200 OK |
+| Protocol Assistant | GET /health | 200 OK |
 | Database | pg_isready | exit 0 |
 
 ### Monitoring Script
@@ -641,6 +654,7 @@ check_service() {
 
 check_service "http://localhost:3001/api/health" "Gateway"
 check_service "http://localhost:8001/" "Forms Service"
+check_service "http://localhost:8002/health" "Protocol Assistant"
 
 echo "All services healthy"
 ```
@@ -690,6 +704,220 @@ redis:
 
 ---
 
+## Protocol Assistant Service Deployment
+
+The Protocol Assistant is an AI-powered service that assists with protocol development, document analysis, and research workflow automation using LLM providers (Anthropic Claude or OpenAI).
+
+### Environment Variables Required
+
+```bash
+# LLM Provider Configuration (Required)
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx     # Claude API key (required if using Anthropic)
+OPENAI_API_KEY=sk-xxxxxxxxxxxxx            # OpenAI API key (optional, for fallback)
+
+# Model Configuration
+CLAUDE_MODEL=claude-sonnet-4-20250514      # Default Claude model
+OPENAI_MODEL=gpt-4o                        # Default OpenAI model
+DEFAULT_LLM_PROVIDER=anthropic             # Primary provider: anthropic or openai
+
+# Security (Required)
+ENCRYPTION_KEY=your-fernet-key-here        # Fernet key for credential storage
+                                           # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Compliance Settings
+HIPAA_COMPLIANCE_ENABLED=true              # Enable PHI detection and redaction
+AUDIT_LOGGING_ENABLED=true                 # Enable comprehensive audit logging
+
+# Database Connection
+DATABASE_URL=postgresql://radiology:password@db:5432/radiology_research
+
+# Service URLs
+FORMS_SERVICE_URL=http://forms-service:8000
+GATEWAY_URL=http://gateway:3000
+```
+
+### Docker Setup
+
+The Protocol Assistant service runs on port 8002 externally (mapped to internal port 8000).
+
+```yaml
+# docker-compose.yml addition
+protocol-assistant:
+  build:
+    context: ./protocol-assistant
+    dockerfile: Dockerfile.dev
+  container_name: radiology-protocol-assistant
+  environment:
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    - OPENAI_API_KEY=${OPENAI_API_KEY}
+    - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+    - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+    - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-anthropic}
+    - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    - HIPAA_COMPLIANCE_ENABLED=${HIPAA_COMPLIANCE_ENABLED:-true}
+    - AUDIT_LOGGING_ENABLED=${AUDIT_LOGGING_ENABLED:-true}
+    - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+  ports:
+    - "8002:8000"
+  volumes:
+    - ./protocol-assistant:/app
+    - protocol_assistant_storage:/app/storage
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+volumes:
+  protocol_assistant_storage:
+```
+
+### Database Migrations
+
+The Protocol Assistant service has its own Alembic migrations separate from the Forms Service.
+
+```bash
+# Run Protocol Assistant migrations
+docker exec radiology-protocol-assistant alembic upgrade head
+
+# Create new migration
+docker exec radiology-protocol-assistant alembic revision --autogenerate -m "description"
+
+# Check migration status
+docker exec radiology-protocol-assistant alembic current
+
+# Rollback one migration
+docker exec radiology-protocol-assistant alembic downgrade -1
+```
+
+### Health Check
+
+The Protocol Assistant exposes a health check endpoint for monitoring:
+
+```bash
+# Check service health
+curl http://localhost:8002/health
+
+# Expected response
+{
+  "status": "healthy",
+  "service": "protocol-assistant",
+  "version": "1.0.0",
+  "llm_provider": "anthropic",
+  "database": "connected",
+  "hipaa_compliance": true
+}
+```
+
+### LLM Provider Configuration
+
+#### Task-Based Routing
+
+The Protocol Assistant supports intelligent routing between LLM providers based on task type:
+
+| Task Type | Default Provider | Rationale |
+|-----------|-----------------|-----------|
+| Protocol Analysis | Anthropic (Claude) | Better at structured document analysis |
+| Text Generation | Configurable | Based on cost/performance needs |
+| Code Generation | OpenAI (GPT-4) | Strong code capabilities |
+| Summarization | Anthropic (Claude) | Consistent summarization quality |
+
+#### Rate Limiting and Retry Logic
+
+```bash
+# Rate limiting configuration (environment variables)
+LLM_RATE_LIMIT_REQUESTS=100        # Requests per minute
+LLM_RATE_LIMIT_TOKENS=100000       # Tokens per minute
+LLM_RETRY_MAX_ATTEMPTS=3           # Maximum retry attempts
+LLM_RETRY_INITIAL_DELAY=1          # Initial delay in seconds
+LLM_RETRY_EXPONENTIAL_BASE=2       # Exponential backoff base
+```
+
+#### Cost Tracking
+
+The service tracks LLM usage costs per user and project:
+
+```bash
+# View cost reports (requires admin access)
+curl -X GET http://localhost:8002/api/admin/costs \
+  -H "Authorization: Bearer <admin-token>"
+
+# Response includes:
+# - Total tokens used (input/output)
+# - Cost breakdown by provider
+# - Usage by user/project
+# - Daily/monthly aggregates
+```
+
+### Production Configuration
+
+For production deployments, ensure the following:
+
+```yaml
+# docker-compose.prod.yml
+protocol-assistant:
+  build:
+    context: ./protocol-assistant
+    dockerfile: Dockerfile.prod
+  environment:
+    - HIPAA_COMPLIANCE_ENABLED=true
+    - AUDIT_LOGGING_ENABLED=true
+    - DEBUG=false
+  deploy:
+    replicas: 2
+    resources:
+      limits:
+        memory: 2G
+      reservations:
+        memory: 1G
+  restart: always
+```
+
+### Troubleshooting Protocol Assistant
+
+#### LLM API Connection Issues
+
+```bash
+# Check API key configuration
+docker exec radiology-protocol-assistant env | grep -E "(ANTHROPIC|OPENAI)"
+
+# Test API connectivity
+docker exec radiology-protocol-assistant python -c "
+import anthropic
+client = anthropic.Anthropic()
+print('Anthropic API connection successful')
+"
+
+# Check service logs
+docker logs radiology-protocol-assistant --tail 100
+```
+
+#### Encryption Key Issues
+
+```bash
+# Generate a new Fernet key
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Verify key is set
+docker exec radiology-protocol-assistant env | grep ENCRYPTION_KEY
+```
+
+#### HIPAA Compliance Verification
+
+```bash
+# Check PHI detection is enabled
+curl http://localhost:8002/health | jq '.hipaa_compliance'
+
+# Review audit logs
+docker exec radiology-protocol-assistant cat /app/logs/audit.log | tail -50
+```
+
+---
+
 ## Updated Docker Configuration Notes
 
 ### Volume Mounts for New Features
@@ -711,6 +939,13 @@ healthcheck:
   interval: 30s
   timeout: 10s
   retries: 3
+
+# Protocol Assistant health
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
 ```
 
 ### Resource Limits Update
@@ -729,4 +964,4 @@ forms-service:
 
 ---
 
-*Last Updated: January 15, 2026*
+*Last Updated: January 23, 2026*

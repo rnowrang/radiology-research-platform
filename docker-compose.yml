@@ -103,9 +103,12 @@ services:
       # LLM Configuration
       DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      # Encryption (for credential storage)
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       # Compliance
       HIPAA_COMPLIANCE_ENABLED: "true"
       AUDIT_LOGGING_ENABLED: "true"

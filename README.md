@@ -9,10 +9,11 @@ A comprehensive research management platform for IRB forms, research projects, a
 
 ## Architecture
 
-The platform uses a microservices architecture with three main components:
+The platform uses a microservices architecture with four main components:
 
 - **Gateway Service** (Node.js/Express) - Authentication, user management, projects, tasks, audit logging
 - **Forms Service** (Python/FastAPI) - Form templates, form data, DOCX/PDF generation
+- **Protocol Assistant** (Python/FastAPI) - AI-powered IRB protocol creation with document generation
 - **Frontend** (React/Vite) - Modern UI with Tailwind CSS and shadcn/ui components
 
 For detailed architecture information, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -62,6 +63,9 @@ After successful deployment, access:
    - **Gateway API**: http://localhost:3001/api
    - **Forms Service API**: http://localhost:8001
    - **Forms API Docs**: http://localhost:8001/docs
+   - **Protocol Assistant API**: http://localhost:8002
+   - **Protocol Assistant Docs**: http://localhost:8002/docs
+   - **Database**: localhost:5434 (PostgreSQL)
 
 ### Default Test Credentials
 
@@ -70,6 +74,46 @@ After successful deployment, access:
 | Admin | admin@example.com | password123 |
 | Reviewer | reviewer@example.com | password123 |
 | Researcher | researcher@example.com | password123 |
+
+## Protocol Assistant Quick Start
+
+The Protocol Assistant is an AI-powered tool that helps create IRB protocols through guided conversations and document analysis.
+
+### Features
+
+- **Guided Chat**: Interactive conversation to gather protocol information
+- **Document Upload**: Upload PDF/DOCX files with automatic field extraction
+- **Gap Detection**: Identifies missing information and asks targeted follow-up questions
+- **Document Generation**: Creates abstracts, consent forms, and complete protocols
+- **HIPAA-Compliant Logging**: Full audit trail of all interactions
+- **LLM Providers**: Claude (primary) and OpenAI (fallback)
+
+### Starting the Protocol Assistant
+
+```bash
+# Start with Docker (included in main docker-compose)
+docker compose up -d protocol-assistant
+
+# Or start standalone for development
+cd protocol-assistant
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8002
+```
+
+### Environment Variables for Protocol Assistant
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| ANTHROPIC_API_KEY | Claude API key | Yes (primary LLM) |
+| OPENAI_API_KEY | OpenAI API key | No (fallback LLM) |
+| PROTOCOL_ASSISTANT_DB_URL | Database connection | Yes |
+
+### API Endpoints
+
+- **POST /api/chat** - Send message to assistant
+- **POST /api/upload** - Upload document for analysis
+- **GET /api/session/{id}** - Get session state
+- **POST /api/generate** - Generate protocol documents
 
 ## Documentation
 
@@ -100,6 +144,13 @@ radiology-research-platform/
 │   │   ├── services/     # Document generation (CRITICAL)
 │   │   ├── models/       # SQLAlchemy models
 │   │   └── data/schemas/ # JSON form schemas
+│   └── Dockerfile.dev
+├── protocol-assistant/   # AI Protocol Assistant Service
+│   ├── app/
+│   │   ├── routers/      # API endpoints
+│   │   ├── services/     # LLM, document parsing, generation
+│   │   ├── models/       # SQLAlchemy models
+│   │   └── prompts/      # LLM prompt templates
 │   └── Dockerfile.dev
 ├── frontend/             # React Frontend Application
 │   ├── src/
@@ -163,6 +214,21 @@ radiology-research-platform/
 - 1200+ lines of document generation logic
 - Handles legacy FORMCHECKBOX fields
 - Must be preserved exactly as-is
+
+### Protocol Assistant (Port 8002)
+
+**Technology**: Python 3.11, FastAPI, LangChain
+
+**Features**:
+- Guided chat interface for IRB protocol creation
+- Document upload and parsing (PDF/DOCX)
+- AI-powered field extraction from uploaded documents
+- Gap detection with targeted follow-up questions
+- Document generation (abstracts, consent forms, protocols)
+- HIPAA-compliant audit logging of all interactions
+- LLM providers: Claude (primary) and OpenAI (fallback)
+- Session state management for multi-turn conversations
+- Integration with Forms Service for protocol submission
 
 ### Frontend (Port 5174)
 

@@ -363,6 +363,957 @@ All user management endpoints require Admin role.
 
 ---
 
+## Protocol Assistant API (`/api/protocol-assistant/*`)
+
+The Protocol Assistant is an AI-powered service that helps researchers create study protocols, generate required documents, and prefill IRB forms. All endpoints are proxied through the Gateway and require JWT authentication.
+
+### Health Check
+
+#### `GET /api/protocol-assistant/health`
+
+Check Protocol Assistant service health.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "timestamp": "2026-01-23T10:00:00Z"
+}
+```
+
+---
+
+### Session Management
+
+#### `POST /api/protocol-assistant/sessions`
+
+Create a new Protocol Assistant session.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "project_id": "uuid",
+  "study_type": "clinical_trial",
+  "title": "My Research Study"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "project_id": "uuid",
+    "user_id": "uuid",
+    "status": "active",
+    "study_type": "clinical_trial",
+    "title": "My Research Study",
+    "created_at": "2026-01-23T10:00:00Z",
+    "updated_at": "2026-01-23T10:00:00Z"
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId`
+
+Get session details.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "project_id": "uuid",
+    "user_id": "uuid",
+    "status": "active",
+    "study_type": "clinical_trial",
+    "title": "My Research Study",
+    "protocol_data": { ... },
+    "gap_analysis": { ... },
+    "documents_generated": ["abstract", "consent"],
+    "created_at": "2026-01-23T10:00:00Z",
+    "updated_at": "2026-01-23T10:00:00Z"
+  }
+}
+```
+
+---
+
+#### `PATCH /api/protocol-assistant/sessions/:sessionId`
+
+Update session details.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "title": "Updated Study Title",
+  "study_type": "observational"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "title": "Updated Study Title",
+    "study_type": "observational",
+    "updated_at": "2026-01-23T10:05:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/close`
+
+Close a session and mark it as complete.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "status": "closed",
+    "closed_at": "2026-01-23T11:00:00Z"
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/projects/:projectId/session`
+
+Get or create a session for a specific project. If a session already exists for the project, it returns the existing session. Otherwise, it creates a new one.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "project_id": "uuid",
+    "status": "active",
+    "is_new": false,
+    "created_at": "2026-01-23T10:00:00Z"
+  }
+}
+```
+
+---
+
+### Chat
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/chat`
+
+Send a message to the Protocol Assistant and receive a response.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "message": "I want to conduct a study on the effects of a new imaging technique for detecting early-stage lung cancer.",
+  "context": {
+    "current_section": "study_design"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message_id": "uuid",
+    "role": "assistant",
+    "content": "That sounds like an important research area. Let me help you develop your study protocol. First, can you tell me more about the specific imaging technique you'll be using?",
+    "suggestions": [
+      "Describe the imaging modality",
+      "Define your target population",
+      "Outline expected outcomes"
+    ],
+    "extracted_data": {
+      "study_type": "diagnostic_imaging",
+      "condition": "lung_cancer"
+    },
+    "timestamp": "2026-01-23T10:01:00Z"
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/history`
+
+Get the complete chat history for a session.
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `limit` (optional): Number of messages to return (default: 50)
+- `offset` (optional): Offset for pagination (default: 0)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "message_id": "uuid",
+        "role": "user",
+        "content": "I want to conduct a study...",
+        "timestamp": "2026-01-23T10:00:00Z"
+      },
+      {
+        "message_id": "uuid",
+        "role": "assistant",
+        "content": "That sounds like an important research area...",
+        "timestamp": "2026-01-23T10:01:00Z"
+      }
+    ],
+    "total": 2,
+    "has_more": false
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/stream`
+
+Stream real-time responses using Server-Sent Events (SSE).
+
+**Authentication:** Required
+
+**Headers:**
+```
+Accept: text/event-stream
+```
+
+**Response (SSE stream):**
+```
+event: message
+data: {"type": "token", "content": "That"}
+
+event: message
+data: {"type": "token", "content": " sounds"}
+
+event: message
+data: {"type": "token", "content": " like"}
+
+event: message
+data: {"type": "complete", "message_id": "uuid"}
+```
+
+---
+
+### Documents
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/documents/upload`
+
+Upload a document (e.g., existing protocol, literature) for the assistant to analyze.
+
+**Authentication:** Required
+
+**Content-Type:** `multipart/form-data`
+
+**Form Fields:**
+- `file`: The document file (PDF, DOCX, or TXT)
+- `document_type`: Type of document (e.g., "existing_protocol", "literature", "irb_template")
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "filename": "existing_protocol.pdf",
+    "document_type": "existing_protocol",
+    "file_size": 245678,
+    "mime_type": "application/pdf",
+    "status": "processing",
+    "uploaded_at": "2026-01-23T10:02:00Z"
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/documents`
+
+Get all documents uploaded to a session.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "documents": [
+      {
+        "document_id": "uuid",
+        "filename": "existing_protocol.pdf",
+        "document_type": "existing_protocol",
+        "status": "processed",
+        "extracted_sections": ["background", "methods", "endpoints"],
+        "uploaded_at": "2026-01-23T10:02:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/protocol`
+
+Get the extracted/generated protocol data for the session.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "protocol": {
+      "title": "A Study of Novel Imaging Technique for Lung Cancer Detection",
+      "study_type": "diagnostic_imaging",
+      "background": "...",
+      "objectives": {
+        "primary": "...",
+        "secondary": ["...", "..."]
+      },
+      "study_design": "...",
+      "population": {
+        "inclusion_criteria": ["...", "..."],
+        "exclusion_criteria": ["...", "..."],
+        "sample_size": 100
+      },
+      "endpoints": {
+        "primary": "...",
+        "secondary": ["...", "..."]
+      },
+      "safety_considerations": "...",
+      "statistical_analysis": "..."
+    },
+    "completeness": 75,
+    "missing_sections": ["budget", "timeline"]
+  }
+}
+```
+
+---
+
+### Gap Analysis
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/gaps`
+
+Get questions for missing or incomplete protocol information.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "gaps": [
+      {
+        "gap_id": "uuid",
+        "section": "study_design",
+        "field": "randomization_method",
+        "question": "What randomization method will be used for participant assignment?",
+        "priority": "high",
+        "suggestions": ["Simple randomization", "Block randomization", "Stratified randomization"],
+        "required_for": ["protocol", "irb_application"]
+      },
+      {
+        "gap_id": "uuid",
+        "section": "safety",
+        "field": "adverse_event_reporting",
+        "question": "How will adverse events be monitored and reported?",
+        "priority": "high",
+        "suggestions": [],
+        "required_for": ["protocol", "consent_form"]
+      }
+    ],
+    "total_gaps": 5,
+    "critical_gaps": 2,
+    "completeness_score": 75
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/gaps/answers`
+
+Submit answers to gap analysis questions.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "answers": [
+    {
+      "gap_id": "uuid",
+      "answer": "We will use block randomization with block sizes of 4 and 6."
+    },
+    {
+      "gap_id": "uuid",
+      "answer": "Adverse events will be monitored weekly and reported within 24 hours for serious events."
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "processed_answers": 2,
+    "remaining_gaps": 3,
+    "updated_completeness_score": 85,
+    "updated_sections": ["study_design", "safety"]
+  }
+}
+```
+
+---
+
+### Document Generation
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate/abstract`
+
+Generate a study abstract based on protocol data.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "format": "structured",
+  "word_limit": 350
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "document_type": "abstract",
+    "content": {
+      "background": "...",
+      "objectives": "...",
+      "methods": "...",
+      "expected_results": "...",
+      "conclusion": "..."
+    },
+    "word_count": 342,
+    "generated_at": "2026-01-23T10:10:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate/consent`
+
+Generate an informed consent form.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "reading_level": "8th_grade",
+  "language": "en",
+  "include_hipaa": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "document_type": "consent_form",
+    "content": "...",
+    "sections": [
+      "introduction",
+      "purpose",
+      "procedures",
+      "risks",
+      "benefits",
+      "alternatives",
+      "confidentiality",
+      "hipaa_authorization",
+      "voluntary_participation",
+      "contact_information",
+      "signature_block"
+    ],
+    "reading_level_score": 7.8,
+    "generated_at": "2026-01-23T10:12:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate/protocol`
+
+Generate a complete study protocol document.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "template": "irb_standard",
+  "include_appendices": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "document_type": "protocol",
+    "content": "...",
+    "sections": [
+      "title_page",
+      "synopsis",
+      "background",
+      "objectives",
+      "study_design",
+      "population",
+      "procedures",
+      "safety",
+      "statistical_analysis",
+      "ethics",
+      "references",
+      "appendices"
+    ],
+    "page_count": 25,
+    "generated_at": "2026-01-23T10:15:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate/recruitment`
+
+Generate recruitment materials (flyers, scripts, ads).
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "material_types": ["flyer", "phone_script", "email_template"],
+  "target_audience": "general_public"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "materials": [
+      {
+        "document_id": "uuid",
+        "material_type": "flyer",
+        "content": "...",
+        "format": "markdown"
+      },
+      {
+        "document_id": "uuid",
+        "material_type": "phone_script",
+        "content": "...",
+        "format": "text"
+      },
+      {
+        "document_id": "uuid",
+        "material_type": "email_template",
+        "content": "...",
+        "format": "html"
+      }
+    ],
+    "generated_at": "2026-01-23T10:18:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate/data-management`
+
+Generate a Data Management Plan (DMP).
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "funding_agency": "NIH",
+  "data_types": ["imaging", "clinical", "biospecimen"]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "document_type": "data_management_plan",
+    "content": "...",
+    "sections": [
+      "data_description",
+      "data_standards",
+      "data_sharing",
+      "data_preservation",
+      "roles_responsibilities",
+      "budget"
+    ],
+    "compliant_with": ["NIH_DMS_Policy"],
+    "generated_at": "2026-01-23T10:20:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate`
+
+Generate a specific document type.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "document_type": "investigator_brochure",
+  "options": {
+    "include_references": true,
+    "format": "docx"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_id": "uuid",
+    "document_type": "investigator_brochure",
+    "content": "...",
+    "format": "docx",
+    "download_url": "/api/protocol-assistant/documents/uuid/download",
+    "generated_at": "2026-01-23T10:22:00Z"
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/generate-all`
+
+Generate all required documents for the study.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "document_types": ["protocol", "consent_form", "abstract", "data_management_plan"],
+  "options": {
+    "format": "pdf"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "uuid",
+    "status": "processing",
+    "documents_requested": 4,
+    "estimated_completion": "2026-01-23T10:30:00Z"
+  }
+}
+```
+
+---
+
+### Form Prefill
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/prefill-form/:formId`
+
+Prefill an existing form with data from the protocol session.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "overwrite_existing": false,
+  "sections": ["project_info", "study_design", "population"]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "form_id": "uuid",
+    "fields_prefilled": 45,
+    "fields_skipped": 5,
+    "completion_percentage": 68,
+    "prefilled_sections": ["project_info", "study_design", "population"],
+    "mapping_details": [
+      {
+        "form_field": "study_title",
+        "protocol_field": "title",
+        "value": "A Study of Novel Imaging Technique...",
+        "confidence": 1.0
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### `POST /api/protocol-assistant/sessions/:sessionId/create-prefilled-form`
+
+Create a new form and prefill it with protocol data.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "template_id": "uuid",
+  "project_id": "uuid",
+  "form_title": "IRB Application - Lung Cancer Imaging Study"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "form_id": "uuid",
+    "template_id": "uuid",
+    "project_id": "uuid",
+    "title": "IRB Application - Lung Cancer Imaging Study",
+    "fields_prefilled": 52,
+    "completion_percentage": 72,
+    "status": "draft",
+    "created_at": "2026-01-23T10:25:00Z"
+  }
+}
+```
+
+---
+
+### Admin
+
+#### `GET /api/protocol-assistant/admin/stats`
+
+Get Protocol Assistant usage statistics.
+
+**Authentication:** Required (Admin role)
+
+**Query Parameters:**
+- `start_date` (optional): Start date for statistics period (ISO 8601)
+- `end_date` (optional): End date for statistics period (ISO 8601)
+- `group_by` (optional): Grouping period - `day`, `week`, `month` (default: `day`)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "period": {
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-01-23T23:59:59Z"
+    },
+    "summary": {
+      "total_sessions": 156,
+      "active_sessions": 23,
+      "completed_sessions": 98,
+      "total_messages": 4521,
+      "total_documents_generated": 312,
+      "total_forms_prefilled": 87,
+      "average_session_duration_minutes": 45,
+      "average_messages_per_session": 29
+    },
+    "documents_by_type": {
+      "protocol": 89,
+      "consent_form": 76,
+      "abstract": 65,
+      "data_management_plan": 42,
+      "recruitment": 40
+    },
+    "usage_by_day": [
+      {
+        "date": "2026-01-22",
+        "sessions": 12,
+        "messages": 342,
+        "documents": 28
+      }
+    ],
+    "top_users": [
+      {
+        "user_id": "uuid",
+        "sessions": 15,
+        "documents_generated": 23
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Utility
+
+#### `GET /api/protocol-assistant/document-types`
+
+Get list of supported document types that can be generated.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "document_types": [
+      {
+        "type": "protocol",
+        "name": "Study Protocol",
+        "description": "Complete research protocol document",
+        "templates": ["irb_standard", "fda_ind", "nih_clinical_trial"]
+      },
+      {
+        "type": "consent_form",
+        "name": "Informed Consent Form",
+        "description": "Participant consent document",
+        "templates": ["adult", "pediatric", "short_form"]
+      },
+      {
+        "type": "abstract",
+        "name": "Study Abstract",
+        "description": "Structured or unstructured study summary",
+        "templates": ["structured", "narrative"]
+      },
+      {
+        "type": "data_management_plan",
+        "name": "Data Management Plan",
+        "description": "DMP compliant with funding agency requirements",
+        "templates": ["nih", "nsf", "generic"]
+      },
+      {
+        "type": "recruitment",
+        "name": "Recruitment Materials",
+        "description": "Flyers, scripts, and advertisements",
+        "templates": ["flyer", "phone_script", "email", "social_media"]
+      },
+      {
+        "type": "investigator_brochure",
+        "name": "Investigator Brochure",
+        "description": "Comprehensive investigator reference document",
+        "templates": ["standard"]
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### `GET /api/protocol-assistant/sessions/:sessionId/progress`
+
+Get the overall progress of a Protocol Assistant session.
+
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "uuid",
+    "overall_progress": 72,
+    "stages": {
+      "protocol_extraction": {
+        "status": "completed",
+        "progress": 100
+      },
+      "gap_analysis": {
+        "status": "in_progress",
+        "progress": 60,
+        "gaps_remaining": 3
+      },
+      "document_generation": {
+        "status": "pending",
+        "progress": 0,
+        "documents_generated": 0,
+        "documents_total": 4
+      },
+      "form_prefill": {
+        "status": "pending",
+        "progress": 0
+      }
+    },
+    "next_recommended_action": "Answer remaining gap questions to improve document quality",
+    "estimated_completion_minutes": 15
+  }
+}
+```
+
+---
+
 ## Forms Service (Port 8001)
 
 The Forms Service handles all form-related operations. It is typically accessed through the Gateway, but direct access is available for development.
@@ -760,4 +1711,4 @@ POST /api/forms/:formId/submit
 
 ---
 
-*Last Updated: January 22, 2026*
+*Last Updated: January 23, 2026*

@@ -735,6 +735,565 @@ Burst: 5 emails/minute per user
 
 ---
 
+## LLM and Protocol Assistant Security
+
+This section outlines security measures for the integrated Large Language Model (LLM) features and Protocol Assistant functionality.
+
+---
+
+## LLM Data Handling
+
+### PHI Detection and Prevention
+
+All content is scanned before being sent to external LLM APIs to prevent inadvertent PHI disclosure.
+
+| Check Type | Implementation | Action |
+|------------|----------------|--------|
+| Pattern Matching | Regex for SSN, MRN, DOB patterns | Block and warn |
+| Named Entity Recognition | Detect names, addresses, phone numbers | Redact or block |
+| Custom PHI Dictionary | Organization-specific identifiers | Configurable blocking |
+| Pre-flight Validation | Validate all prompts before API call | Required |
+
+**Implementation**:
+```python
+class PHIDetector:
+    def scan_content(self, text: str) -> PHIScanResult:
+        """Scan text for potential PHI before LLM submission."""
+        findings = []
+
+        # Pattern-based detection
+        patterns = {
+            'ssn': r'\b\d{3}-\d{2}-\d{4}\b',
+            'mrn': r'\bMRN[:\s]?\d{6,10}\b',
+            'dob': r'\b(DOB|Date of Birth)[:\s]?\d{1,2}/\d{1,2}/\d{4}\b',
+            'phone': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
+        }
+
+        for phi_type, pattern in patterns.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                findings.append(PHIFinding(type=phi_type, blocked=True))
+
+        return PHIScanResult(has_phi=len(findings) > 0, findings=findings)
+```
+
+### Data Minimization
+
+Only the minimum necessary context is sent to LLM APIs.
+
+| Principle | Implementation |
+|-----------|----------------|
+| Context Limiting | Only relevant sections sent, not entire forms |
+| Field Filtering | Exclude sensitive fields from context |
+| Summarization | Use summaries instead of full documents when possible |
+| Session Isolation | Each request contains only single-task context |
+
+**Configuration**:
+```python
+LLM_CONTEXT_SETTINGS = {
+    'max_context_tokens': 4000,
+    'exclude_fields': ['patient_name', 'ssn', 'mrn', 'dob', 'address', 'phone'],
+    'include_metadata_only': ['attachments', 'signatures'],
+    'summarize_threshold': 2000,  # Summarize sections over this token count
+}
+```
+
+### No Training Policy
+
+All LLM integrations use APIs configured to not train on user data.
+
+| Provider Requirement | Verification |
+|---------------------|--------------|
+| API-only access | No web interface data sharing |
+| Opt-out of training | Contractual and API-level opt-out |
+| Data deletion | 30-day maximum retention by provider |
+| Enterprise tier | Business agreements with data protection |
+
+**API Configuration**:
+```python
+# OpenAI API configuration example
+LLM_API_CONFIG = {
+    'provider': 'openai',
+    'api_version': '2024-01-01',
+    'data_retention': 'zero',  # No data retention
+    'training_opt_out': True,
+    'enterprise_features': True,
+}
+```
+
+### LLM Interaction Audit Logging
+
+All LLM interactions are logged for compliance and security review.
+
+| Event | Data Captured | Retention |
+|-------|---------------|-----------|
+| Request Sent | User ID, timestamp, token count, purpose | 7 years |
+| Response Received | Response ID, token count, latency | 7 years |
+| PHI Blocked | Blocked content hash, PHI type, user notified | 7 years |
+| Error | Error type, retry count, resolution | 7 years |
+
+**Audit Log Schema**:
+```sql
+CREATE TABLE llm_audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    session_id UUID NOT NULL,
+    request_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    purpose VARCHAR(100) NOT NULL,
+    input_token_count INTEGER,
+    output_token_count INTEGER,
+    model_version VARCHAR(50),
+    phi_scan_result JSONB,
+    response_time_ms INTEGER,
+    success BOOLEAN DEFAULT true,
+    error_details JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Append-only enforcement
+CREATE RULE llm_audit_no_update AS ON UPDATE TO llm_audit_logs DO INSTEAD NOTHING;
+CREATE RULE llm_audit_no_delete AS ON DELETE TO llm_audit_logs DO INSTEAD NOTHING;
+```
+
+---
+
+## Credential Storage
+
+### User API Key Encryption
+
+User-provided API keys (e.g., for external LLM services) are encrypted at rest using Fernet symmetric encryption (AES-128-CBC with HMAC).
+
+| Security Measure | Implementation |
+|-----------------|----------------|
+| Encryption Algorithm | Fernet (AES-128-CBC + HMAC-SHA256) |
+| Key Derivation | PBKDF2 with 480,000 iterations |
+| Master Key Storage | Environment variable (never in code) |
+| Key Rotation | Supported via re-encryption |
+
+**Implementation**:
+```python
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import os
+
+class CredentialManager:
+    def __init__(self):
+        master_key = os.environ.get('CREDENTIAL_ENCRYPTION_KEY')
+        if not master_key:
+            raise SecurityError('Master encryption key not configured')
+        self.fernet = Fernet(master_key.encode())
+
+    def encrypt_api_key(self, api_key: str) -> bytes:
+        """Encrypt user API key for storage."""
+        return self.fernet.encrypt(api_key.encode())
+
+    def decrypt_api_key(self, encrypted_key: bytes) -> str:
+        """Decrypt user API key for use."""
+        return self.fernet.decrypt(encrypted_key).decode()
+```
+
+### Credential Storage Schema
+
+```sql
+CREATE TABLE user_credentials (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    credential_type VARCHAR(50) NOT NULL,
+    provider VARCHAR(50) NOT NULL,
+    encrypted_key BYTEA NOT NULL,
+    key_prefix VARCHAR(10),  -- First few chars for identification (e.g., "sk-abc...")
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    last_used_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    UNIQUE(user_id, credential_type, provider)
+);
+
+-- Index for quick lookups
+CREATE INDEX idx_user_credentials_user_provider ON user_credentials(user_id, provider);
+```
+
+### API Key Security Requirements
+
+| Requirement | Enforcement |
+|-------------|-------------|
+| Never logged | API keys excluded from all logs |
+| Never in responses | Keys never returned after initial storage |
+| Masked display | Show only prefix (e.g., "sk-abc...xyz") |
+| Secure deletion | Keys overwritten before deletion |
+| Access logging | All key usage logged (without key value) |
+
+**Security Controls**:
+```python
+# Logging sanitization
+SENSITIVE_FIELD_PATTERNS = [
+    r'api[_-]?key',
+    r'secret',
+    r'password',
+    r'token',
+    r'credential',
+]
+
+def sanitize_log_data(data: dict) -> dict:
+    """Remove sensitive fields from log data."""
+    sanitized = {}
+    for key, value in data.items():
+        if any(re.search(pattern, key, re.IGNORECASE) for pattern in SENSITIVE_FIELD_PATTERNS):
+            sanitized[key] = '[REDACTED]'
+        else:
+            sanitized[key] = value
+    return sanitized
+```
+
+---
+
+## HIPAA Compliance for AI Features
+
+### Business Associate Agreement (BAA) Requirements
+
+| LLM Provider Requirement | Status | Notes |
+|-------------------------|--------|-------|
+| BAA Available | Required | Must have signed BAA before use |
+| HIPAA-eligible Service | Required | Provider must offer HIPAA-compliant tier |
+| Data Processing Addendum | Required | EU/international data handling |
+| Subprocessor List | Required | Transparency on data handling chain |
+
+**Verification Checklist**:
+- [ ] BAA signed with LLM provider
+- [ ] Provider SOC 2 Type II report reviewed
+- [ ] Data processing locations documented
+- [ ] Subprocessor notification process established
+- [ ] Breach notification procedures agreed
+
+### Data Residency Considerations
+
+| Requirement | Implementation |
+|-------------|----------------|
+| US Data Residency | Configure API endpoints to US regions only |
+| No Cross-Border Transfer | Block requests if residency cannot be guaranteed |
+| Region Verification | Validate provider data center locations |
+| Contractual Guarantee | Written confirmation of data residency |
+
+**Configuration**:
+```python
+LLM_DATA_RESIDENCY = {
+    'required_regions': ['us-east-1', 'us-west-2'],
+    'blocked_regions': ['eu-*', 'ap-*'],
+    'verify_on_request': True,
+    'fail_closed': True,  # Block if residency cannot be verified
+}
+```
+
+### Access Controls and Audit Trails
+
+| Control | Implementation |
+|---------|----------------|
+| Role-Based Access | Only authorized roles can use LLM features |
+| Per-User Permissions | Granular LLM feature access |
+| Usage Quotas | Configurable limits per user/role |
+| Full Audit Trail | All interactions logged with user context |
+
+**Permission Matrix**:
+
+| LLM Feature | Admin | Reviewer | Researcher |
+|-------------|-------|----------|------------|
+| Protocol Assistant | Yes | Yes | Yes |
+| Form Auto-fill | Yes | Yes | Yes |
+| Bulk Processing | Yes | No | No |
+| Custom Prompts | Yes | Yes | No |
+| API Key Management | Yes | No | Self only |
+
+### Right to Erasure Support
+
+| GDPR/CCPA Requirement | Implementation |
+|----------------------|----------------|
+| User Data Deletion | All LLM interaction logs deletable |
+| Provider Data Deletion | Automated deletion requests to provider |
+| Verification | Confirmation of deletion from all systems |
+| Timeline | 30 days maximum for complete erasure |
+
+**Erasure Process**:
+```python
+async def process_erasure_request(user_id: UUID) -> ErasureResult:
+    """Process right to erasure request for LLM data."""
+    results = []
+
+    # 1. Delete local LLM audit logs
+    await db.execute(
+        "DELETE FROM llm_audit_logs WHERE user_id = $1",
+        user_id
+    )
+    results.append(ErasureStep('local_logs', 'completed'))
+
+    # 2. Request deletion from LLM provider
+    provider_result = await llm_provider.request_data_deletion(user_id)
+    results.append(ErasureStep('provider_data', provider_result.status))
+
+    # 3. Delete cached sessions
+    await session_cache.delete_user_sessions(user_id)
+    results.append(ErasureStep('session_cache', 'completed'))
+
+    return ErasureResult(user_id=user_id, steps=results)
+```
+
+---
+
+## LLM Security Best Practices
+
+### Prompt Injection Prevention
+
+| Attack Vector | Mitigation |
+|--------------|------------|
+| Direct Injection | Input sanitization and validation |
+| Indirect Injection | Context isolation and filtering |
+| Jailbreak Attempts | Pattern detection and blocking |
+| Role Manipulation | System prompt protection |
+
+**Implementation**:
+```python
+class PromptSecurityValidator:
+    INJECTION_PATTERNS = [
+        r'ignore\s+(previous|above|all)\s+instructions',
+        r'disregard\s+(your|the)\s+(rules|instructions)',
+        r'you\s+are\s+now\s+[a-zA-Z]+',
+        r'pretend\s+(to\s+be|you\'re)',
+        r'system:\s*',
+        r'\[INST\]',
+        r'<\|im_start\|>',
+    ]
+
+    def validate_input(self, user_input: str) -> ValidationResult:
+        """Check for potential prompt injection attempts."""
+        for pattern in self.INJECTION_PATTERNS:
+            if re.search(pattern, user_input, re.IGNORECASE):
+                return ValidationResult(
+                    valid=False,
+                    reason='Potential prompt injection detected',
+                    blocked_pattern=pattern
+                )
+        return ValidationResult(valid=True)
+
+    def sanitize_input(self, user_input: str) -> str:
+        """Sanitize user input before including in prompt."""
+        # Escape special characters
+        sanitized = user_input.replace('{', '{{').replace('}', '}}')
+        # Remove control characters
+        sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', sanitized)
+        return sanitized
+```
+
+### Output Validation
+
+| Validation Type | Purpose |
+|----------------|---------|
+| Content Filtering | Remove inappropriate or harmful content |
+| PHI Re-check | Scan output for any PHI that may have been generated |
+| Format Validation | Ensure output matches expected structure |
+| Hallucination Detection | Flag potentially fabricated information |
+
+**Implementation**:
+```python
+class OutputValidator:
+    def validate_response(self, response: str, expected_format: str) -> ValidationResult:
+        """Validate LLM response before returning to user."""
+        issues = []
+
+        # Check for PHI in output
+        phi_scan = self.phi_detector.scan_content(response)
+        if phi_scan.has_phi:
+            issues.append('PHI detected in output')
+            response = self.redact_phi(response, phi_scan.findings)
+
+        # Check for harmful content
+        if self.content_filter.is_harmful(response):
+            issues.append('Harmful content detected')
+            return ValidationResult(valid=False, issues=issues)
+
+        # Validate format if specified
+        if expected_format and not self.matches_format(response, expected_format):
+            issues.append('Output format mismatch')
+
+        return ValidationResult(
+            valid=len(issues) == 0,
+            issues=issues,
+            sanitized_response=response
+        )
+```
+
+### Rate Limiting for LLM Endpoints
+
+| Limit Type | Value | Window |
+|------------|-------|--------|
+| Requests per user | 100 | 1 hour |
+| Requests per IP | 200 | 1 hour |
+| Tokens per user | 100,000 | 24 hours |
+| Concurrent requests | 5 | Per user |
+
+**Configuration**:
+```python
+LLM_RATE_LIMITS = {
+    'requests_per_user_per_hour': 100,
+    'requests_per_ip_per_hour': 200,
+    'tokens_per_user_per_day': 100_000,
+    'max_concurrent_requests': 5,
+    'burst_limit': 10,
+    'burst_window_seconds': 60,
+}
+```
+
+### Token Limits per Request
+
+| Limit | Value | Purpose |
+|-------|-------|---------|
+| Max Input Tokens | 4,000 | Prevent excessive context |
+| Max Output Tokens | 2,000 | Limit response size |
+| Total Request Tokens | 6,000 | Cost control |
+| System Prompt Tokens | 500 | Reserved for system context |
+
+**Enforcement**:
+```python
+def validate_token_limits(request: LLMRequest) -> None:
+    """Enforce token limits before sending request."""
+    input_tokens = count_tokens(request.prompt)
+
+    if input_tokens > LLM_LIMITS['max_input_tokens']:
+        raise TokenLimitExceeded(
+            f'Input exceeds {LLM_LIMITS["max_input_tokens"]} token limit'
+        )
+
+    if request.max_output_tokens > LLM_LIMITS['max_output_tokens']:
+        request.max_output_tokens = LLM_LIMITS['max_output_tokens']
+```
+
+---
+
+## LLM Session Security
+
+### Session Expiration
+
+| Session Type | Expiration | Extension |
+|--------------|------------|-----------|
+| Protocol Assistant Session | 24 hours | Not extendable |
+| Conversation Context | 2 hours of inactivity | Resets on activity |
+| Cached Responses | 1 hour | Automatic refresh |
+
+**Implementation**:
+```python
+SESSION_CONFIG = {
+    'max_session_duration': timedelta(hours=24),
+    'inactivity_timeout': timedelta(hours=2),
+    'cache_ttl': timedelta(hours=1),
+    'cleanup_interval': timedelta(minutes=15),
+}
+
+class SessionManager:
+    async def validate_session(self, session_id: UUID) -> bool:
+        """Check if session is still valid."""
+        session = await self.get_session(session_id)
+        if not session:
+            return False
+
+        # Check absolute expiration
+        if datetime.utcnow() > session.created_at + SESSION_CONFIG['max_session_duration']:
+            await self.terminate_session(session_id)
+            return False
+
+        # Check inactivity timeout
+        if datetime.utcnow() > session.last_activity + SESSION_CONFIG['inactivity_timeout']:
+            await self.terminate_session(session_id)
+            return False
+
+        return True
+```
+
+### User Isolation
+
+Users can only access their own LLM sessions and conversation history.
+
+| Isolation Control | Implementation |
+|-------------------|----------------|
+| Session Ownership | Sessions bound to user ID |
+| Query Filtering | All queries include user ID filter |
+| Cross-User Prevention | Strict validation on all session access |
+| Admin Override | Audit-logged admin access for support |
+
+**Database Constraints**:
+```sql
+-- Session table with user isolation
+CREATE TABLE llm_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose VARCHAR(50) NOT NULL,
+    context JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_activity TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT true
+);
+
+-- Row-level security for user isolation
+ALTER TABLE llm_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY llm_sessions_user_isolation ON llm_sessions
+    FOR ALL
+    USING (user_id = current_user_id());
+```
+
+**Access Validation**:
+```python
+async def get_session(self, session_id: UUID, user_id: UUID) -> Optional[LLMSession]:
+    """Get session with user isolation enforcement."""
+    session = await db.fetchone(
+        """
+        SELECT * FROM llm_sessions
+        WHERE id = $1 AND user_id = $2 AND is_active = true
+        """,
+        session_id, user_id
+    )
+
+    if not session:
+        audit_log('session_access_denied', user_id, session_id)
+        return None
+
+    return LLMSession(**session)
+```
+
+### Session Data Encryption at Rest
+
+| Data Type | Encryption | Key Management |
+|-----------|------------|----------------|
+| Conversation History | AES-256-GCM | Per-session key |
+| User Context | AES-256-GCM | Per-user key |
+| Cached Responses | AES-256-GCM | Rotating keys |
+
+**Implementation**:
+```python
+class SessionEncryption:
+    def __init__(self):
+        self.master_key = os.environ.get('SESSION_ENCRYPTION_KEY')
+
+    def encrypt_session_data(self, session_id: UUID, data: dict) -> bytes:
+        """Encrypt session data with session-specific key."""
+        session_key = self.derive_session_key(session_id)
+        cipher = AESGCM(session_key)
+        nonce = os.urandom(12)
+        plaintext = json.dumps(data).encode()
+        ciphertext = cipher.encrypt(nonce, plaintext, None)
+        return nonce + ciphertext
+
+    def derive_session_key(self, session_id: UUID) -> bytes:
+        """Derive session-specific encryption key."""
+        kdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=session_id.bytes,
+            info=b'session_encryption'
+        )
+        return kdf.derive(self.master_key.encode())
+```
+
+---
+
 ## Contact
 
 For security concerns or vulnerability reports, contact the security team.

@@ -6,15 +6,16 @@ This document provides a comprehensive overview of all technologies used in the 
 
 ## Overview
 
-| Layer | Technology | Version |
-|-------|------------|---------|
-| Frontend | React + TypeScript | 18.2.0 |
-| UI Framework | Tailwind CSS + shadcn/ui | 3.4.0 |
-| API Gateway | Node.js + Express | 18.x / 4.x |
-| Forms Service | Python + FastAPI | 3.11 / 0.109 |
-| Database | PostgreSQL | 15 |
-| Containerization | Docker + Docker Compose | 24.x |
-| PDF Generation | LibreOffice | 7.x |
+| Layer | Technology | Version | Port |
+|-------|------------|---------|------|
+| Frontend | React + TypeScript | 18.2.0 | 5174 |
+| UI Framework | Tailwind CSS + shadcn/ui | 3.4.0 | - |
+| API Gateway | Node.js + Express | 18.x / 4.x | 3001 |
+| Forms Service | Python + FastAPI | 3.11 / 0.109 | 8001 |
+| Protocol Assistant | Python + FastAPI | 3.11 / 0.109 | 8002 |
+| Database | PostgreSQL | 15 | 5434 |
+| Containerization | Docker + Docker Compose | 24.x | - |
+| PDF Generation | LibreOffice | 7.x | - |
 
 ---
 
@@ -215,6 +216,58 @@ This document provides a comprehensive overview of all technologies used in the 
 
 ---
 
+## Protocol Assistant Service
+
+- **Runtime**: Python 3.11+
+- **Framework**: FastAPI, Uvicorn
+- **ORM**: SQLAlchemy 2.0 with AsyncPG
+- **AI/LLM**:
+  - Anthropic Claude SDK (anthropic 0.18.0+)
+  - OpenAI SDK (openai 1.12.0+)
+- **Document Processing**: PyPDF2, python-docx
+- **Security**: cryptography (Fernet encryption for credentials)
+- **Resilience**: tenacity (retry logic)
+- **Async**: asyncio, httpx
+
+### Core Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| fastapi | >=0.109.0 | Web framework |
+| uvicorn[standard] | >=0.27.0 | ASGI server |
+| sqlalchemy | >=2.0.25 | ORM |
+| asyncpg | >=0.29.0 | Async PostgreSQL driver |
+
+### AI/LLM Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| anthropic | >=0.18.0 | Anthropic Claude SDK |
+| openai | >=1.12.0 | OpenAI SDK |
+
+### Document Processing
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| PyPDF2 | >=3.0.0 | PDF reading and parsing |
+| python-docx | >=1.1.0 | DOCX manipulation |
+
+### Security & Resilience
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| cryptography | >=42.0.0 | Fernet encryption for credentials |
+| tenacity | >=8.2.0 | Retry logic for API calls |
+
+### Async & HTTP
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| httpx | >=0.26.0 | Async HTTP client |
+| asyncio | stdlib | Async runtime |
+
+---
+
 ## Database Stack
 
 ### PostgreSQL 15
@@ -281,8 +334,10 @@ This document provides a comprehensive overview of all technologies used in the 
 
 | Tool | URL | Purpose |
 |------|-----|---------|
-| FastAPI Swagger | http://localhost:8001/docs | Forms Service API docs |
-| FastAPI ReDoc | http://localhost:8001/redoc | Alternative API docs |
+| FastAPI Swagger (Forms) | http://localhost:8001/docs | Forms Service API docs |
+| FastAPI ReDoc (Forms) | http://localhost:8001/redoc | Alternative API docs |
+| FastAPI Swagger (Protocol Assistant) | http://localhost:8002/docs | Protocol Assistant API docs |
+| FastAPI ReDoc (Protocol Assistant) | http://localhost:8002/redoc | Alternative API docs |
 
 ---
 
@@ -331,12 +386,13 @@ This document provides a comprehensive overview of all technologies used in the 
 
 ```bash
 NODE_ENV=development
-PORT=3000
-DATABASE_URL=postgres://user:pass@host:port/db
+PORT=3001
+DATABASE_URL=postgres://user:pass@host:5434/db
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
-FORMS_SERVICE_URL=http://forms-service:8000
+FORMS_SERVICE_URL=http://forms-service:8001
+PROTOCOL_ASSISTANT_URL=http://protocol-assistant:8002
 INTERNAL_API_KEY=internal-key
 CORS_ORIGIN=http://localhost:5174
 ```
@@ -344,10 +400,10 @@ CORS_ORIGIN=http://localhost:5174
 ### Forms Service
 
 ```bash
-DATABASE_URL=postgres://user:pass@host:port/db
+DATABASE_URL=postgres://user:pass@host:5434/db
 SECRET_KEY=your-secret-key
 INTERNAL_API_KEY=internal-key
-GATEWAY_URL=http://gateway:3000
+GATEWAY_URL=http://gateway:3001
 STORAGE_PATH=/app/storage
 TEMPLATE_DIR=/app/storage/templates
 GENERATED_DIR=/app/storage/generated
@@ -355,10 +411,24 @@ LIBREOFFICE_PATH=/usr/bin/soffice
 DEBUG=true
 ```
 
+### Protocol Assistant Service
+
+```bash
+DATABASE_URL=postgres://user:pass@host:5434/db
+SECRET_KEY=your-secret-key
+INTERNAL_API_KEY=internal-key
+GATEWAY_URL=http://gateway:3001
+ANTHROPIC_API_KEY=your-anthropic-key
+OPENAI_API_KEY=your-openai-key
+ENCRYPTION_KEY=your-fernet-key
+DEBUG=true
+```
+
 ### Frontend
 
 ```bash
 VITE_API_URL=http://localhost:3001/api
+VITE_FRONTEND_PORT=5174
 ```
 
 ---
@@ -386,6 +456,7 @@ VITE_API_URL=http://localhost:3001/api
 | Service | Python Version |
 |---------|----------------|
 | Forms Service | 3.11+ |
+| Protocol Assistant | 3.11+ |
 
 ---
 
@@ -406,4 +477,4 @@ VITE_API_URL=http://localhost:3001/api
 
 ---
 
-*Last Updated: January 15, 2026*
+*Last Updated: January 23, 2026*

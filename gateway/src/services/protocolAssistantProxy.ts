@@ -123,10 +123,11 @@ export const protocolAssistantProxy = {
       contentType: mimetype,
     });
 
-    return protocolClient.post(`/api/protocol-assistant/sessions/${sessionId}/documents/upload`, formData, {
+    return protocolClient.post(`/api/documents/extract-protocol`, formData, {
       headers: {
         ...formData.getHeaders(),
         'X-User-ID': userId,
+        'X-Session-ID': sessionId,
       },
       timeout: 180000, // 3 minutes for large documents
     });

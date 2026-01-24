@@ -15,6 +15,81 @@ This document tracks all development work completed on the Radiology Research Pl
 
 ## Development Timeline
 
+### January 2026: Protocol Assistant Implementation
+
+#### Summary
+
+Added AI-powered Protocol Assistant service for intelligent form assistance and document generation.
+
+#### Changes
+
+1. **New FastAPI microservice (protocol-assistant/)**
+   - Standalone Python service for AI-powered assistance
+   - Integrated with main platform architecture
+
+2. **Gateway proxy routes for Protocol Assistant**
+   - Added routing through API gateway
+   - Service-to-service authentication
+
+3. **LLM integration with Claude and OpenAI**
+   - Multi-provider AI support
+   - Configurable model selection
+
+4. **Document extraction and analysis**
+   - PDF and document parsing
+   - Content extraction for protocol analysis
+
+5. **Gap analysis for missing protocol information**
+   - Intelligent detection of incomplete sections
+   - Suggestions for required information
+
+6. **Automated document generation (consent forms, abstracts, etc.)**
+   - AI-powered document drafting
+   - Template-based generation
+
+7. **Form prefill functionality**
+   - Auto-populate form fields from uploaded documents
+   - Intelligent field mapping
+
+8. **Real-time chat with SSE streaming**
+   - Server-Sent Events for real-time responses
+   - Streaming AI responses for better UX
+
+9. **HIPAA-compliant audit logging**
+   - All AI interactions logged
+   - Compliance with healthcare data requirements
+
+10. **Encrypted credential storage**
+    - Secure API key management
+    - Environment-based configuration
+
+#### Bug Fixes
+
+- Fixed DATABASE_URL format for SQLAlchemy asyncpg (postgres:// to postgresql+asyncpg://)
+- Renamed SQLAlchemy model columns that conflicted with reserved 'metadata' attribute
+- Fixed gateway route ordering (specific routes before catch-all)
+- Added missing AUDIT_ACTIONS export in audit middleware
+- Created missing Skeleton UI component
+- Fixed document upload endpoint path
+
+#### Files Added
+
+- `protocol-assistant/` directory (~50 files)
+- `gateway/src/routes/protocol-assistant.ts`
+- `gateway/src/controllers/protocol-assistant.ts`
+- `gateway/src/services/protocolAssistantProxy.ts`
+- Frontend Protocol Assistant components
+
+#### Testing
+
+- Health endpoint verified
+- Session creation verified
+- Chat endpoint verified
+- Admin analytics verified
+- Audit logging verified
+
+---
+
 ### January 22, 2026: Form Saving and Section Collapse Bug Fixes
 
 #### Summary
@@ -585,4 +660,4 @@ frontend/src/
 
 ---
 
-*Last Updated: January 22, 2026*
+*Last Updated: January 2026*

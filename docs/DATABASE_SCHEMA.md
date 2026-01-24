@@ -19,8 +19,11 @@ This document provides a comprehensive reference for the PostgreSQL database sch
 | Files | 1 | File attachments |
 | Tasks | 3 | Task definitions, mappings, and tasks |
 | Notifications | 1 | User notifications |
+| Protocol Assistant | 17 | AI-powered protocol review and document generation |
 
-**Total Tables**: 21
+**Total Tables**: 38
+
+**Database Connection**: Port 5434
 
 ---
 
@@ -1576,4 +1579,1330 @@ DELETE FROM editing_locks WHERE expires_at < NOW();
 
 ---
 
-*Last Updated: January 22, 2026*
+## Protocol Assistant Tables
+
+The Protocol Assistant is an AI-powered service for protocol review, gap analysis, and document generation. It runs on the same PostgreSQL database (port 5434) but uses separate tables with distinct functionality.
+
+### Chat & Sessions
+
+#### chat_sessions
+
+Represents a chat session between a user and the Protocol Assistant. Each session tracks the context of a protocol review conversation, including extracted protocol data, identified gaps, and collected answers.
+
+```sql
+CREATE TABLE chat_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    institution_id UUID,
+    uploaded_document_id VARCHAR(255),
+    document_filename VARCHAR(500),
+    extracted_protocol JSONB,
+    current_gaps JSONB,
+    collected_answers JSONB DEFAULT '{}',
+    status VARCHAR(50) DEFAULT 'active',
+    completion_percentage INTEGER DEFAULT 0,
+    title VARCHAR(500),
+    summary TEXT,
+    llm_provider VARCHAR(50),
+    total_tokens_used INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX ix_chat_sessions_project_user ON chat_sessions(project_id, user_id);
+CREATE INDEX ix_chat_sessions_status ON chat_sessions(status);
+CREATE INDEX ix_chat_sessions_created_at ON chat_sessions(created_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique session identifier |
+| project_id | UUID | NOT NULL | - | Reference to projects table |
+| user_id | UUID | NOT NULL | - | Reference to users table |
+| institution_id | UUID | - | NULL | Institution scope for multi-tenancy |
+| uploaded_document_id | VARCHAR(255) | - | NULL | Reference to uploaded protocol document |
+| document_filename | VARCHAR(500) | - | NULL | Original uploaded filename |
+| extracted_protocol | JSONB | - | NULL | Structured protocol data extracted by AI |
+| current_gaps | JSONB | - | NULL | List of identified gaps in protocol |
+| collected_answers | JSONB | - | '{}' | User responses to gap questions |
+| status | VARCHAR(50) | - | 'active' | Session status: active, completed, abandoned, handed_off |
+| completion_percentage | INTEGER | - | 0 | Progress indicator (0-100) |
+| title | VARCHAR(500) | - | NULL | Session title for display |
+| summary | TEXT | - | NULL | AI-generated session summary |
+| llm_provider | VARCHAR(50) | - | NULL | LLM provider used (claude, openai, etc.) |
+| total_tokens_used | INTEGER | - | 0 | Cumulative token usage |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Session creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+| completed_at | TIMESTAMP WITH TIME ZONE | - | NULL | Session completion timestamp |
+
+**Relationships:**
+- `messages` -> `chat_messages` (one-to-many)
+- `generated_documents` -> `generated_documents` (one-to-many)
+- `feedback` -> `ai_feedback` (one-to-many)
+- `handoffs` -> `session_handoffs` (one-to-many)
+- `provenance_nodes` -> `provenance_nodes` (one-to-many)
+
+**Indexes:**
+- `ix_chat_sessions_project_user` - Combined project and user lookups
+- `ix_chat_sessions_status` - Status filtering
+- `ix_chat_sessions_created_at` - Chronological sorting
+
+---
+
+#### chat_messages
+
+Individual messages within a chat session. Supports different message types including regular chat, questions, suggestions, and action messages.
+
+```sql
+CREATE TABLE chat_messages (
+    id SERIAL PRIMARY KEY,
+    session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL,
+    content TEXT NOT NULL,
+    message_type VARCHAR(50) DEFAULT 'chat',
+    metadata JSONB,
+    prompt_version_id INTEGER REFERENCES prompt_versions(id),
+    tokens_used INTEGER,
+    gap_id VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_chat_messages_session_created ON chat_messages(session_id, created_at);
+CREATE INDEX ix_chat_messages_role ON chat_messages(role);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | SERIAL | PRIMARY KEY | auto-increment | Unique message identifier |
+| session_id | UUID | NOT NULL, FK | - | Reference to chat_sessions |
+| role | VARCHAR(20) | NOT NULL | - | Message role: user, assistant, system |
+| content | TEXT | NOT NULL | - | Message content |
+| message_type | VARCHAR(50) | - | 'chat' | Type: chat, question, suggestion, action, error |
+| metadata | JSONB | - | NULL | Flexible additional data |
+| prompt_version_id | INTEGER | FK | NULL | Reference to prompt version used |
+| tokens_used | INTEGER | - | NULL | Token count for this message |
+| gap_id | VARCHAR(100) | - | NULL | Reference to specific gap being addressed |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Message timestamp |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE CASCADE
+- `prompt_version_id` -> `prompt_versions(id)`
+
+**Indexes:**
+- `ix_chat_messages_session_created` - Session message ordering
+- `ix_chat_messages_role` - Role-based filtering
+
+---
+
+### Generated Documents
+
+#### generated_documents
+
+Stores AI-generated documents such as protocols, consent forms, and other research documents. Documents can be versioned, reviewed, and exported in multiple formats.
+
+```sql
+CREATE TABLE generated_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+    project_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    institution_id UUID,
+    document_type VARCHAR(100) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    version INTEGER DEFAULT 1,
+    version_label VARCHAR(100),
+    content TEXT NOT NULL,
+    content_html TEXT,
+    content_format VARCHAR(50) DEFAULT 'markdown',
+    template_id UUID,
+    template_version INTEGER,
+    generation_metadata JSONB,
+    source_data JSONB,
+    status VARCHAR(50) DEFAULT 'draft',
+    is_latest BOOLEAN DEFAULT true,
+    reviewed_by UUID,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    review_notes TEXT,
+    quality_score INTEGER,
+    coherence_score INTEGER,
+    completeness_score INTEGER,
+    content_hash VARCHAR(64),
+    parent_document_id UUID REFERENCES generated_documents(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT ck_generated_documents_version_positive CHECK (version > 0),
+    CONSTRAINT ck_generated_documents_quality_score_range CHECK (quality_score IS NULL OR (quality_score >= 0 AND quality_score <= 100))
+);
+
+CREATE INDEX ix_generated_documents_project_type ON generated_documents(project_id, document_type);
+CREATE INDEX ix_generated_documents_status ON generated_documents(status);
+CREATE INDEX ix_generated_documents_created_at ON generated_documents(created_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique document identifier |
+| session_id | UUID | FK | NULL | Reference to originating chat session |
+| project_id | UUID | NOT NULL | - | Reference to projects table |
+| user_id | UUID | NOT NULL | - | Document creator |
+| institution_id | UUID | - | NULL | Institution scope |
+| document_type | VARCHAR(100) | NOT NULL | - | Type: protocol, consent_form, amendment, etc. |
+| title | VARCHAR(500) | NOT NULL | - | Document title |
+| version | INTEGER | CHECK > 0 | 1 | Version number |
+| version_label | VARCHAR(100) | - | NULL | Human-readable version label |
+| content | TEXT | NOT NULL | - | Primary document content (markdown/text) |
+| content_html | TEXT | - | NULL | Rendered HTML version |
+| content_format | VARCHAR(50) | - | 'markdown' | Content format: markdown, html, plain |
+| template_id | UUID | - | NULL | Reference to template used |
+| template_version | INTEGER | - | NULL | Template version used |
+| generation_metadata | JSONB | - | NULL | LLM params, prompt info, etc. |
+| source_data | JSONB | - | NULL | Input data used for generation |
+| status | VARCHAR(50) | - | 'draft' | Status: draft, review, approved, final, archived |
+| is_latest | BOOLEAN | - | true | Latest version flag |
+| reviewed_by | UUID | - | NULL | Reviewer user ID |
+| reviewed_at | TIMESTAMP WITH TIME ZONE | - | NULL | Review timestamp |
+| review_notes | TEXT | - | NULL | Reviewer notes |
+| quality_score | INTEGER | CHECK 0-100 | NULL | AI-assessed quality score |
+| coherence_score | INTEGER | - | NULL | Coherence check score |
+| completeness_score | INTEGER | - | NULL | Completeness check score |
+| content_hash | VARCHAR(64) | - | NULL | SHA-256 hash for integrity |
+| parent_document_id | UUID | FK | NULL | Parent document for versioning |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE SET NULL
+- `parent_document_id` -> `generated_documents(id)` ON DELETE SET NULL (self-referential)
+
+**Indexes:**
+- `ix_generated_documents_project_type` - Project and type filtering
+- `ix_generated_documents_status` - Status filtering
+- `ix_generated_documents_created_at` - Chronological sorting
+
+---
+
+### Institution Configuration
+
+#### institution_feature_flags
+
+Feature flags and configuration for each institution. Controls which AI features are enabled, LLM provider settings, rate limits, and integration configurations.
+
+```sql
+CREATE TABLE institution_feature_flags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID NOT NULL UNIQUE,
+    institution_name VARCHAR(500),
+    ai_assistant_enabled BOOLEAN DEFAULT true,
+    document_extraction_enabled BOOLEAN DEFAULT true,
+    gap_analysis_enabled BOOLEAN DEFAULT true,
+    document_generation_enabled BOOLEAN DEFAULT true,
+    form_prefill_enabled BOOLEAN DEFAULT true,
+    coherence_checking_enabled BOOLEAN DEFAULT true,
+    allowed_llm_providers VARCHAR[] DEFAULT ARRAY['claude'],
+    default_llm_provider VARCHAR(50) DEFAULT 'claude',
+    fallback_behavior VARCHAR(50) DEFAULT 'error',
+    max_retries INTEGER DEFAULT 3,
+    daily_request_limit INTEGER DEFAULT 1000,
+    monthly_token_budget INTEGER DEFAULT 1000000,
+    max_document_size_mb INTEGER DEFAULT 50,
+    max_concurrent_sessions INTEGER DEFAULT 100,
+    integrations_enabled JSONB DEFAULT '{}',
+    custom_prompts_enabled BOOLEAN DEFAULT false,
+    rag_knowledge_base_enabled BOOLEAN DEFAULT false,
+    ab_testing_enabled BOOLEAN DEFAULT true,
+    advanced_analytics_enabled BOOLEAN DEFAULT false,
+    audit_log_retention_days INTEGER DEFAULT 2555,
+    require_electronic_signatures BOOLEAN DEFAULT false,
+    cfr_part_11_compliant BOOLEAN DEFAULT false,
+    custom_config JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT ck_institution_daily_limit_positive CHECK (daily_request_limit > 0),
+    CONSTRAINT ck_institution_monthly_budget_positive CHECK (monthly_token_budget > 0),
+    CONSTRAINT ck_institution_max_doc_size_positive CHECK (max_document_size_mb > 0),
+    CONSTRAINT ck_institution_max_retries_non_negative CHECK (max_retries >= 0)
+);
+
+CREATE UNIQUE INDEX ix_institution_feature_flags_institution_id ON institution_feature_flags(institution_id);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique identifier |
+| institution_id | UUID | UNIQUE, NOT NULL | - | Institution reference |
+| institution_name | VARCHAR(500) | - | NULL | Institution display name |
+| ai_assistant_enabled | BOOLEAN | - | true | Enable AI assistant feature |
+| document_extraction_enabled | BOOLEAN | - | true | Enable document extraction |
+| gap_analysis_enabled | BOOLEAN | - | true | Enable gap analysis |
+| document_generation_enabled | BOOLEAN | - | true | Enable document generation |
+| form_prefill_enabled | BOOLEAN | - | true | Enable form prefill |
+| coherence_checking_enabled | BOOLEAN | - | true | Enable coherence checking |
+| allowed_llm_providers | VARCHAR[] | - | ['claude'] | Allowed LLM providers |
+| default_llm_provider | VARCHAR(50) | - | 'claude' | Default LLM provider |
+| fallback_behavior | VARCHAR(50) | - | 'error' | Fallback: error, queue, alternate |
+| max_retries | INTEGER | CHECK >= 0 | 3 | Maximum retry attempts |
+| daily_request_limit | INTEGER | CHECK > 0 | 1000 | Daily request limit |
+| monthly_token_budget | INTEGER | CHECK > 0 | 1000000 | Monthly token budget |
+| max_document_size_mb | INTEGER | CHECK > 0 | 50 | Max document size in MB |
+| max_concurrent_sessions | INTEGER | - | 100 | Max concurrent sessions |
+| integrations_enabled | JSONB | - | '{}' | Enabled integrations map |
+| custom_prompts_enabled | BOOLEAN | - | false | Allow custom prompts |
+| rag_knowledge_base_enabled | BOOLEAN | - | false | Enable RAG knowledge base |
+| ab_testing_enabled | BOOLEAN | - | true | Enable A/B testing |
+| advanced_analytics_enabled | BOOLEAN | - | false | Enable advanced analytics |
+| audit_log_retention_days | INTEGER | - | 2555 | Audit log retention (~7 years) |
+| require_electronic_signatures | BOOLEAN | - | false | Require e-signatures |
+| cfr_part_11_compliant | BOOLEAN | - | false | 21 CFR Part 11 compliance mode |
+| custom_config | JSONB | - | NULL | Institution-specific settings |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Relationships:**
+- `knowledge_documents` -> `knowledge_documents` (one-to-many)
+- `usage_analytics` -> `usage_analytics` (one-to-many)
+- `compliance_logs` -> `compliance_audit_log` (one-to-many)
+
+---
+
+### A/B Testing & Learning
+
+#### prompt_versions
+
+Stores different versions of prompts for A/B testing. Enables controlled rollout of prompt changes and measurement of their effectiveness.
+
+```sql
+CREATE TABLE prompt_versions (
+    id SERIAL PRIMARY KEY,
+    prompt_key VARCHAR(100) NOT NULL,
+    version INTEGER NOT NULL,
+    name VARCHAR(200),
+    description TEXT,
+    content TEXT NOT NULL,
+    system_prompt TEXT,
+    parameters JSONB,
+    traffic_percentage FLOAT DEFAULT 0.0,
+    is_active BOOLEAN DEFAULT false,
+    is_default BOOLEAN DEFAULT false,
+    success_rate FLOAT,
+    avg_quality_score FLOAT,
+    avg_latency_ms FLOAT,
+    sample_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    created_by UUID,
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    retired_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_prompt_versions_key_version UNIQUE (prompt_key, version),
+    CONSTRAINT ck_prompt_versions_traffic_percentage_range CHECK (traffic_percentage >= 0 AND traffic_percentage <= 100),
+    CONSTRAINT ck_prompt_versions_version_positive CHECK (version > 0)
+);
+
+CREATE INDEX ix_prompt_versions_active ON prompt_versions(is_active);
+CREATE INDEX ix_prompt_versions_key_active ON prompt_versions(prompt_key, is_active);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | SERIAL | PRIMARY KEY | auto-increment | Unique version identifier |
+| prompt_key | VARCHAR(100) | NOT NULL | - | Prompt identifier (e.g., "gap_analysis") |
+| version | INTEGER | NOT NULL, CHECK > 0 | - | Version number |
+| name | VARCHAR(200) | - | NULL | Human-readable version name |
+| description | TEXT | - | NULL | Version description |
+| content | TEXT | NOT NULL | - | The actual prompt template |
+| system_prompt | TEXT | - | NULL | System prompt if separate |
+| parameters | JSONB | - | NULL | LLM parameters (temperature, etc.) |
+| traffic_percentage | FLOAT | CHECK 0-100 | 0.0 | Percentage of traffic |
+| is_active | BOOLEAN | - | false | Currently active flag |
+| is_default | BOOLEAN | - | false | Fallback version flag |
+| success_rate | FLOAT | - | NULL | Percentage of successful outputs |
+| avg_quality_score | FLOAT | - | NULL | Average quality rating |
+| avg_latency_ms | FLOAT | - | NULL | Average response time |
+| sample_count | INTEGER | - | 0 | Number of uses |
+| error_count | INTEGER | - | 0 | Number of errors |
+| created_by | UUID | - | NULL | Creator user ID |
+| approved_by | UUID | - | NULL | Approver user ID |
+| approved_at | TIMESTAMP WITH TIME ZONE | - | NULL | Approval timestamp |
+| retired_at | TIMESTAMP WITH TIME ZONE | - | NULL | Retirement timestamp |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Unique Constraint:** `(prompt_key, version)` - Unique version per prompt
+
+**Indexes:**
+- `ix_prompt_versions_active` - Active version filtering
+- `ix_prompt_versions_key_active` - Key and active filtering
+
+---
+
+#### ai_feedback
+
+User feedback on AI-generated outputs. Captures ratings, comments, and corrections for continuous improvement.
+
+```sql
+CREATE TABLE ai_feedback (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+    output_id VARCHAR(255),
+    message_id INTEGER REFERENCES chat_messages(id) ON DELETE SET NULL,
+    document_id UUID REFERENCES generated_documents(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL,
+    institution_id UUID,
+    rating INTEGER,
+    feedback_type VARCHAR(50) NOT NULL,
+    comment TEXT,
+    corrections JSONB,
+    original_content TEXT,
+    corrected_content TEXT,
+    prompt_version_id INTEGER REFERENCES prompt_versions(id) ON DELETE SET NULL,
+    issue_category VARCHAR(100),
+    severity VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT ck_ai_feedback_rating_range CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5))
+);
+
+CREATE INDEX ix_ai_feedback_user_created ON ai_feedback(user_id, created_at);
+CREATE INDEX ix_ai_feedback_type ON ai_feedback(feedback_type);
+CREATE INDEX ix_ai_feedback_rating ON ai_feedback(rating);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique feedback identifier |
+| session_id | UUID | FK | NULL | Reference to chat session |
+| output_id | VARCHAR(255) | - | NULL | Reference to specific output |
+| message_id | INTEGER | FK | NULL | Reference to chat message |
+| document_id | UUID | FK | NULL | Reference to generated document |
+| user_id | UUID | NOT NULL | - | User providing feedback |
+| institution_id | UUID | - | NULL | Institution scope |
+| rating | INTEGER | CHECK 1-5 | NULL | Rating on 1-5 scale |
+| feedback_type | VARCHAR(50) | NOT NULL | - | Type: quality, accuracy, helpfulness, relevance |
+| comment | TEXT | - | NULL | User comment |
+| corrections | JSONB | - | NULL | Structured corrections |
+| original_content | TEXT | - | NULL | Original AI output |
+| corrected_content | TEXT | - | NULL | User-corrected version |
+| prompt_version_id | INTEGER | FK | NULL | Prompt version used |
+| issue_category | VARCHAR(100) | - | NULL | Category: factual_error, formatting, tone, etc. |
+| severity | VARCHAR(20) | - | NULL | Severity: low, medium, high, critical |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Feedback timestamp |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE SET NULL
+- `message_id` -> `chat_messages(id)` ON DELETE SET NULL
+- `document_id` -> `generated_documents(id)` ON DELETE SET NULL
+- `prompt_version_id` -> `prompt_versions(id)` ON DELETE SET NULL
+
+**Indexes:**
+- `ix_ai_feedback_user_created` - User feedback history
+- `ix_ai_feedback_type` - Type filtering
+- `ix_ai_feedback_rating` - Rating filtering
+
+---
+
+### Audit & Compliance
+
+#### provenance_nodes
+
+Tracks the lineage of AI-generated outputs. Creates an audit trail showing how data flows through the system, from input documents through extraction, generation, and editing.
+
+```sql
+CREATE TABLE provenance_nodes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+    project_id UUID,
+    type VARCHAR(50) NOT NULL,
+    actor VARCHAR(255) NOT NULL,
+    actor_type VARCHAR(50) DEFAULT 'user',
+    resource_type VARCHAR(100),
+    resource_id VARCHAR(255),
+    data_hash VARCHAR(64) NOT NULL,
+    parent_ids UUID[] DEFAULT '{}',
+    depth INTEGER DEFAULT 0,
+    metadata JSONB,
+    llm_provider VARCHAR(50),
+    llm_model VARCHAR(100),
+    prompt_version_id INTEGER,
+    action VARCHAR(100),
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_provenance_nodes_type ON provenance_nodes(type);
+CREATE INDEX ix_provenance_nodes_actor ON provenance_nodes(actor);
+CREATE INDEX ix_provenance_nodes_resource ON provenance_nodes(resource_type, resource_id);
+CREATE INDEX ix_provenance_nodes_created_at ON provenance_nodes(created_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique node identifier |
+| session_id | UUID | FK | NULL | Reference to chat session |
+| project_id | UUID | - | NULL | Project scope |
+| type | VARCHAR(50) | NOT NULL | - | Node type: input, extraction, generation, edit, approval, review |
+| actor | VARCHAR(255) | NOT NULL | - | Actor: user_id, "system", or "llm:{provider}" |
+| actor_type | VARCHAR(50) | - | 'user' | Actor type: user, system, llm |
+| resource_type | VARCHAR(100) | - | NULL | Resource type: document, message, section |
+| resource_id | VARCHAR(255) | - | NULL | Resource identifier |
+| data_hash | VARCHAR(64) | NOT NULL | - | SHA-256 hash of content |
+| parent_ids | UUID[] | - | '{}' | Parent nodes in lineage chain |
+| depth | INTEGER | - | 0 | Depth in provenance tree |
+| metadata | JSONB | - | NULL | Additional context |
+| llm_provider | VARCHAR(50) | - | NULL | LLM provider if AI-generated |
+| llm_model | VARCHAR(100) | - | NULL | LLM model used |
+| prompt_version_id | INTEGER | - | NULL | Prompt version used |
+| action | VARCHAR(100) | - | NULL | Specific action taken |
+| description | TEXT | - | NULL | Human-readable description |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Node creation timestamp |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE SET NULL
+
+**Indexes:**
+- `ix_provenance_nodes_type` - Type filtering
+- `ix_provenance_nodes_actor` - Actor lookups
+- `ix_provenance_nodes_resource` - Resource tracking
+- `ix_provenance_nodes_created_at` - Chronological sorting
+
+---
+
+#### compliance_audit_log
+
+Append-only compliance audit log for regulatory requirements including HIPAA, 21 CFR Part 11, and institutional policies.
+
+```sql
+CREATE TABLE compliance_audit_log (
+    id SERIAL PRIMARY KEY,
+    institution_id UUID REFERENCES institution_feature_flags(institution_id) ON DELETE SET NULL,
+    event_type VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(100) NOT NULL,
+    resource_id VARCHAR(255),
+    actor_id UUID,
+    actor_name VARCHAR(255),
+    actor_email VARCHAR(255),
+    actor_role VARCHAR(100),
+    action VARCHAR(100) NOT NULL,
+    action_detail TEXT,
+    details JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    request_id VARCHAR(100),
+    success BOOLEAN DEFAULT true,
+    error_message TEXT,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX ix_compliance_audit_log_event_type ON compliance_audit_log(event_type);
+CREATE INDEX ix_compliance_audit_log_timestamp ON compliance_audit_log(timestamp);
+CREATE INDEX ix_compliance_audit_log_actor_timestamp ON compliance_audit_log(actor_id, timestamp);
+CREATE INDEX ix_compliance_audit_log_resource ON compliance_audit_log(resource_type, resource_id);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | SERIAL | PRIMARY KEY | auto-increment | Unique log entry identifier |
+| institution_id | UUID | FK | NULL | Institution scope |
+| event_type | VARCHAR(100) | NOT NULL | - | Event type: access, create, update, delete, export, login, etc. |
+| resource_type | VARCHAR(100) | NOT NULL | - | Resource type: document, session, user, etc. |
+| resource_id | VARCHAR(255) | - | NULL | Resource identifier |
+| actor_id | UUID | - | NULL | User who performed action |
+| actor_name | VARCHAR(255) | - | NULL | Actor name at time of action |
+| actor_email | VARCHAR(255) | - | NULL | Actor email at time of action |
+| actor_role | VARCHAR(100) | - | NULL | Actor role at time of action |
+| action | VARCHAR(100) | NOT NULL | - | Action performed |
+| action_detail | TEXT | - | NULL | Action description |
+| details | JSONB | - | NULL | Structured details |
+| ip_address | INET | - | NULL | Client IP address |
+| user_agent | TEXT | - | NULL | Client user agent |
+| request_id | VARCHAR(100) | - | NULL | Request ID for tracing |
+| success | BOOLEAN | - | true | Action success status |
+| error_message | TEXT | - | NULL | Error message if failed |
+| timestamp | TIMESTAMP WITH TIME ZONE | NOT NULL | NOW() | Action timestamp (immutable) |
+
+**Foreign Keys:**
+- `institution_id` -> `institution_feature_flags(institution_id)` ON DELETE SET NULL
+
+**Indexes:**
+- `ix_compliance_audit_log_event_type` - Event type filtering
+- `ix_compliance_audit_log_timestamp` - Chronological sorting
+- `ix_compliance_audit_log_actor_timestamp` - Actor activity history
+- `ix_compliance_audit_log_resource` - Resource audit trail
+
+---
+
+#### electronic_signatures
+
+Electronic signatures for 21 CFR Part 11 compliance. Captures legally binding signatures with all required metadata for regulatory compliance.
+
+```sql
+CREATE TABLE electronic_signatures (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID NOT NULL REFERENCES generated_documents(id) ON DELETE CASCADE,
+    document_version INTEGER NOT NULL,
+    document_hash VARCHAR(64) NOT NULL,
+    signer_id UUID NOT NULL,
+    signer_name VARCHAR(255) NOT NULL,
+    signer_email VARCHAR(255) NOT NULL,
+    signer_title VARCHAR(255),
+    signer_institution VARCHAR(500),
+    meaning VARCHAR(100) NOT NULL,
+    statement TEXT,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    timezone VARCHAR(50) DEFAULT 'UTC' NOT NULL,
+    timestamp_utc TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    system_id VARCHAR(100) NOT NULL,
+    system_version VARCHAR(50),
+    signature_hash VARCHAR(128) NOT NULL,
+    signature_algorithm VARCHAR(50) DEFAULT 'SHA-256',
+    public_key_fingerprint VARCHAR(128),
+    auth_method VARCHAR(50) NOT NULL,
+    auth_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    is_valid BOOLEAN DEFAULT true,
+    invalidated_at TIMESTAMP WITH TIME ZONE,
+    invalidation_reason TEXT,
+    CONSTRAINT ck_electronic_signatures_meaning_valid CHECK (meaning IN ('approval', 'review', 'author', 'witness', 'acknowledgment'))
+);
+
+CREATE INDEX ix_electronic_signatures_signer ON electronic_signatures(signer_id);
+CREATE INDEX ix_electronic_signatures_document_signer ON electronic_signatures(document_id, signer_id);
+CREATE INDEX ix_electronic_signatures_timestamp ON electronic_signatures(timestamp);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique signature identifier |
+| document_id | UUID | NOT NULL, FK | - | Reference to generated document |
+| document_version | INTEGER | NOT NULL | - | Document version at signing |
+| document_hash | VARCHAR(64) | NOT NULL | - | SHA-256 hash of document at signing |
+| signer_id | UUID | NOT NULL | - | Signer user ID |
+| signer_name | VARCHAR(255) | NOT NULL | - | Full name at time of signing |
+| signer_email | VARCHAR(255) | NOT NULL | - | Email at time of signing |
+| signer_title | VARCHAR(255) | - | NULL | Title at time of signing |
+| signer_institution | VARCHAR(500) | - | NULL | Institution at time of signing |
+| meaning | VARCHAR(100) | NOT NULL, CHECK | - | Signature meaning: approval, review, author, witness, acknowledgment |
+| statement | TEXT | - | NULL | Optional statement with signature |
+| timestamp | TIMESTAMP WITH TIME ZONE | NOT NULL | NOW() | Signing timestamp |
+| timezone | VARCHAR(50) | NOT NULL | 'UTC' | Signer's timezone |
+| timestamp_utc | TIMESTAMP WITH TIME ZONE | NOT NULL | NOW() | UTC normalized timestamp |
+| system_id | VARCHAR(100) | NOT NULL | - | Unique system identifier |
+| system_version | VARCHAR(50) | - | NULL | System version |
+| signature_hash | VARCHAR(128) | NOT NULL | - | Hash of signature data |
+| signature_algorithm | VARCHAR(50) | - | 'SHA-256' | Hash algorithm used |
+| public_key_fingerprint | VARCHAR(128) | - | NULL | PKI fingerprint if using certificates |
+| auth_method | VARCHAR(50) | NOT NULL | - | Authentication method: password, mfa, biometric, certificate |
+| auth_timestamp | TIMESTAMP WITH TIME ZONE | NOT NULL | - | Authentication timestamp |
+| ip_address | INET | - | NULL | Client IP address |
+| user_agent | TEXT | - | NULL | Client user agent |
+| is_valid | BOOLEAN | - | true | Signature validity status |
+| invalidated_at | TIMESTAMP WITH TIME ZONE | - | NULL | Invalidation timestamp |
+| invalidation_reason | TEXT | - | NULL | Reason for invalidation |
+
+**Foreign Keys:**
+- `document_id` -> `generated_documents(id)` ON DELETE CASCADE
+
+**Indexes:**
+- `ix_electronic_signatures_signer` - Signer lookups
+- `ix_electronic_signatures_document_signer` - Document signature lookups
+- `ix_electronic_signatures_timestamp` - Chronological sorting
+
+---
+
+### Collaboration
+
+#### session_handoffs
+
+Tracks handoffs of chat sessions between users. Enables collaboration by allowing users to transfer sessions to colleagues with context and notes.
+
+```sql
+CREATE TABLE session_handoffs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    from_user_id UUID NOT NULL,
+    from_user_name VARCHAR(255),
+    to_user_id UUID NOT NULL,
+    to_user_name VARCHAR(255),
+    to_user_email VARCHAR(255),
+    handoff_note TEXT,
+    handoff_reason VARCHAR(100),
+    session_snapshot JSONB,
+    completion_at_handoff INTEGER,
+    status VARCHAR(50) DEFAULT 'pending',
+    response_note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    responded_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT ck_session_handoffs_status_valid CHECK (status IN ('pending', 'accepted', 'declined', 'expired', 'cancelled'))
+);
+
+CREATE INDEX ix_session_handoffs_from_user ON session_handoffs(from_user_id);
+CREATE INDEX ix_session_handoffs_to_user ON session_handoffs(to_user_id);
+CREATE INDEX ix_session_handoffs_status ON session_handoffs(status);
+CREATE INDEX ix_session_handoffs_created_at ON session_handoffs(created_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique handoff identifier |
+| session_id | UUID | NOT NULL, FK | - | Reference to chat session |
+| from_user_id | UUID | NOT NULL | - | User initiating handoff |
+| from_user_name | VARCHAR(255) | - | NULL | Sender name at handoff time |
+| to_user_id | UUID | NOT NULL | - | User receiving handoff |
+| to_user_name | VARCHAR(255) | - | NULL | Recipient name |
+| to_user_email | VARCHAR(255) | - | NULL | Recipient email |
+| handoff_note | TEXT | - | NULL | Message from sender |
+| handoff_reason | VARCHAR(100) | - | NULL | Reason: collaboration, expertise_needed, unavailable |
+| session_snapshot | JSONB | - | NULL | Session state at handoff |
+| completion_at_handoff | INTEGER | - | NULL | Completion percentage when handed off |
+| status | VARCHAR(50) | CHECK | 'pending' | Status: pending, accepted, declined, expired, cancelled |
+| response_note | TEXT | - | NULL | Response from recipient |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Handoff creation timestamp |
+| responded_at | TIMESTAMP WITH TIME ZONE | - | NULL | Response timestamp |
+| expires_at | TIMESTAMP WITH TIME ZONE | - | NULL | Optional expiration time |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE CASCADE
+
+**Indexes:**
+- `ix_session_handoffs_from_user` - Outgoing handoff lookups
+- `ix_session_handoffs_to_user` - Incoming handoff lookups
+- `ix_session_handoffs_status` - Status filtering
+- `ix_session_handoffs_created_at` - Chronological sorting
+
+---
+
+#### session_collaborators
+
+Tracks users who have access to collaborate on a session. Supports multi-user collaboration with different permission levels.
+
+```sql
+CREATE TABLE session_collaborators (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    user_name VARCHAR(255),
+    user_email VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'viewer',
+    can_edit VARCHAR(50) DEFAULT 'false',
+    can_invite VARCHAR(50) DEFAULT 'false',
+    invited_by UUID,
+    invitation_status VARCHAR(50) DEFAULT 'accepted',
+    last_accessed_at TIMESTAMP WITH TIME ZONE,
+    contribution_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT ck_session_collaborators_role_valid CHECK (role IN ('owner', 'editor', 'viewer', 'commenter'))
+);
+
+CREATE UNIQUE INDEX ix_session_collaborators_session_user ON session_collaborators(session_id, user_id);
+CREATE INDEX ix_session_collaborators_role ON session_collaborators(role);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique collaborator entry identifier |
+| session_id | UUID | NOT NULL, FK | - | Reference to chat session |
+| user_id | UUID | NOT NULL | - | Collaborator user ID |
+| user_name | VARCHAR(255) | - | NULL | Collaborator name |
+| user_email | VARCHAR(255) | - | NULL | Collaborator email |
+| role | VARCHAR(50) | CHECK | 'viewer' | Role: owner, editor, viewer, commenter |
+| can_edit | VARCHAR(50) | - | 'false' | Edit permission |
+| can_invite | VARCHAR(50) | - | 'false' | Invite permission |
+| invited_by | UUID | - | NULL | User who invited collaborator |
+| invitation_status | VARCHAR(50) | - | 'accepted' | Status: pending, accepted, declined |
+| last_accessed_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last access timestamp |
+| contribution_count | INTEGER | - | 0 | Number of contributions |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Foreign Keys:**
+- `session_id` -> `chat_sessions(id)` ON DELETE CASCADE
+
+**Unique Constraint:** `(session_id, user_id)` - One entry per user per session
+
+**Indexes:**
+- `ix_session_collaborators_session_user` - Session collaborator lookups (unique)
+- `ix_session_collaborators_role` - Role filtering
+
+---
+
+### Knowledge Base (RAG)
+
+#### knowledge_documents
+
+Stores knowledge base documents for RAG (Retrieval-Augmented Generation). These documents provide context for the AI assistant, including institutional guidelines, templates, and reference materials.
+
+```sql
+CREATE TABLE knowledge_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID REFERENCES institution_feature_flags(institution_id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    source_url VARCHAR(1000),
+    source_filename VARCHAR(500),
+    content TEXT NOT NULL,
+    content_type VARCHAR(50) DEFAULT 'text',
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    tags JSONB DEFAULT '[]',
+    embedding_model VARCHAR(100),
+    has_embeddings BOOLEAN DEFAULT false,
+    chunk_index INTEGER,
+    parent_document_id UUID REFERENCES knowledge_documents(id) ON DELETE CASCADE,
+    chunk_count INTEGER,
+    metadata JSONB,
+    language VARCHAR(10) DEFAULT 'en',
+    word_count INTEGER,
+    version INTEGER DEFAULT 1,
+    is_latest BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    is_public BOOLEAN DEFAULT false,
+    added_by UUID,
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_indexed_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT ck_knowledge_documents_version_positive CHECK (version > 0)
+);
+
+CREATE INDEX ix_knowledge_documents_category ON knowledge_documents(category);
+CREATE INDEX ix_knowledge_documents_active ON knowledge_documents(is_active);
+CREATE INDEX ix_knowledge_documents_institution_category ON knowledge_documents(institution_id, category);
+CREATE INDEX ix_knowledge_documents_embeddings ON knowledge_documents(has_embeddings);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique document identifier |
+| institution_id | UUID | FK | NULL | Institution scope (NULL = global) |
+| title | VARCHAR(500) | NOT NULL | - | Document title |
+| description | TEXT | - | NULL | Document description |
+| source_url | VARCHAR(1000) | - | NULL | Source URL |
+| source_filename | VARCHAR(500) | - | NULL | Original filename |
+| content | TEXT | NOT NULL | - | Document content |
+| content_type | VARCHAR(50) | - | 'text' | Content type: text, markdown, html |
+| category | VARCHAR(100) | - | NULL | Category: guidelines, templates, regulations, etc. |
+| subcategory | VARCHAR(100) | - | NULL | Subcategory |
+| tags | JSONB | - | '[]' | List of tags |
+| embedding_model | VARCHAR(100) | - | NULL | Model used for embeddings |
+| has_embeddings | BOOLEAN | - | false | Whether embeddings exist |
+| chunk_index | INTEGER | - | NULL | Chunk index if part of larger doc |
+| parent_document_id | UUID | FK | NULL | Parent document for chunks |
+| chunk_count | INTEGER | - | NULL | Total chunks if parent |
+| metadata | JSONB | - | NULL | Additional metadata |
+| language | VARCHAR(10) | - | 'en' | Document language |
+| word_count | INTEGER | - | NULL | Word count |
+| version | INTEGER | CHECK > 0 | 1 | Document version |
+| is_latest | BOOLEAN | - | true | Latest version flag |
+| is_active | BOOLEAN | - | true | Active status |
+| is_public | BOOLEAN | - | false | Public visibility |
+| added_by | UUID | - | NULL | User who added document |
+| approved_by | UUID | - | NULL | Approver user ID |
+| approved_at | TIMESTAMP WITH TIME ZONE | - | NULL | Approval timestamp |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+| last_indexed_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last embedding update |
+
+**Foreign Keys:**
+- `institution_id` -> `institution_feature_flags(institution_id)` ON DELETE CASCADE
+- `parent_document_id` -> `knowledge_documents(id)` ON DELETE CASCADE (self-referential)
+
+**Indexes:**
+- `ix_knowledge_documents_category` - Category filtering
+- `ix_knowledge_documents_active` - Active document filtering
+- `ix_knowledge_documents_institution_category` - Institution and category filtering
+- `ix_knowledge_documents_embeddings` - Embedding status filtering
+
+---
+
+#### knowledge_queries
+
+Logs queries made against the knowledge base. Used for analytics and improving retrieval relevance.
+
+```sql
+CREATE TABLE knowledge_queries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID,
+    user_id UUID,
+    institution_id UUID,
+    query_text TEXT NOT NULL,
+    query_type VARCHAR(50) DEFAULT 'semantic',
+    result_count INTEGER,
+    result_document_ids JSONB,
+    top_similarity_score VARCHAR(20),
+    latency_ms INTEGER,
+    was_helpful BOOLEAN,
+    user_feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_knowledge_queries_created_at ON knowledge_queries(created_at);
+CREATE INDEX ix_knowledge_queries_type ON knowledge_queries(query_type);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique query identifier |
+| session_id | UUID | - | NULL | Session context |
+| user_id | UUID | - | NULL | User making query |
+| institution_id | UUID | - | NULL | Institution scope |
+| query_text | TEXT | NOT NULL | - | Query text |
+| query_type | VARCHAR(50) | - | 'semantic' | Type: semantic, keyword, hybrid |
+| result_count | INTEGER | - | NULL | Number of results returned |
+| result_document_ids | JSONB | - | NULL | IDs of retrieved documents |
+| top_similarity_score | VARCHAR(20) | - | NULL | Highest similarity score |
+| latency_ms | INTEGER | - | NULL | Query latency |
+| was_helpful | BOOLEAN | - | NULL | User helpfulness rating |
+| user_feedback | TEXT | - | NULL | User feedback text |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Query timestamp |
+
+**Indexes:**
+- `ix_knowledge_queries_created_at` - Chronological sorting
+- `ix_knowledge_queries_type` - Query type filtering
+
+---
+
+### Analytics
+
+#### usage_analytics
+
+Daily aggregate usage statistics per institution. Provides insights into feature usage, costs, and user activity.
+
+```sql
+CREATE TABLE usage_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID NOT NULL REFERENCES institution_feature_flags(institution_id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    session_count INTEGER DEFAULT 0,
+    session_starts INTEGER DEFAULT 0,
+    session_completions INTEGER DEFAULT 0,
+    session_abandonments INTEGER DEFAULT 0,
+    document_count INTEGER DEFAULT 0,
+    documents_uploaded INTEGER DEFAULT 0,
+    documents_extracted INTEGER DEFAULT 0,
+    generation_count INTEGER DEFAULT 0,
+    prefill_count INTEGER DEFAULT 0,
+    gap_analyses_count INTEGER DEFAULT 0,
+    coherence_checks_count INTEGER DEFAULT 0,
+    token_count INTEGER DEFAULT 0,
+    tokens_claude INTEGER DEFAULT 0,
+    tokens_openai INTEGER DEFAULT 0,
+    tokens_input INTEGER DEFAULT 0,
+    tokens_output INTEGER DEFAULT 0,
+    active_user_count INTEGER DEFAULT 0,
+    unique_users JSONB DEFAULT '[]',
+    avg_session_duration_seconds INTEGER,
+    avg_response_time_ms INTEGER,
+    completion_rate NUMERIC(5,2),
+    error_count INTEGER DEFAULT 0,
+    errors_by_type JSONB DEFAULT '{}',
+    cost_claude NUMERIC(10,4) DEFAULT 0,
+    cost_openai NUMERIC(10,4) DEFAULT 0,
+    cost_total NUMERIC(10,4) DEFAULT 0,
+    feature_usage JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_usage_analytics_institution_date UNIQUE (institution_id, date)
+);
+
+CREATE INDEX ix_usage_analytics_date ON usage_analytics(date);
+CREATE INDEX ix_usage_analytics_institution_date ON usage_analytics(institution_id, date);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique analytics record identifier |
+| institution_id | UUID | NOT NULL, FK | - | Institution reference |
+| date | DATE | NOT NULL | - | Analytics date |
+| session_count | INTEGER | - | 0 | Total sessions |
+| session_starts | INTEGER | - | 0 | New sessions started |
+| session_completions | INTEGER | - | 0 | Sessions completed |
+| session_abandonments | INTEGER | - | 0 | Sessions abandoned |
+| document_count | INTEGER | - | 0 | Total documents |
+| documents_uploaded | INTEGER | - | 0 | Documents uploaded |
+| documents_extracted | INTEGER | - | 0 | Documents extracted |
+| generation_count | INTEGER | - | 0 | Document generations |
+| prefill_count | INTEGER | - | 0 | Form prefills |
+| gap_analyses_count | INTEGER | - | 0 | Gap analyses performed |
+| coherence_checks_count | INTEGER | - | 0 | Coherence checks performed |
+| token_count | INTEGER | - | 0 | Total tokens used |
+| tokens_claude | INTEGER | - | 0 | Claude tokens used |
+| tokens_openai | INTEGER | - | 0 | OpenAI tokens used |
+| tokens_input | INTEGER | - | 0 | Input tokens |
+| tokens_output | INTEGER | - | 0 | Output tokens |
+| active_user_count | INTEGER | - | 0 | Active users count |
+| unique_users | JSONB | - | '[]' | List of unique user IDs |
+| avg_session_duration_seconds | INTEGER | - | NULL | Average session duration |
+| avg_response_time_ms | INTEGER | - | NULL | Average response time |
+| completion_rate | NUMERIC(5,2) | - | NULL | Completion rate percentage |
+| error_count | INTEGER | - | 0 | Error count |
+| errors_by_type | JSONB | - | '{}' | Errors by type |
+| cost_claude | NUMERIC(10,4) | - | 0 | Claude API cost (USD) |
+| cost_openai | NUMERIC(10,4) | - | 0 | OpenAI API cost (USD) |
+| cost_total | NUMERIC(10,4) | - | 0 | Total cost (USD) |
+| feature_usage | JSONB | - | '{}' | Feature usage breakdown |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Foreign Keys:**
+- `institution_id` -> `institution_feature_flags(institution_id)` ON DELETE CASCADE
+
+**Unique Constraint:** `(institution_id, date)` - One record per institution per day
+
+**Indexes:**
+- `ix_usage_analytics_date` - Date filtering
+- `ix_usage_analytics_institution_date` - Institution and date filtering
+
+---
+
+#### user_activities
+
+Individual user activity tracking. Records significant user actions for analytics and usage pattern analysis.
+
+```sql
+CREATE TABLE user_activities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    institution_id UUID,
+    session_id UUID,
+    activity_type VARCHAR(100) NOT NULL,
+    activity_detail VARCHAR(255),
+    metadata JSONB,
+    resource_type VARCHAR(100),
+    resource_id VARCHAR(255),
+    duration_ms INTEGER,
+    success BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_user_activities_type ON user_activities(activity_type);
+CREATE INDEX ix_user_activities_user_created ON user_activities(user_id, created_at);
+CREATE INDEX ix_user_activities_created_at ON user_activities(created_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique activity identifier |
+| user_id | UUID | NOT NULL | - | User reference |
+| institution_id | UUID | - | NULL | Institution scope |
+| session_id | UUID | - | NULL | Session context |
+| activity_type | VARCHAR(100) | NOT NULL | - | Type: session_start, document_upload, generation, etc. |
+| activity_detail | VARCHAR(255) | - | NULL | Activity detail |
+| metadata | JSONB | - | NULL | Additional metadata |
+| resource_type | VARCHAR(100) | - | NULL | Resource type affected |
+| resource_id | VARCHAR(255) | - | NULL | Resource identifier |
+| duration_ms | INTEGER | - | NULL | Activity duration |
+| success | BOOLEAN | - | true | Success status |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Activity timestamp |
+
+**Indexes:**
+- `ix_user_activities_type` - Activity type filtering
+- `ix_user_activities_user_created` - User activity history
+- `ix_user_activities_created_at` - Chronological sorting
+
+---
+
+#### feature_usage_metrics
+
+Tracks usage of specific features for optimization and reporting.
+
+```sql
+CREATE TABLE feature_usage_metrics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID,
+    user_id UUID,
+    feature_name VARCHAR(100) NOT NULL,
+    feature_version VARCHAR(50),
+    invocation_count INTEGER DEFAULT 1,
+    success_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    avg_latency_ms INTEGER,
+    total_tokens INTEGER DEFAULT 0,
+    period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_feature_usage_metrics_feature ON feature_usage_metrics(feature_name);
+CREATE INDEX ix_feature_usage_metrics_period ON feature_usage_metrics(period_start, period_end);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique metric identifier |
+| institution_id | UUID | - | NULL | Institution scope |
+| user_id | UUID | - | NULL | User scope |
+| feature_name | VARCHAR(100) | NOT NULL | - | Feature name |
+| feature_version | VARCHAR(50) | - | NULL | Feature version |
+| invocation_count | INTEGER | - | 1 | Number of invocations |
+| success_count | INTEGER | - | 0 | Successful invocations |
+| error_count | INTEGER | - | 0 | Failed invocations |
+| avg_latency_ms | INTEGER | - | NULL | Average latency |
+| total_tokens | INTEGER | - | 0 | Total tokens used |
+| period_start | TIMESTAMP WITH TIME ZONE | NOT NULL | - | Period start |
+| period_end | TIMESTAMP WITH TIME ZONE | NOT NULL | - | Period end |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Indexes:**
+- `ix_feature_usage_metrics_feature` - Feature filtering
+- `ix_feature_usage_metrics_period` - Period filtering
+
+---
+
+### Integrations
+
+#### user_integration_credentials
+
+Stores encrypted credentials for external integrations. Supports OAuth tokens, API keys, and other authentication methods for services like REDCap, EHR systems, etc.
+
+```sql
+CREATE TABLE user_integration_credentials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    institution_id UUID,
+    provider VARCHAR(100) NOT NULL,
+    provider_instance VARCHAR(255),
+    credentials_encrypted BYTEA NOT NULL,
+    encryption_key_id VARCHAR(100),
+    encryption_algorithm VARCHAR(50) DEFAULT 'AES-256-GCM',
+    token_type VARCHAR(50) DEFAULT 'oauth2',
+    access_token_expires_at TIMESTAMP WITH TIME ZONE,
+    refresh_token_expires_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    scopes JSONB DEFAULT '[]',
+    permissions JSONB,
+    is_active BOOLEAN DEFAULT true,
+    is_valid BOOLEAN DEFAULT true,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    last_error TEXT,
+    error_count INTEGER DEFAULT 0,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_user_integration_provider UNIQUE (user_id, provider, provider_instance)
+);
+
+CREATE INDEX ix_user_integration_credentials_provider ON user_integration_credentials(provider);
+CREATE INDEX ix_user_integration_credentials_user_provider ON user_integration_credentials(user_id, provider);
+CREATE INDEX ix_user_integration_credentials_expires ON user_integration_credentials(expires_at);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique credential identifier |
+| user_id | UUID | NOT NULL | - | User reference |
+| institution_id | UUID | - | NULL | Institution scope |
+| provider | VARCHAR(100) | NOT NULL | - | Provider: redcap, epic, cerner, etc. |
+| provider_instance | VARCHAR(255) | - | NULL | Specific instance URL/ID |
+| credentials_encrypted | BYTEA | NOT NULL | - | Encrypted credentials |
+| encryption_key_id | VARCHAR(100) | - | NULL | Reference to encryption key |
+| encryption_algorithm | VARCHAR(50) | - | 'AES-256-GCM' | Encryption algorithm |
+| token_type | VARCHAR(50) | - | 'oauth2' | Token type: oauth2, api_key, basic, certificate |
+| access_token_expires_at | TIMESTAMP WITH TIME ZONE | - | NULL | Access token expiration |
+| refresh_token_expires_at | TIMESTAMP WITH TIME ZONE | - | NULL | Refresh token expiration |
+| expires_at | TIMESTAMP WITH TIME ZONE | - | NULL | General expiration |
+| scopes | JSONB | - | '[]' | OAuth scopes granted |
+| permissions | JSONB | - | NULL | Provider-specific permissions |
+| is_active | BOOLEAN | - | true | Active status |
+| is_valid | BOOLEAN | - | true | Validity status |
+| last_used_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last usage timestamp |
+| last_error | TEXT | - | NULL | Last error message |
+| error_count | INTEGER | - | 0 | Error count |
+| metadata | JSONB | - | NULL | Additional metadata |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Unique Constraint:** `(user_id, provider, provider_instance)` - One credential per user per provider instance
+
+**Indexes:**
+- `ix_user_integration_credentials_provider` - Provider filtering
+- `ix_user_integration_credentials_user_provider` - User and provider filtering
+- `ix_user_integration_credentials_expires` - Expiration tracking
+
+---
+
+#### institution_integrations
+
+Institution-level integration configurations. Stores shared integration settings and credentials that apply to all users within an institution.
+
+```sql
+CREATE TABLE institution_integrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID NOT NULL,
+    integration_type VARCHAR(100) NOT NULL,
+    integration_name VARCHAR(255) NOT NULL,
+    provider VARCHAR(100) NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}',
+    endpoint_url VARCHAR(1000),
+    credentials_encrypted BYTEA,
+    encryption_key_id VARCHAR(100),
+    is_enabled BOOLEAN DEFAULT true,
+    is_configured BOOLEAN DEFAULT false,
+    last_sync_at TIMESTAMP WITH TIME ZONE,
+    last_error TEXT,
+    health_status VARCHAR(50) DEFAULT 'unknown',
+    sync_enabled BOOLEAN DEFAULT false,
+    sync_interval_minutes INTEGER,
+    sync_config JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_institution_integration UNIQUE (institution_id, integration_type, provider)
+);
+
+CREATE INDEX ix_institution_integrations_type ON institution_integrations(integration_type);
+CREATE INDEX ix_institution_integrations_enabled ON institution_integrations(is_enabled);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique integration identifier |
+| institution_id | UUID | NOT NULL | - | Institution reference |
+| integration_type | VARCHAR(100) | NOT NULL | - | Type: hl7_fhir, redcap, ehr, storage, etc. |
+| integration_name | VARCHAR(255) | NOT NULL | - | Integration display name |
+| provider | VARCHAR(100) | NOT NULL | - | Provider name |
+| config | JSONB | NOT NULL | '{}' | Non-sensitive configuration |
+| endpoint_url | VARCHAR(1000) | - | NULL | Integration endpoint URL |
+| credentials_encrypted | BYTEA | - | NULL | Encrypted credentials |
+| encryption_key_id | VARCHAR(100) | - | NULL | Encryption key reference |
+| is_enabled | BOOLEAN | - | true | Enabled status |
+| is_configured | BOOLEAN | - | false | Configuration complete status |
+| last_sync_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last sync timestamp |
+| last_error | TEXT | - | NULL | Last error message |
+| health_status | VARCHAR(50) | - | 'unknown' | Health: healthy, degraded, error, unknown |
+| sync_enabled | BOOLEAN | - | false | Sync enabled status |
+| sync_interval_minutes | INTEGER | - | NULL | Sync interval |
+| sync_config | JSONB | - | NULL | Sync configuration |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Unique Constraint:** `(institution_id, integration_type, provider)` - One integration per type per provider per institution
+
+**Indexes:**
+- `ix_institution_integrations_type` - Integration type filtering
+- `ix_institution_integrations_enabled` - Enabled status filtering
+
+---
+
+#### webhook_endpoints
+
+Webhook endpoints for receiving notifications from integrations.
+
+```sql
+CREATE TABLE webhook_endpoints (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    institution_id UUID,
+    integration_id UUID REFERENCES institution_integrations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    url VARCHAR(1000) NOT NULL,
+    secret_key_encrypted BYTEA,
+    events JSONB DEFAULT '[]',
+    filters JSONB,
+    is_active BOOLEAN DEFAULT true,
+    last_triggered_at TIMESTAMP WITH TIME ZONE,
+    last_success_at TIMESTAMP WITH TIME ZONE,
+    last_failure_at TIMESTAMP WITH TIME ZONE,
+    failure_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    retry_delay_seconds INTEGER DEFAULT 60,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX ix_webhook_endpoints_active ON webhook_endpoints(is_active);
+CREATE INDEX ix_webhook_endpoints_institution ON webhook_endpoints(institution_id);
+```
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| id | UUID | PRIMARY KEY | uuid_generate_v4() | Unique endpoint identifier |
+| institution_id | UUID | - | NULL | Institution scope |
+| integration_id | UUID | FK | NULL | Reference to institution integration |
+| name | VARCHAR(255) | NOT NULL | - | Endpoint name |
+| url | VARCHAR(1000) | NOT NULL | - | Webhook URL |
+| secret_key_encrypted | BYTEA | - | NULL | Encrypted secret for signature verification |
+| events | JSONB | - | '[]' | Events to listen for |
+| filters | JSONB | - | NULL | Event filters |
+| is_active | BOOLEAN | - | true | Active status |
+| last_triggered_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last trigger timestamp |
+| last_success_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last successful trigger |
+| last_failure_at | TIMESTAMP WITH TIME ZONE | - | NULL | Last failed trigger |
+| failure_count | INTEGER | - | 0 | Consecutive failure count |
+| max_retries | INTEGER | - | 3 | Maximum retry attempts |
+| retry_delay_seconds | INTEGER | - | 60 | Delay between retries |
+| created_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Creation timestamp |
+| updated_at | TIMESTAMP WITH TIME ZONE | - | NOW() | Last update timestamp |
+
+**Foreign Keys:**
+- `integration_id` -> `institution_integrations(id)` ON DELETE CASCADE
+
+**Indexes:**
+- `ix_webhook_endpoints_active` - Active endpoint filtering
+- `ix_webhook_endpoints_institution` - Institution endpoint lookups
+
+---
+
+## Protocol Assistant Indexes Summary
+
+| Table | Index Name | Columns | Purpose |
+|-------|------------|---------|---------|
+| chat_sessions | ix_chat_sessions_project_user | project_id, user_id | Combined project and user lookups |
+| chat_sessions | ix_chat_sessions_status | status | Status filtering |
+| chat_sessions | ix_chat_sessions_created_at | created_at | Chronological sorting |
+| chat_messages | ix_chat_messages_session_created | session_id, created_at | Session message ordering |
+| chat_messages | ix_chat_messages_role | role | Role-based filtering |
+| generated_documents | ix_generated_documents_project_type | project_id, document_type | Project and type filtering |
+| generated_documents | ix_generated_documents_status | status | Status filtering |
+| generated_documents | ix_generated_documents_created_at | created_at | Chronological sorting |
+| institution_feature_flags | ix_institution_feature_flags_institution_id | institution_id | Institution lookups (unique) |
+| prompt_versions | ix_prompt_versions_active | is_active | Active version filtering |
+| prompt_versions | ix_prompt_versions_key_active | prompt_key, is_active | Key and active filtering |
+| ai_feedback | ix_ai_feedback_user_created | user_id, created_at | User feedback history |
+| ai_feedback | ix_ai_feedback_type | feedback_type | Type filtering |
+| ai_feedback | ix_ai_feedback_rating | rating | Rating filtering |
+| provenance_nodes | ix_provenance_nodes_type | type | Type filtering |
+| provenance_nodes | ix_provenance_nodes_actor | actor | Actor lookups |
+| provenance_nodes | ix_provenance_nodes_resource | resource_type, resource_id | Resource tracking |
+| provenance_nodes | ix_provenance_nodes_created_at | created_at | Chronological sorting |
+| compliance_audit_log | ix_compliance_audit_log_event_type | event_type | Event type filtering |
+| compliance_audit_log | ix_compliance_audit_log_timestamp | timestamp | Chronological sorting |
+| compliance_audit_log | ix_compliance_audit_log_actor_timestamp | actor_id, timestamp | Actor activity history |
+| compliance_audit_log | ix_compliance_audit_log_resource | resource_type, resource_id | Resource audit trail |
+| electronic_signatures | ix_electronic_signatures_signer | signer_id | Signer lookups |
+| electronic_signatures | ix_electronic_signatures_document_signer | document_id, signer_id | Document signature lookups |
+| electronic_signatures | ix_electronic_signatures_timestamp | timestamp | Chronological sorting |
+| session_handoffs | ix_session_handoffs_from_user | from_user_id | Outgoing handoff lookups |
+| session_handoffs | ix_session_handoffs_to_user | to_user_id | Incoming handoff lookups |
+| session_handoffs | ix_session_handoffs_status | status | Status filtering |
+| session_handoffs | ix_session_handoffs_created_at | created_at | Chronological sorting |
+| session_collaborators | ix_session_collaborators_session_user | session_id, user_id | Session collaborator lookups (unique) |
+| session_collaborators | ix_session_collaborators_role | role | Role filtering |
+| knowledge_documents | ix_knowledge_documents_category | category | Category filtering |
+| knowledge_documents | ix_knowledge_documents_active | is_active | Active document filtering |
+| knowledge_documents | ix_knowledge_documents_institution_category | institution_id, category | Institution and category filtering |
+| knowledge_documents | ix_knowledge_documents_embeddings | has_embeddings | Embedding status filtering |
+| knowledge_queries | ix_knowledge_queries_created_at | created_at | Chronological sorting |
+| knowledge_queries | ix_knowledge_queries_type | query_type | Query type filtering |
+| usage_analytics | ix_usage_analytics_date | date | Date filtering |
+| usage_analytics | ix_usage_analytics_institution_date | institution_id, date | Institution and date filtering |
+| user_activities | ix_user_activities_type | activity_type | Activity type filtering |
+| user_activities | ix_user_activities_user_created | user_id, created_at | User activity history |
+| user_activities | ix_user_activities_created_at | created_at | Chronological sorting |
+| feature_usage_metrics | ix_feature_usage_metrics_feature | feature_name | Feature filtering |
+| feature_usage_metrics | ix_feature_usage_metrics_period | period_start, period_end | Period filtering |
+| user_integration_credentials | ix_user_integration_credentials_provider | provider | Provider filtering |
+| user_integration_credentials | ix_user_integration_credentials_user_provider | user_id, provider | User and provider filtering |
+| user_integration_credentials | ix_user_integration_credentials_expires | expires_at | Expiration tracking |
+| institution_integrations | ix_institution_integrations_type | integration_type | Integration type filtering |
+| institution_integrations | ix_institution_integrations_enabled | is_enabled | Enabled status filtering |
+| webhook_endpoints | ix_webhook_endpoints_active | is_active | Active endpoint filtering |
+| webhook_endpoints | ix_webhook_endpoints_institution | institution_id | Institution endpoint lookups |
+
+---
+
+*Last Updated: January 23, 2026*

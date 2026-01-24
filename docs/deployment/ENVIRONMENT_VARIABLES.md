@@ -16,6 +16,7 @@ This document provides a complete reference for all environment variables used i
 - [Monitoring and Logging](#monitoring-and-logging)
 - [Security Settings](#security-settings)
 - [Example Configurations](#example-configurations)
+- [Protocol Assistant Configuration](#protocol-assistant-configuration)
 
 ## Overview
 
@@ -478,6 +479,76 @@ STORAGE_PATH=/data/protocol-assistant/documents
 
 LOG_LEVEL=INFO
 PROMETHEUS_ENABLED=true
+```
+
+## Protocol Assistant Configuration
+
+This section documents the environment variables specific to the Protocol Assistant service.
+
+### Service Ports
+
+The following ports are used by the platform services:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Frontend | 5174 | React/Vite development server |
+| Gateway | 3001 | API Gateway service |
+| Forms Service | 8001 | Forms backend service |
+| Protocol Assistant | 8002 | Protocol Assistant service |
+| Database | 5434 | PostgreSQL database |
+
+### LLM API Keys
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | Yes* | - | Claude API key from console.anthropic.com |
+| `OPENAI_API_KEY` | No | - | OpenAI API key from platform.openai.com |
+| `CLAUDE_API_KEY` | No | - | Alias for ANTHROPIC_API_KEY |
+| `DEFAULT_LLM_PROVIDER` | No | `anthropic` | Primary LLM provider (anthropic/openai) |
+| `CLAUDE_MODEL` | No | `claude-sonnet-4-20250514` | Claude model to use |
+| `OPENAI_MODEL` | No | `gpt-4o` | OpenAI model to use |
+
+*At least one LLM API key is required
+
+```bash
+# LLM API Keys example
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxxx
+DEFAULT_LLM_PROVIDER=anthropic
+CLAUDE_MODEL=claude-sonnet-4-20250514
+```
+
+### Security
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ENCRYPTION_KEY` | Yes (prod) | - | Fernet key for credential encryption |
+| `HIPAA_COMPLIANCE_ENABLED` | No | `true` | Enable PHI detection |
+| `AUDIT_LOGGING_ENABLED` | No | `true` | Enable audit logging |
+
+**How to Generate Encryption Key:**
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+```bash
+# Security example
+ENCRYPTION_KEY=your-generated-fernet-key
+HIPAA_COMPLIANCE_ENABLED=true
+AUDIT_LOGGING_ENABLED=true
+```
+
+### Service Configuration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `PROTOCOL_ASSISTANT_URL` | Yes | `http://protocol-assistant:8000` | Internal service URL |
+| `PROTOCOL_ASSISTANT_PORT` | No | `8002` | External port mapping |
+
+```bash
+# Service configuration example
+PROTOCOL_ASSISTANT_URL=http://protocol-assistant:8000
+PROTOCOL_ASSISTANT_PORT=8002
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to the Protocol Assistant! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to the Radiology Research Platform! This document provides guidelines for contributing to the project.
 
 ## Table of Contents
 
@@ -12,6 +12,7 @@ Thank you for your interest in contributing to the Protocol Assistant! This docu
 - [Testing Requirements](#testing-requirements)
 - [Documentation Requirements](#documentation-requirements)
 - [Issue Guidelines](#issue-guidelines)
+- [Protocol Assistant Development](#protocol-assistant-development)
 
 ## Code of Conduct
 
@@ -99,6 +100,16 @@ We are committed to providing a welcoming and inclusive experience for everyone.
    cd frontend
    npm run dev
    ```
+
+### Development Ports
+
+| Service | Port |
+|---------|------|
+| Frontend | 5174 |
+| Gateway | 3001 |
+| Forms Service | 8001 |
+| Protocol Assistant | 8002 |
+| Database | 5434 |
 
 ### Branch Strategy
 
@@ -442,7 +453,53 @@ Contributors are recognized in:
 - Release notes
 - Project documentation
 
-Thank you for contributing to Protocol Assistant!
+## Protocol Assistant Development
+
+The Protocol Assistant is an LLM-powered service that helps users create and manage research protocols.
+
+### Service Structure
+
+- **Location:** `protocol-assistant/`
+- **Framework:** FastAPI with async SQLAlchemy
+- **Language:** Python 3.11+
+
+### Adding New LLM Features
+
+1. **Add prompts** in `app/services/prompts/`
+2. **Implement service logic** in `app/services/`
+3. **Add API routes** in `app/routers/`
+4. **Update schemas** in `app/schemas/`
+
+### Testing
+
+```bash
+# Unit tests
+pytest protocol-assistant/tests/
+
+# Integration tests require LLM API keys
+# Mock LLM responses for CI
+```
+
+### Database Migrations
+
+```bash
+# Create a new migration
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Test migration (downgrade and upgrade)
+alembic downgrade -1 && alembic upgrade head
+```
+
+### Code Style
+
+- Use **black** for formatting
+- Use **mypy** for type checking
+- Follow existing patterns in the codebase
+
+Thank you for contributing to the Radiology Research Platform!
 
 ---
 

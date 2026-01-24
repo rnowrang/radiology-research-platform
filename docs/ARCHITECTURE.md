@@ -42,27 +42,30 @@ This document describes the architecture of the Radiology Research Platform.
 │                     │  │   - User Management │  │   - Version Control │
 │                     │  │   - Project Mgmt    │  │                     │
 │                     │  │   - Forms Proxy     │  │                     │
+│                     │  │   - Protocol Proxy  │  │                     │
 └─────────────────────┘  └──────────┬──────────┘  └──────────┬──────────┘
                                     │                        │
                                     │    Internal Network    │
                                     │    (Docker Bridge)     │
                                     │                        │
-                                    └───────────┬────────────┘
-                                                │
-                                                ▼
-                              ┌─────────────────────────────────┐
-                              │         PostgreSQL 15           │
-                              │                                 │
-                              │   Port: 5434                    │
-                              │                                 │
-                              │   - Users & Sessions            │
-                              │   - Projects                    │
-                              │   - Form Templates              │
-                              │   - Form Instances              │
-                              │   - Review Workflow             │
-                              │   - Audit Logs                  │
-                              │                                 │
-                              └─────────────────────────────────┘
+              ┌─────────────────────┼────────────────────────┘
+              │                     │
+              ▼                     ▼
+┌─────────────────────┐  ┌─────────────────────┐
+│ Protocol Assistant  │  │    PostgreSQL 15    │
+│ (Python/FastAPI)    │  │                     │
+│                     │  │   Port: 5434        │
+│ Port: 8002          │  │                     │
+│                     │  │   - Users/Sessions  │
+│ - Chat Sessions     │  │   - Projects        │
+│ - Document Parsing  │  │   - Form Templates  │
+│ - Protocol Extract  │  │   - Form Instances  │
+│ - Doc Generation    │  │   - Review Workflow │
+│ - LLM Integration   │  │   - Audit Logs      │
+│                     │  │   - Chat Sessions   │
+└──────────┬──────────┘  │   - Protocol Drafts │
+           │             │                     │
+           └─────────────▶─────────────────────┘
 ```
 
 ---
@@ -106,6 +109,7 @@ This document describes the architecture of the Radiology Research Platform.
 - Rate limiting and security headers
 - User and project management
 - Proxy requests to Forms Service
+- Proxy requests to Protocol Assistant
 - Email notifications (future)
 
 **Key Technologies**:
@@ -119,6 +123,7 @@ This document describes the architecture of the Radiology Research Platform.
 **Communication**:
 - Inbound: HTTP from Frontend/clients
 - Outbound: HTTP to Forms Service (internal)
+- Outbound: HTTP to Protocol Assistant (internal)
 - Database: Direct PostgreSQL connection
 
 ---
@@ -155,7 +160,47 @@ This document describes the architecture of the Radiology Research Platform.
 
 ---
 
-### 4. PostgreSQL Database
+### 4. Protocol Assistant Service (Python/FastAPI)
+
+**Purpose**: AI-powered IRB protocol creation assistant
+
+**Responsibilities**:
+- Manage chat sessions for protocol assistance
+- Parse and analyze uploaded research documents
+- Extract protocol information from documents
+- Generate draft protocol documents
+- Route tasks to appropriate LLM providers
+- Maintain conversation context and history
+
+**Key Technologies**:
+- FastAPI with Python 3.11
+- AsyncPG for async database operations
+- Claude SDK (Anthropic) for complex reasoning
+- OpenAI SDK for document processing
+- Pydantic for validation
+- Document parsing libraries (PyPDF2, python-docx)
+
+**Key Features**:
+- **Chat Sessions**: Persistent conversation threads for protocol development
+- **Document Parsing**: Extract text and structure from PDFs, DOCX files
+- **Protocol Extraction**: Identify key protocol elements from research documents
+- **Document Generation**: Create draft IRB protocols from extracted information
+- **LLM Integration**: Task-based routing between Claude and OpenAI models
+
+**LLM Integration Strategy**:
+- Claude: Complex reasoning, protocol analysis, research comprehension
+- OpenAI: Document summarization, structured data extraction
+- Task router selects optimal model based on task characteristics
+
+**Communication**:
+- Inbound: HTTP from Gateway (internal)
+- Outbound: HTTPS to Claude API (Anthropic)
+- Outbound: HTTPS to OpenAI API
+- Database: Direct PostgreSQL connection (AsyncPG)
+
+---
+
+### 5. PostgreSQL Database
 
 **Purpose**: Persistent data storage
 
@@ -179,6 +224,7 @@ This document describes the architecture of the Radiology Research Platform.
 11. **Activity**: activities, editing_locks
 12. **Search**: search indexes (GIN), search_vector columns
 13. **Audit**: audit_logs (append-only)
+14. **Protocol Assistant**: chat_sessions, chat_messages, protocol_drafts, extracted_protocols
 
 ---
 
@@ -266,6 +312,66 @@ This document describes the architecture of the Radiology Research Platform.
      │◀──────────────│               │               │
 ```
 
+### Protocol Assistant Flow
+
+```
+┌─────────┐     ┌─────────┐     ┌───────────────┐     ┌────────────┐
+│ Browser │────▶│ Gateway │────▶│   Protocol    │────▶│  LLM APIs  │
+└─────────┘     └─────────┘     │   Assistant   │     │ (Claude/   │
+                                │   Service     │     │  OpenAI)   │
+                                └───────────────┘     └────────────┘
+     │               │               │                      │
+     │  1. POST      │  2. Verify    │                      │
+     │  /protocol/   │  JWT token    │                      │
+     │  chat         │               │                      │
+     │  {message,    │  3. Forward   │                      │
+     │   sessionId}  │  to Protocol  │                      │
+     │               │  Assistant    │  4. Route to         │
+     │               │  ────────────▶│  appropriate LLM     │
+     │               │               │  ─────────────────────▶
+     │               │               │                      │
+     │               │               │  5. Process          │
+     │               │               │  response            │
+     │               │               │◀─────────────────────│
+     │               │               │                      │
+     │               │               │  6. Save to          │
+     │               │               │  database            │
+     │               │               │  ───────▶ [Database] │
+     │               │               │                      │
+     │  7. Return    │◀──────────────│                      │
+     │  {response,   │               │                      │
+     │   sessionId}  │               │                      │
+     │◀──────────────│               │                      │
+
+Document Upload Flow:
+
+┌─────────┐     ┌─────────┐     ┌───────────────┐     ┌────────────┐
+│ Browser │────▶│ Gateway │────▶│   Protocol    │────▶│  Document  │
+└─────────┘     └─────────┘     │   Assistant   │     │  Parser    │
+                                └───────────────┘     └────────────┘
+     │               │               │                      │
+     │  1. POST      │  2. Validate  │                      │
+     │  /protocol/   │  file type,   │                      │
+     │  upload       │  size         │                      │
+     │  (multipart)  │               │                      │
+     │               │  3. Forward   │  4. Extract          │
+     │               │  ────────────▶│  text content        │
+     │               │               │  ─────────────────────▶
+     │               │               │                      │
+     │               │               │  5. Send to LLM      │
+     │               │               │  for extraction      │
+     │               │               │  ───────▶ [LLM API]  │
+     │               │               │                      │
+     │               │               │  6. Store            │
+     │               │               │  extracted data      │
+     │               │               │  ───────▶ [Database] │
+     │               │               │                      │
+     │  7. Return    │◀──────────────│                      │
+     │  {extracted   │               │                      │
+     │   protocol}   │               │                      │
+     │◀──────────────│               │                      │
+```
+
 ---
 
 ## Network Architecture
@@ -273,82 +379,108 @@ This document describes the architecture of the Radiology Research Platform.
 ### Docker Network (Development)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                 radiology-network (bridge)                   │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ radiology-db │  │  radiology-  │  │  radiology-  │       │
-│  │              │  │   gateway    │  │    forms     │       │
-│  │ 172.20.0.2   │  │ 172.20.0.3   │  │ 172.20.0.4   │       │
-│  │ :5432        │  │ :3000        │  │ :8000        │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-│                                                              │
-│  ┌──────────────┐                                           │
-│  │  radiology-  │                                           │
-│  │   frontend   │                                           │
-│  │ 172.20.0.5   │                                           │
-│  │ :5173        │                                           │
-│  └──────────────┘                                           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     radiology-network (bridge)                           │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ radiology-db │  │  radiology-  │  │  radiology-  │  │  radiology-  │ │
+│  │              │  │   gateway    │  │    forms     │  │  protocol    │ │
+│  │ 172.20.0.2   │  │ 172.20.0.3   │  │ 172.20.0.4   │  │ 172.20.0.5   │ │
+│  │ :5432        │  │ :3000        │  │ :8000        │  │ :8000        │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                                          │
+│  ┌──────────────┐                                                        │
+│  │  radiology-  │                                                        │
+│  │   frontend   │                                                        │
+│  │ 172.20.0.6   │                                                        │
+│  │ :5173        │                                                        │
+│  └──────────────┘                                                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
                            │
                            │ Port Mappings
                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Host Machine                             │
-│                                                              │
-│   localhost:5434 ──▶ db:5432                                │
-│   localhost:3001 ──▶ gateway:3000                           │
-│   localhost:8001 ──▶ forms-service:8000                     │
-│   localhost:5174 ──▶ frontend:5173                          │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Host Machine                                    │
+│                                                                          │
+│   localhost:5434 ──▶ db:5432                                            │
+│   localhost:3001 ──▶ gateway:3000                                       │
+│   localhost:8001 ──▶ forms-service:8000                                 │
+│   localhost:8002 ──▶ protocol-assistant:8000                            │
+│   localhost:5174 ──▶ frontend:5173                                      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Production Architecture (Future)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Internet                              │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Cloud Load Balancer                       │
-│                    (SSL Termination)                         │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         │                   │                   │
-         ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│  Frontend CDN   │ │ Gateway Cluster │ │ Forms Cluster   │
-│                 │ │   (2+ nodes)    │ │   (2+ nodes)    │
-│  Static Assets  │ │   Auto-scaling  │ │   Auto-scaling  │
-└─────────────────┘ └────────┬────────┘ └────────┬────────┘
-                             │                   │
-                             └─────────┬─────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────┐
-                    │    PostgreSQL (Primary/Replica) │
-                    │         + Redis Cache           │
-                    │       + S3 File Storage         │
-                    └─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            Internet                                      │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Cloud Load Balancer                               │
+│                        (SSL Termination)                                 │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│  Frontend CDN   │  │  Gateway Cluster    │  │  Backend Services   │
+│                 │  │    (2+ nodes)       │  │     Cluster         │
+│  Static Assets  │  │    Auto-scaling     │  │                     │
+└─────────────────┘  └──────────┬──────────┘  │  ┌───────────────┐  │
+                                │             │  │ Forms Service │  │
+                                │             │  │   (2+ nodes)  │  │
+                                │             │  └───────────────┘  │
+                                │             │                     │
+                                │             │  ┌───────────────┐  │
+                                │             │  │   Protocol    │  │
+                                │             │  │   Assistant   │  │
+                                │             │  │   (2+ nodes)  │  │
+                                │             │  └───────────────┘  │
+                                │             └──────────┬──────────┘
+                                │                        │
+                                └────────────┬───────────┘
+                                             │
+                                             ▼
+                    ┌─────────────────────────────────────────┐
+                    │    PostgreSQL (Primary/Replica)         │
+                    │           + Redis Cache                 │
+                    │         + S3 File Storage               │
+                    └─────────────────────────────────────────┘
 ```
 
 ---
 
-## Component Interaction Matrix
+## Service-to-Service Communication
 
-| Component | Frontend | Gateway | Forms Service | Database | File Storage | Email Service |
-|-----------|----------|---------|---------------|----------|--------------|---------------|
-| Frontend | - | HTTP/REST | - | - | - | - |
-| Gateway | - | - | HTTP/REST | PostgreSQL | Read | SMTP |
-| Forms Service | - | - | - | PostgreSQL | Read/Write | - |
-| Database | - | - | - | - | - | - |
-| File Storage | - | - | - | - | - | - |
-| Email Service | - | - | - | - | - | - |
+### Communication Matrix
+
+| Component | Frontend | Gateway | Forms Service | Protocol Assistant | Database | File Storage | LLM APIs |
+|-----------|----------|---------|---------------|-------------------|----------|--------------|----------|
+| Frontend | - | HTTP/REST | - | - | - | - | - |
+| Gateway | - | - | HTTP/REST | HTTP/REST | PostgreSQL | Read | - |
+| Forms Service | - | - | - | - | PostgreSQL | Read/Write | - |
+| Protocol Assistant | - | - | - | - | PostgreSQL | Read/Write | HTTPS |
+| Database | - | - | - | - | - | - | - |
+| File Storage | - | - | - | - | - | - | - |
+| LLM APIs | - | - | - | - | - | - | - |
+
+### Gateway Proxy Routes
+
+| Route Pattern | Target Service | Description |
+|---------------|----------------|-------------|
+| `/api/forms/*` | Forms Service (8001) | Form templates and instances |
+| `/api/templates/*` | Forms Service (8001) | Template management |
+| `/api/export/*` | Forms Service (8001) | Document export |
+| `/api/protocol/*` | Protocol Assistant (8002) | Chat and document processing |
+| `/api/protocol/chat/*` | Protocol Assistant (8002) | Chat session management |
+| `/api/protocol/upload/*` | Protocol Assistant (8002) | Document upload and parsing |
+| `/api/protocol/extract/*` | Protocol Assistant (8002) | Protocol extraction |
 
 ---
 
@@ -550,6 +682,14 @@ storage/
 │   │   └── attachments/
 │   │       └── {file_uuid}.{ext}
 │   └── ...
+│
+├── protocol/                     # Protocol Assistant files
+│   ├── uploads/                  # Uploaded research documents
+│   │   └── {session_id}/
+│   │       └── {file_uuid}.{ext}
+│   └── generated/                # Generated protocol drafts
+│       └── {session_id}/
+│           └── protocol_draft_{timestamp}.docx
 │
 └── generated/                    # System-generated documents
     ├── {form_id}/
@@ -822,6 +962,209 @@ editing_locks
 
 ---
 
+## Protocol Assistant Service
+
+### Overview
+
+The Protocol Assistant is an AI-powered service that helps researchers create IRB protocols by analyzing their research documents and guiding them through the protocol creation process via an interactive chat interface.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Protocol Assistant Service                           │
+│                     Port: 8002 (host) / 8000 (container)                │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                        API Layer (FastAPI)                        │   │
+│  │                                                                   │   │
+│  │  /chat          - Chat message handling                          │   │
+│  │  /sessions      - Session management                             │   │
+│  │  /upload        - Document upload                                │   │
+│  │  /extract       - Protocol extraction                            │   │
+│  │  /generate      - Document generation                            │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                    │                                     │
+│                                    ▼                                     │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                      Service Layer                                │   │
+│  │                                                                   │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │   │
+│  │  │    Chat     │  │  Document   │  │  Protocol   │              │   │
+│  │  │   Service   │  │   Parser    │  │  Extractor  │              │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │   │
+│  │         │                │                │                      │   │
+│  │         └────────────────┴────────┬───────┘                      │   │
+│  │                                   │                              │   │
+│  │                                   ▼                              │   │
+│  │  ┌─────────────────────────────────────────────────────────┐    │   │
+│  │  │                   LLM Task Router                        │    │   │
+│  │  │                                                          │    │   │
+│  │  │  Task Type          │  Model              │  Use Case    │    │   │
+│  │  │  ─────────────────────────────────────────────────────  │    │   │
+│  │  │  Complex reasoning  │  Claude (Opus/Sonnet)│  Protocol   │    │   │
+│  │  │                     │                      │  analysis   │    │   │
+│  │  │  Summarization      │  OpenAI GPT-4       │  Document   │    │   │
+│  │  │                     │                      │  summaries  │    │   │
+│  │  │  Data extraction    │  OpenAI GPT-4       │  Structured │    │   │
+│  │  │                     │                      │  data       │    │   │
+│  │  │  Conversation       │  Claude (Sonnet)    │  Chat       │    │   │
+│  │  │                     │                      │  responses  │    │   │
+│  │  └─────────────────────────────────────────────────────────┘    │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                    │                                     │
+│                                    ▼                                     │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                      Data Layer (AsyncPG)                         │   │
+│  │                                                                   │   │
+│  │  chat_sessions    │  chat_messages    │  protocol_drafts         │   │
+│  │  extracted_data   │  uploaded_files   │  llm_usage_logs          │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Features
+
+#### 1. Chat Sessions
+- Persistent conversation threads for each protocol development effort
+- Context-aware responses based on conversation history
+- Support for multi-turn conversations with document references
+
+#### 2. Document Parsing
+- PDF text extraction (PyPDF2)
+- DOCX content parsing (python-docx)
+- Table and structure preservation
+- Image/figure reference extraction (metadata only)
+
+#### 3. Protocol Extraction
+- Identify research objectives from documents
+- Extract methodology descriptions
+- Recognize participant populations
+- Identify risk factors and mitigation strategies
+- Detect data handling procedures
+
+#### 4. Document Generation
+- Generate draft IRB protocol sections
+- Fill standardized protocol templates
+- Create summary documents for review
+
+### LLM Integration
+
+#### Task-Based Routing
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         LLM Task Router                                  │
+│                                                                          │
+│   Incoming Task                                                          │
+│        │                                                                 │
+│        ▼                                                                 │
+│   ┌─────────────────────────────────────────────┐                       │
+│   │           Task Classification               │                       │
+│   │                                             │                       │
+│   │   - Analyze task requirements               │                       │
+│   │   - Check context length                    │                       │
+│   │   - Evaluate complexity                     │                       │
+│   └─────────────────────────────────────────────┘                       │
+│        │                                                                 │
+│        ├─────────────────────┬──────────────────┐                       │
+│        │                     │                  │                       │
+│        ▼                     ▼                  ▼                       │
+│   ┌─────────┐          ┌─────────┐        ┌─────────┐                  │
+│   │ Claude  │          │ OpenAI  │        │  Local  │                  │
+│   │  API    │          │  API    │        │ (Future)│                  │
+│   └─────────┘          └─────────┘        └─────────┘                  │
+│        │                     │                  │                       │
+│        └─────────────────────┴──────────────────┘                       │
+│                              │                                           │
+│                              ▼                                           │
+│                    Response Processing                                   │
+│                              │                                           │
+│                              ▼                                           │
+│                    Return to Caller                                      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Model Selection Criteria
+
+| Criteria | Claude (Anthropic) | OpenAI GPT-4 |
+|----------|-------------------|--------------|
+| Complex reasoning | Primary | Fallback |
+| Long context | Primary (200K) | Secondary |
+| Structured extraction | Secondary | Primary |
+| Cost-sensitive tasks | Secondary | Primary |
+| Research analysis | Primary | Secondary |
+
+### Database Schema (Protocol Assistant)
+
+```
+chat_sessions
+┌────────────────────────┐
+│ id (UUID)              │
+│ user_id                │
+│ project_id (nullable)  │
+│ title                  │
+│ status                 │
+│ context (JSON)         │
+│ created_at             │
+│ updated_at             │
+└────────────────────────┘
+         │
+         │ 1:N
+         ▼
+chat_messages
+┌────────────────────────┐
+│ id (UUID)              │
+│ session_id             │
+│ role (user/assistant)  │
+│ content                │
+│ metadata (JSON)        │
+│ tokens_used            │
+│ model_used             │
+│ created_at             │
+└────────────────────────┘
+
+protocol_drafts
+┌────────────────────────┐
+│ id (UUID)              │
+│ session_id             │
+│ project_id (nullable)  │
+│ version                │
+│ content (JSON)         │
+│ status                 │
+│ created_at             │
+│ updated_at             │
+└────────────────────────┘
+
+extracted_protocols
+┌────────────────────────┐
+│ id (UUID)              │
+│ session_id             │
+│ source_file_id         │
+│ extracted_data (JSON)  │
+│ confidence_score       │
+│ created_at             │
+└────────────────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/protocol/sessions` | GET | List user's chat sessions |
+| `/protocol/sessions` | POST | Create new chat session |
+| `/protocol/sessions/{id}` | GET | Get session details with messages |
+| `/protocol/sessions/{id}` | DELETE | Delete a chat session |
+| `/protocol/chat` | POST | Send message and get response |
+| `/protocol/upload` | POST | Upload document for analysis |
+| `/protocol/extract/{file_id}` | POST | Extract protocol from document |
+| `/protocol/generate/{session_id}` | POST | Generate protocol draft |
+| `/protocol/drafts/{session_id}` | GET | Get protocol drafts for session |
+
+---
+
 ## Scalability Considerations
 
 ### Horizontal Scaling
@@ -829,13 +1172,19 @@ editing_locks
 1. **Frontend**: Stateless, scales infinitely behind CDN
 2. **Gateway**: Stateless (JWT), scales behind load balancer
 3. **Forms Service**: Stateless, scales behind load balancer
-4. **Database**: Primary/replica setup, read replicas for queries
+4. **Protocol Assistant**: Stateless, scales behind load balancer (LLM calls are external)
+5. **Database**: Primary/replica setup, read replicas for queries
 
 ### Vertical Scaling
 
 1. **Forms Service**: PDF generation is CPU-intensive
    - Consider dedicated worker processes
    - Queue-based document generation
+
+2. **Protocol Assistant**: LLM calls are I/O bound
+   - Async processing with AsyncPG
+   - Connection pooling for database
+   - Rate limiting for LLM API calls
 
 ### Caching Strategy (Future)
 
@@ -844,6 +1193,7 @@ editing_locks
    - Rate limiting counters
    - Template schema caching
    - User permissions caching
+   - LLM response caching (for repeated queries)
 
 ---
 
@@ -852,6 +1202,7 @@ editing_locks
 ### Database Failure
 - Gateway returns 503 Service Unavailable
 - Forms Service returns 503 Service Unavailable
+- Protocol Assistant returns 503 Service Unavailable
 - Frontend shows error state
 - **Recovery**: Automatic reconnection with exponential backoff
 
@@ -860,16 +1211,40 @@ editing_locks
 - Other operations (auth, projects) continue to work
 - **Recovery**: Docker auto-restart, health checks
 
+### Protocol Assistant Failure
+- Gateway returns 502 Bad Gateway for protocol operations
+- Form operations and other services continue to work
+- **Recovery**: Docker auto-restart, health checks
+
 ### Gateway Failure
 - Frontend cannot make API calls
 - Direct Forms Service access blocked (no auth)
+- Direct Protocol Assistant access blocked (no auth)
 - **Recovery**: Docker auto-restart, health checks
+
+### LLM API Failure
+- Protocol Assistant returns degraded service response
+- Chat functionality temporarily unavailable
+- **Recovery**: Retry with exponential backoff, fallback to alternative provider
 
 ### File Storage Failure
 - Document generation fails
+- Protocol document uploads fail
 - Existing documents inaccessible
 - **Recovery**: Volume remount, backup restoration
 
 ---
 
-*Last Updated: January 15, 2026*
+## Port Summary
+
+| Service | Container Port | Host Port | Description |
+|---------|---------------|-----------|-------------|
+| Frontend | 5173 | 5174 | React development server |
+| Gateway | 3000 | 3001 | Node.js API gateway |
+| Forms Service | 8000 | 8001 | Python FastAPI forms backend |
+| Protocol Assistant | 8000 | 8002 | Python FastAPI AI assistant |
+| PostgreSQL | 5432 | 5434 | Database server |
+
+---
+
+*Last Updated: January 23, 2026*
