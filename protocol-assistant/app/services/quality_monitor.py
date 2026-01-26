@@ -17,7 +17,7 @@ from uuid import UUID
 from enum import Enum
 from dataclasses import dataclass
 
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import select, func, and_, desc, Integer, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.learning import AIFeedback, PromptVersion
@@ -340,7 +340,7 @@ class QualityMonitor:
                 func.avg(AIFeedback.rating).label("avg_rating"),
                 func.count(AIFeedback.id).label("count"),
                 func.sum(
-                    func.cast(AIFeedback.rating <= self.LOW_RATING_THRESHOLD, func.Integer)
+                    case((AIFeedback.rating <= self.LOW_RATING_THRESHOLD, 1), else_=0)
                 ).label("low_count"),
             )
             .where(AIFeedback.created_at >= cutoff)
