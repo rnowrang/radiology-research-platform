@@ -31,6 +31,7 @@ router.post('/sessions', protocolAssistantController.createSession);
 router.get('/sessions/:sessionId', protocolAssistantController.getSession);
 router.patch('/sessions/:sessionId', protocolAssistantController.updateSession);
 router.post('/sessions/:sessionId/close', protocolAssistantController.closeSession);
+router.post('/sessions/:sessionId/reset-protocol', protocolAssistantController.resetSessionProtocol);
 
 // Get or create session for project
 router.get('/projects/:projectId/session', protocolAssistantController.getOrCreateProjectSession);

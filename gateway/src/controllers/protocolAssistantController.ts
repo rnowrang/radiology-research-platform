@@ -89,6 +89,24 @@ export const protocolAssistantController = {
     }
   },
 
+  resetSessionProtocol: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const response = await protocolAssistantProxy.resetSessionProtocol(sessionId, req.user!.id);
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'protocol_assistant_session',
+        resourceId: sessionId,
+        details: { action: 'reset_protocol' },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getOrCreateProjectSession: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { projectId } = req.params;

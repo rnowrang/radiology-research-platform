@@ -190,7 +190,9 @@ async def extract_protocol(
         document = await parser.parse(content, file.filename or "document")
 
         # Check for PHI and redact before sending to LLM
-        phi_detector = get_phi_detector()
+        # Use "low" sensitivity to avoid over-redacting research/medical terminology
+        # The user is uploading their own protocol draft, so we're more permissive
+        phi_detector = get_phi_detector(sensitivity="low")
         if phi_detector.has_phi(document.full_text):
             logger.warning(
                 f"PHI detected in document {file.filename}, redacting before analysis"
@@ -449,8 +451,8 @@ async def analyze_quality(
         parser = get_document_parser()
         document = await parser.parse(content, file.filename or "document")
 
-        # Check for PHI and redact
-        phi_detector = get_phi_detector()
+        # Check for PHI and redact (use low sensitivity for user-uploaded protocols)
+        phi_detector = get_phi_detector(sensitivity="low")
         if phi_detector.has_phi(document.full_text):
             redacted_text = phi_detector.redact(document.full_text)
             document = ParsedDocument(

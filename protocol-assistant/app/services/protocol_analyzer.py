@@ -33,38 +33,41 @@ Respond ONLY with valid JSON matching the required schema. Do not include any ad
 
 
 # User prompt template for extraction
-EXTRACTION_USER_PROMPT = """Please analyze the following research protocol document and extract the key information.
+EXTRACTION_USER_PROMPT = """Please analyze the following research protocol document and extract COMPREHENSIVE information.
+
+IMPORTANT: Extract as much detail as possible from the document. Do NOT summarize - include full descriptions, all criteria, all risks, and all benefits mentioned in the document.
 
 Document content:
 ---
 {document_text}
 ---
 
-Extract the following information into a JSON object:
-- study_title: The title of the study
-- principal_investigator: Name of the PI if mentioned
+Extract the following information into a JSON object. Be thorough and include ALL relevant information from the document:
+
+- study_title: The complete title of the study
+- principal_investigator: Full name and credentials of the PI if mentioned
 - study_type: One of: retrospective, prospective, clinical_trial, quality_improvement, educational, other
 - objectives:
-  - primary: The primary study objective (minimum 10 characters)
-  - secondary: List of secondary objectives
+  - primary: The COMPLETE primary study objective with full description (copy verbatim if possible)
+  - secondary: List ALL secondary objectives mentioned (each as a complete statement)
 - methodology:
-  - design: Study design description
-  - population: Target population description
-  - sample_size: Sample size or estimation if mentioned
-  - inclusion_criteria: List of inclusion criteria
-  - exclusion_criteria: List of exclusion criteria
+  - design: FULL study design description including study type, phases, arms, randomization, blinding, etc.
+  - population: Complete description of the target population including demographics, clinical characteristics
+  - sample_size: Sample size with justification and power analysis if mentioned
+  - inclusion_criteria: List EVERY inclusion criterion mentioned (do not summarize)
+  - exclusion_criteria: List EVERY exclusion criterion mentioned (do not summarize)
 - data_collection:
-  - sources: Data sources
-  - variables: Variables to be collected
-  - timeline: Data collection timeline
+  - sources: All data sources (medical records, questionnaires, lab values, imaging, etc.)
+  - variables: List ALL variables to be collected (primary endpoints, secondary endpoints, safety measures, demographics)
+  - timeline: Complete data collection timeline with visit schedules and time points
 - risks_benefits:
-  - risks: List of identified risks
-  - benefits: List of potential benefits
-  - mitigation: Risk mitigation strategies
-- confidentiality_measures: Description of data protection measures
-- missing_sections: List any sections that appear to be missing or incomplete
-- quality_score: Score from 0-100 based on completeness and clarity
-- recommendations: List of specific recommendations for improvement
+  - risks: List EVERY risk mentioned including physical, psychological, social, and privacy risks
+  - benefits: List ALL potential benefits to participants and society
+  - mitigation: All risk mitigation strategies and safety monitoring procedures
+- confidentiality_measures: Complete description of data protection, storage, access controls, and privacy safeguards
+- missing_sections: List any IRB-required sections that appear to be missing or incomplete
+- quality_score: Score from 0-100 based on completeness and clarity (be realistic - most drafts score 40-70)
+- recommendations: Specific, actionable recommendations for improvement
 
 Respond with valid JSON only."""
 
@@ -153,7 +156,7 @@ class ProtocolAnalyzer:
     async def extract_protocol_info(
         self,
         document: ParsedDocument,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> ExtractedProtocol:
         """
         Extract structured protocol information from a parsed document.

@@ -93,6 +93,27 @@ class PHIDetector:
         r"(?:IRB|Protocol|Study|Form)\s*#?\s*\d+",
         # Reference numbers
         r"(?:Ref|Reference|Ver|Version)\s*[:#]?\s*[\d.]+",
+        # Medical/research terminology that matches name patterns but isn't PHI
+        r"\b(?:Principal\s+)?Investigator\b",
+        r"\b(?:Co-)?Investigator\b",
+        r"\bStudy\s+(?:Coordinator|Director|Team)\b",
+        r"\bResearch\s+(?:Coordinator|Assistant|Staff)\b",
+        r"\b(?:Informed\s+)?Consent\b",
+        r"\bAdverse\s+Events?\b",
+        r"\b(?:Inclusion|Exclusion)\s+Criteria\b",
+        r"\bData\s+(?:Safety|Monitoring|Management)\b",
+        # Common medical abbreviations that might match patterns
+        r"\b(?:BMI|CBC|CMP|ALT|AST|FSH|ULN|PK|DOB)\b",
+        # Age ranges with "years"
+        r"\b\d+[-–]\d+\s*years?\b",
+        r"\byears?\s+of\s+age\b",
+        # Medical conditions and terms
+        r"\b(?:acute|chronic|severe|mild|moderate)\b",
+        r"\b(?:cardiovascular|hepatic|renal|neurological)\b",
+        # Section headers that look like names
+        r"\bSection\s+\d+",
+        # Common protocol section names
+        r"\b(?:Background|Methods|Results|Discussion|Objectives|Procedures)\b",
     ]
 
     def __init__(self, sensitivity: str = "medium"):

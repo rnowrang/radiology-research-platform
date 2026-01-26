@@ -133,6 +133,13 @@ export const protocolAssistantProxy = {
     });
   },
 
+  resetSessionProtocol: async (sessionId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/protocol-assistant/sessions/${sessionId}/reset-protocol`, null, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
   getOrCreateProjectSession: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
     const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
     return protocolClient.get(`/api/protocol-assistant/projects/${projectId}/session`, {

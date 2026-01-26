@@ -418,6 +418,31 @@ class ChatService:
         await self.db.flush()
         logger.info(f"Closed session {session_id}")
 
+    async def reset_protocol_data(self, session_id: UUID) -> None:
+        """
+        Reset the extracted protocol data for a session.
+
+        Clears extracted protocol, gaps, collected answers, and completion percentage
+        to allow re-extraction from a new document upload.
+
+        Args:
+            session_id: UUID of the session to reset
+        """
+        await self.db.execute(
+            update(ChatSession)
+            .where(ChatSession.id == session_id)
+            .values(
+                extracted_protocol=None,
+                current_gaps=None,
+                collected_answers=None,
+                document_filename=None,
+                completion_percentage=0,
+                updated_at=datetime.utcnow(),
+            )
+        )
+        await self.db.flush()
+        logger.info(f"Reset protocol data for session {session_id}")
+
     async def _update_token_count(self, session_id: UUID, tokens: int) -> None:
         """Update the total token count for a session."""
         await self.db.execute(
@@ -468,27 +493,93 @@ class ChatService:
         return "\n\n".join(context_parts)
 
     def _summarize_protocol(self, protocol: dict[str, Any]) -> str:
-        """Create a readable summary of extracted protocol data."""
+        """Create a comprehensive summary of extracted protocol data."""
         if not protocol:
             return "No protocol data available."
 
         summary_parts = []
-        key_fields = [
-            ("title", "Title"),
-            ("principal_investigator", "Principal Investigator"),
-            ("study_type", "Study Type"),
-            ("population", "Study Population"),
-            ("objectives", "Objectives"),
-        ]
 
-        for key, label in key_fields:
-            if key in protocol:
-                value = protocol[key]
-                if isinstance(value, list):
-                    value = ", ".join(str(v) for v in value[:3])
-                    if len(protocol[key]) > 3:
-                        value += f" (+{len(protocol[key]) - 3} more)"
-                summary_parts.append(f"- **{label}**: {value}")
+        # Basic info
+        if protocol.get("study_title"):
+            summary_parts.append(f"**Study Title**: {protocol['study_title']}")
+        if protocol.get("principal_investigator"):
+            summary_parts.append(f"**Principal Investigator**: {protocol['principal_investigator']}")
+        if protocol.get("study_type"):
+            summary_parts.append(f"**Study Type**: {protocol['study_type']}")
+
+        # Objectives
+        objectives = protocol.get("objectives", {})
+        if objectives:
+            if objectives.get("primary"):
+                summary_parts.append(f"**Primary Objective**: {objectives['primary']}")
+            if objectives.get("secondary"):
+                secondary = objectives["secondary"]
+                if isinstance(secondary, list) and secondary:
+                    summary_parts.append(f"**Secondary Objectives**: {'; '.join(secondary)}")
+
+        # Methodology
+        methodology = protocol.get("methodology", {})
+        if methodology:
+            if methodology.get("design"):
+                summary_parts.append(f"**Study Design**: {methodology['design']}")
+            if methodology.get("population"):
+                summary_parts.append(f"**Study Population**: {methodology['population']}")
+            if methodology.get("sample_size"):
+                summary_parts.append(f"**Sample Size**: {methodology['sample_size']}")
+            if methodology.get("inclusion_criteria"):
+                criteria = methodology["inclusion_criteria"]
+                if isinstance(criteria, list) and criteria:
+                    summary_parts.append(f"**Inclusion Criteria**: {'; '.join(criteria)}")
+            if methodology.get("exclusion_criteria"):
+                criteria = methodology["exclusion_criteria"]
+                if isinstance(criteria, list) and criteria:
+                    summary_parts.append(f"**Exclusion Criteria**: {'; '.join(criteria)}")
+
+        # Data Collection
+        data_collection = protocol.get("data_collection", {})
+        if data_collection:
+            if data_collection.get("sources"):
+                sources = data_collection["sources"]
+                if isinstance(sources, list) and sources:
+                    summary_parts.append(f"**Data Sources**: {'; '.join(sources)}")
+            if data_collection.get("variables"):
+                variables = data_collection["variables"]
+                if isinstance(variables, list) and variables:
+                    summary_parts.append(f"**Variables**: {'; '.join(variables)}")
+            if data_collection.get("timeline"):
+                summary_parts.append(f"**Data Collection Timeline**: {data_collection['timeline']}")
+
+        # Risks and Benefits
+        risks_benefits = protocol.get("risks_benefits", {})
+        if risks_benefits:
+            if risks_benefits.get("risks"):
+                risks = risks_benefits["risks"]
+                if isinstance(risks, list) and risks:
+                    summary_parts.append(f"**Risks**: {'; '.join(risks)}")
+            if risks_benefits.get("benefits"):
+                benefits = risks_benefits["benefits"]
+                if isinstance(benefits, list) and benefits:
+                    summary_parts.append(f"**Benefits**: {'; '.join(benefits)}")
+            if risks_benefits.get("mitigation"):
+                mitigation = risks_benefits["mitigation"]
+                if isinstance(mitigation, list) and mitigation:
+                    summary_parts.append(f"**Risk Mitigation**: {'; '.join(mitigation)}")
+
+        # Confidentiality
+        if protocol.get("confidentiality_measures"):
+            summary_parts.append(f"**Confidentiality Measures**: {protocol['confidentiality_measures']}")
+
+        # Quality info
+        if protocol.get("quality_score") is not None:
+            summary_parts.append(f"**Quality Score**: {protocol['quality_score']}/100")
+        if protocol.get("missing_sections"):
+            missing = protocol["missing_sections"]
+            if isinstance(missing, list) and missing:
+                summary_parts.append(f"**Missing Sections**: {'; '.join(missing)}")
+        if protocol.get("recommendations"):
+            recs = protocol["recommendations"]
+            if isinstance(recs, list) and recs:
+                summary_parts.append(f"**Recommendations**: {'; '.join(recs)}")
 
         return "\n".join(summary_parts) if summary_parts else "Protocol data is being processed."
 

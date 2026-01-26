@@ -385,3 +385,43 @@ async def get_or_create_project_session(
         created_at=session.created_at,
         updated_at=session.updated_at,
     )
+
+
+@router.post(
+    "/sessions/{session_id}/reset-protocol",
+    status_code=status.HTTP_200_OK,
+    summary="Reset session protocol data",
+    description="Clear extracted protocol and gaps from a session to allow re-extraction.",
+)
+async def reset_session_protocol(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+) -> dict:
+    """
+    Reset the extracted protocol data for a session.
+
+    This clears:
+    - Extracted protocol data
+    - Current gap questions
+    - Collected answers
+    - Completion percentage
+
+    Use this when you want to re-upload and re-extract a document
+    without creating a new session.
+    """
+    service = ChatService(db)
+
+    # Verify session exists
+    session = await service.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+
+    await service.reset_protocol_data(session_id)
+
+    return {
+        "status": "success",
+        "message": f"Protocol data cleared for session {session_id}. You can now re-upload a document.",
+    }
