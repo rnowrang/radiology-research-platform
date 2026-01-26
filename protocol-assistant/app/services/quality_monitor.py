@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.learning import Feedback, PromptVersion
+from app.models.learning import AIFeedback, PromptVersion
 from app.learning.prompt_management import PromptManager
 from app.services.feature_flags import get_feature_flag_service
 
@@ -120,17 +120,17 @@ class QualityMonitor:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         # Build query for recent feedback
-        query = select(Feedback).where(Feedback.created_at >= cutoff)
+        query = select(Feedback).where(AIFeedback.created_at >= cutoff)
 
         if prompt_key:
             # Get active prompt version
             versions = await self.prompt_manager.get_versions(prompt_key)
             active_ids = [v.id for v in versions if v.is_active]
             if active_ids:
-                query = query.where(Feedback.prompt_version_id.in_(active_ids))
+                query = query.where(AIFeedback.prompt_version_id.in_(active_ids))
 
         if institution_id:
-            query = query.where(Feedback.institution_id == institution_id)
+            query = query.where(AIFeedback.institution_id == institution_id)
 
         result = await self.db.execute(query)
         feedbacks = list(result.scalars().all())
@@ -336,26 +336,26 @@ class QualityMonitor:
 
         query = (
             select(
-                func.date(Feedback.created_at).label("date"),
-                func.avg(Feedback.rating).label("avg_rating"),
-                func.count(Feedback.id).label("count"),
+                func.date(AIFeedback.created_at).label("date"),
+                func.avg(AIFeedback.rating).label("avg_rating"),
+                func.count(AIFeedback.id).label("count"),
                 func.sum(
-                    func.cast(Feedback.rating <= self.LOW_RATING_THRESHOLD, func.Integer)
+                    func.cast(AIFeedback.rating <= self.LOW_RATING_THRESHOLD, func.Integer)
                 ).label("low_count"),
             )
-            .where(Feedback.created_at >= cutoff)
-            .group_by(func.date(Feedback.created_at))
-            .order_by(func.date(Feedback.created_at))
+            .where(AIFeedback.created_at >= cutoff)
+            .group_by(func.date(AIFeedback.created_at))
+            .order_by(func.date(AIFeedback.created_at))
         )
 
         if prompt_key:
             versions = await self.prompt_manager.get_versions(prompt_key)
             version_ids = [v.id for v in versions]
             if version_ids:
-                query = query.where(Feedback.prompt_version_id.in_(version_ids))
+                query = query.where(AIFeedback.prompt_version_id.in_(version_ids))
 
         if institution_id:
-            query = query.where(Feedback.institution_id == institution_id)
+            query = query.where(AIFeedback.institution_id == institution_id)
 
         result = await self.db.execute(query)
         rows = result.fetchall()
@@ -391,10 +391,10 @@ class QualityMonitor:
         week_ago = now - timedelta(days=7)
         two_weeks_ago = now - timedelta(days=14)
 
-        query = select(func.avg(Feedback.rating)).where(
+        query = select(func.avg(AIFeedback.rating)).where(
             and_(
-                Feedback.created_at >= two_weeks_ago,
-                Feedback.created_at < week_ago,
+                AIFeedback.created_at >= two_weeks_ago,
+                AIFeedback.created_at < week_ago,
             )
         )
 
@@ -402,10 +402,10 @@ class QualityMonitor:
             versions = await self.prompt_manager.get_versions(prompt_key)
             version_ids = [v.id for v in versions]
             if version_ids:
-                query = query.where(Feedback.prompt_version_id.in_(version_ids))
+                query = query.where(AIFeedback.prompt_version_id.in_(version_ids))
 
         if institution_id:
-            query = query.where(Feedback.institution_id == institution_id)
+            query = query.where(AIFeedback.institution_id == institution_id)
 
         result = await self.db.execute(query)
         baseline = result.scalar()

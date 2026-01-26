@@ -53,8 +53,8 @@ class FeatureFlag(Base):
     rollout_percentage = Column(Float, default=100.0)  # 0-100, used for gradual rollout
     rollout_groups = Column(JSON, nullable=True)  # Specific groups to include/exclude
 
-    # Metadata
-    metadata = Column("flag_metadata", JSON, nullable=True)
+    # Extra metadata
+    flag_metadata = Column(JSON, nullable=True)
 
     # Feature type
     flag_type = Column(String(20), default="boolean")  # boolean, percentage, config
