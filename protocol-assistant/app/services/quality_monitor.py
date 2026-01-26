@@ -117,7 +117,7 @@ class QualityMonitor:
         Returns:
             QualityMetrics with current status
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
 
         # Build query for recent feedback
         query = select(AIFeedback).where(AIFeedback.created_at >= cutoff)
@@ -238,7 +238,7 @@ class QualityMonitor:
                         "rolled_back_from": rollback_result["from_version"],
                         "rolled_back_to": rollback_result["to_version"],
                     },
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
                     prompt_key=prompt_key,
                     institution_id=institution_id,
                 )
@@ -276,7 +276,7 @@ class QualityMonitor:
         service = AnalyticsService(self.db)
 
         # Get current month's costs
-        today = datetime.now(timezone.utc).date()
+        today = datetime.utcnow().date()
         month_start = today.replace(day=1)
         costs = await service.get_cost_analysis(institution_id, month_start, today)
 
@@ -307,7 +307,7 @@ class QualityMonitor:
                     "threshold": monthly_threshold,
                     "days_elapsed": days_elapsed,
                 },
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.utcnow(),
                 institution_id=institution_id,
             )
             alerts.append(alert)
@@ -332,7 +332,7 @@ class QualityMonitor:
         Returns:
             List of daily metrics
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.utcnow() - timedelta(days=days)
 
         query = (
             select(
@@ -387,7 +387,7 @@ class QualityMonitor:
         institution_id: Optional[UUID],
     ) -> float:
         """Get baseline rating from historical data (previous week)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         week_ago = now - timedelta(days=7)
         two_weeks_ago = now - timedelta(days=14)
 
