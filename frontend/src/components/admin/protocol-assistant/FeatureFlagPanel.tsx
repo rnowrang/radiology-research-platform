@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Info, RefreshCw } from 'lucide-react';
 import { protocolAssistantAdminApi } from '@/lib/protocolAssistantAdminApi';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 // Categories with their display colors
 const categoryColors: Record<string, string> = {
@@ -54,10 +54,10 @@ export function FeatureFlagPanel() {
       protocolAssistantAdminApi.updateFeatureFlag(name, { is_enabled: enabled }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['pa-feature-flags'] });
-      toast.success(`Flag "${variables.name}" ${variables.enabled ? 'enabled' : 'disabled'}`);
+      toast({ title: 'Success', description: `Flag "${variables.name}" ${variables.enabled ? 'enabled' : 'disabled'}` });
     },
     onError: () => {
-      toast.error('Failed to update flag');
+      toast({ title: 'Error', description: 'Failed to update flag', variant: 'destructive' });
     },
   });
 

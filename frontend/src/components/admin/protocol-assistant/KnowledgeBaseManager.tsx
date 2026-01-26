@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Search, Plus, Trash2, ExternalLink, FileText } from 'lucide-react';
 import { protocolAssistantAdminApi, KnowledgeDocument } from '@/lib/protocolAssistantAdminApi';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 export function KnowledgeBaseManager() {
   const queryClient = useQueryClient();
@@ -88,10 +88,10 @@ export function KnowledgeBaseManager() {
       queryClient.invalidateQueries({ queryKey: ['pa-kb'] });
       setAddDialogOpen(false);
       setNewDocument({ title: '', content: '', category: '', description: '', source_url: '' });
-      toast.success('Document added to knowledge base');
+      toast({ title: 'Success', description: 'Document added to knowledge base' });
     },
     onError: () => {
-      toast.error('Failed to add document');
+      toast({ title: 'Error', description: 'Failed to add document', variant: 'destructive' });
     },
   });
 
@@ -101,10 +101,10 @@ export function KnowledgeBaseManager() {
       queryClient.invalidateQueries({ queryKey: ['pa-kb'] });
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
-      toast.success('Document removed from knowledge base');
+      toast({ title: 'Success', description: 'Document removed from knowledge base' });
     },
     onError: () => {
-      toast.error('Failed to delete document');
+      toast({ title: 'Error', description: 'Failed to delete document', variant: 'destructive' });
     },
   });
 
@@ -120,7 +120,7 @@ export function KnowledgeBaseManager() {
 
   const handleAdd = () => {
     if (!newDocument.title.trim() || !newDocument.content.trim() || !newDocument.category) {
-      toast.error('Please fill in title, content, and category');
+      toast({ title: 'Error', description: 'Please fill in title, content, and category', variant: 'destructive' });
       return;
     }
     addMutation.mutate(newDocument);

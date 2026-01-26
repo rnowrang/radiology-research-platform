@@ -37,7 +37,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { protocolAssistantAdminApi, QualityStatus } from '@/lib/protocolAssistantAdminApi';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 const statusConfig = {
   healthy: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Healthy' },
@@ -85,10 +85,10 @@ export function QualityMonitor() {
       queryClient.invalidateQueries({ queryKey: ['pa-prompt-versions'] });
       setRollbackDialogOpen(false);
       setPromptToRollback(null);
-      toast.success('Prompt rolled back successfully');
+      toast({ title: 'Success', description: 'Prompt rolled back successfully' });
     },
     onError: () => {
-      toast.error('Failed to rollback prompt');
+      toast({ title: 'Error', description: 'Failed to rollback prompt', variant: 'destructive' });
     },
   });
 
@@ -98,13 +98,13 @@ export function QualityMonitor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['pa-quality'] });
       if (data.data?.status === 'rollback_triggered') {
-        toast.warning('Auto-rollback was triggered due to quality degradation');
+        toast({ title: 'Warning', description: 'Auto-rollback was triggered due to quality degradation' });
       } else {
-        toast.success('Quality check passed - no action needed');
+        toast({ title: 'Success', description: 'Quality check passed - no action needed' });
       }
     },
     onError: () => {
-      toast.error('Failed to run quality check');
+      toast({ title: 'Error', description: 'Failed to run quality check', variant: 'destructive' });
     },
   });
 

@@ -28,10 +28,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Play, Pause, Plus, GitCompare, CheckCircle, XCircle } from 'lucide-react';
 import { protocolAssistantAdminApi, PromptVersion } from '@/lib/protocolAssistantAdminApi';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/useToast';
 
 export function PromptManagement() {
   const queryClient = useQueryClient();
@@ -63,10 +62,10 @@ export function PromptManagement() {
       protocolAssistantAdminApi.activatePrompt(versionId, percentage),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pa-prompt-versions', selectedKey] });
-      toast.success('Prompt version activated');
+      toast({ title: 'Success', description: 'Prompt version activated' });
     },
     onError: () => {
-      toast.error('Failed to activate prompt');
+      toast({ title: 'Error', description: 'Failed to activate prompt', variant: 'destructive' });
     },
   });
 
@@ -74,10 +73,10 @@ export function PromptManagement() {
     mutationFn: (versionId: number) => protocolAssistantAdminApi.deactivatePrompt(versionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pa-prompt-versions', selectedKey] });
-      toast.success('Prompt version deactivated');
+      toast({ title: 'Success', description: 'Prompt version deactivated' });
     },
     onError: () => {
-      toast.error('Failed to deactivate prompt');
+      toast({ title: 'Error', description: 'Failed to deactivate prompt', variant: 'destructive' });
     },
   });
 
@@ -88,10 +87,10 @@ export function PromptManagement() {
       queryClient.invalidateQueries({ queryKey: ['pa-prompt-versions', selectedKey] });
       setCreateDialogOpen(false);
       setNewPrompt({ name: '', content: '', description: '' });
-      toast.success('New prompt version created');
+      toast({ title: 'Success', description: 'New prompt version created' });
     },
     onError: () => {
-      toast.error('Failed to create prompt version');
+      toast({ title: 'Error', description: 'Failed to create prompt version', variant: 'destructive' });
     },
   });
 
@@ -100,7 +99,7 @@ export function PromptManagement() {
 
   const handleCreate = () => {
     if (!selectedKey || !newPrompt.content.trim()) {
-      toast.error('Please select a prompt key and enter content');
+      toast({ title: 'Error', description: 'Please select a prompt key and enter content', variant: 'destructive' });
       return;
     }
     createMutation.mutate({
@@ -200,12 +199,14 @@ export function PromptManagement() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
-              <Slider
-                value={[abTestPercentage]}
-                onValueChange={([value]) => setAbTestPercentage(value)}
+              <input
+                type="range"
+                value={abTestPercentage}
+                onChange={(e) => setAbTestPercentage(Number(e.target.value))}
+                min={0}
                 max={100}
                 step={5}
-                className="flex-1"
+                className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
               />
               <span className="w-16 text-right font-mono">{abTestPercentage}%</span>
             </div>
