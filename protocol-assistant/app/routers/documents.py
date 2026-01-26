@@ -244,7 +244,7 @@ async def extract_protocol(
                     "document_filename": file.filename,
                 }
                 if gap_analysis:
-                    update_values["current_gaps"] = [g.model_dump() for g in gap_analysis.gaps]
+                    update_values["current_gaps"] = [g.model_dump() for g in gap_analysis.questions]
 
                 await db.execute(
                     update(ChatSession)
