@@ -471,6 +471,23 @@ export const protocolAssistantProxy = {
     );
   },
 
+  /**
+   * Pre-fill a task-linked form using protocol assistant data
+   * Creates a form instance linked to a task and pre-fills it with extracted protocol data
+   */
+  prefillTaskForm: async (
+    sessionId: string,
+    body: { project_id: string; task_id: number; template_id?: number },
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(
+      `/api/protocol-assistant/sessions/${sessionId}/prefill-task-form`,
+      body,
+      { headers: buildUserHeaders(userContext) }
+    );
+  },
+
   // Health check
   healthCheck: async (): Promise<AxiosResponse> => {
     return protocolClient.get('/health');

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Save,
   Download,
@@ -64,6 +64,7 @@ import {
 import { formsApi } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 import { PdfPreviewModal } from '@/components/forms/PdfPreviewModal';
+import { ConflictReviewBanner } from '@/components/forms/ConflictReviewBanner';
 import { cn } from '@/lib/utils';
 import type { FormInstance, FormField as FormFieldType, FormSchema } from '@/types';
 
@@ -128,6 +129,7 @@ interface ExtendedSchema extends FormSchema {
 export function FormEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
   const [form, setForm] = useState<FormInstance | null>(null);
@@ -141,6 +143,30 @@ export function FormEditorPage() {
   const [versionLabel, setVersionLabel] = useState('');
   const [creatingVersion, setCreatingVersion] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+
+  // Parse conflict field IDs from URL query params
+  const prefillConflicts = useMemo(() => {
+    const param = searchParams.get('prefill_conflicts');
+    return param ? param.split(',').filter(Boolean) : [];
+  }, [searchParams]);
+
+  // State for active conflicts (can be dismissed)
+  const [activeConflicts, setActiveConflicts] = useState<string[]>([]);
+
+  // Initialize active conflicts from URL params
+  useEffect(() => {
+    if (prefillConflicts.length > 0) {
+      setActiveConflicts(prefillConflicts);
+    }
+  }, [prefillConflicts]);
+
+  // Handler to dismiss conflicts
+  const handleDismissConflicts = useCallback(() => {
+    setActiveConflicts([]);
+    // Remove the query param from URL
+    searchParams.delete('prefill_conflicts');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (id) {
@@ -1217,9 +1243,19 @@ export function FormEditorPage() {
 
   // Render field with label and help text
   const renderFieldWithLabel = (field: ExtendedField) => {
+    // Check if this field is in conflict
+    const isConflict = activeConflicts.includes(field.id);
+
     // For checkbox without options, the label is inline
     if (field.type === 'checkbox' && (!field.options || field.options.length === 0)) {
-      return renderField(field);
+      return (
+        <div
+          data-field-id={field.id}
+          className={cn(isConflict && 'ring-2 ring-yellow-400 ring-offset-2 rounded-md p-2')}
+        >
+          {renderField(field)}
+        </div>
+      );
     }
 
     // For heading/paragraph, no label wrapper needed
@@ -1228,7 +1264,13 @@ export function FormEditorPage() {
     }
 
     return (
-      <div className="space-y-2">
+      <div
+        data-field-id={field.id}
+        className={cn(
+          'space-y-2',
+          isConflict && 'ring-2 ring-yellow-400 ring-offset-2 rounded-md p-2'
+        )}
+      >
         <div className="flex items-center gap-2">
           <Label htmlFor={field.id}>
             {field.label}
@@ -1365,8 +1407,17 @@ export function FormEditorPage() {
   const isEditable = form.status === 'draft' || form.status === 'needs_changes';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <>
+      {/* Conflict review banner */}
+      {activeConflicts.length > 0 && (
+        <ConflictReviewBanner
+          conflictCount={activeConflicts.length}
+          onDismiss={handleDismissConflicts}
+        />
+      )}
+
+      <div className={cn('space-y-6', activeConflicts.length > 0 && 'pt-14')}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{form.title}</h1>
           <div className="mt-2 flex items-center gap-4">
@@ -1513,48 +1564,49 @@ export function FormEditorPage() {
           })}
       </div>
 
-      {/* Version Modal */}
-      <Dialog open={showVersionModal} onOpenChange={setShowVersionModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save Version</DialogTitle>
-            <DialogDescription>
-              Create a named snapshot of your current progress
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="versionLabel">Version Label (optional)</Label>
-            <Input
-              id="versionLabel"
-              value={versionLabel}
-              onChange={(e) => setVersionLabel(e.target.value)}
-              placeholder="e.g., Draft before adding personnel"
-              className="mt-2"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVersionModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateVersion} disabled={creatingVersion}>
-              {creatingVersion ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save Version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Version Modal */}
+        <Dialog open={showVersionModal} onOpenChange={setShowVersionModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save Version</DialogTitle>
+              <DialogDescription>
+                Create a named snapshot of your current progress
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="versionLabel">Version Label (optional)</Label>
+              <Input
+                id="versionLabel"
+                value={versionLabel}
+                onChange={(e) => setVersionLabel(e.target.value)}
+                placeholder="e.g., Draft before adding personnel"
+                className="mt-2"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowVersionModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateVersion} disabled={creatingVersion}>
+                {creatingVersion ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Version
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* PDF Preview Modal */}
-      <PdfPreviewModal
-        formId={parseInt(id!, 10)}
-        formTitle={form?.title || 'Form'}
-        isOpen={showPdfPreview}
-        onClose={() => setShowPdfPreview(false)}
-      />
-    </div>
+        {/* PDF Preview Modal */}
+        <PdfPreviewModal
+          formId={parseInt(id!, 10)}
+          formTitle={form?.title || 'Form'}
+          isOpen={showPdfPreview}
+          onClose={() => setShowPdfPreview(false)}
+        />
+      </div>
+    </>
   );
 }

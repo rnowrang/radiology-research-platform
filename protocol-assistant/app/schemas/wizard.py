@@ -1,7 +1,7 @@
 """Pydantic schemas for the guided wizard functionality."""
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Any, Optional, List
 from enum import Enum
 
 
@@ -102,3 +102,30 @@ class SkipResponse(BaseModel):
 class SuggestionsResponse(BaseModel):
     """Response containing suggestions for a question."""
     suggestions: List[SuggestedAnswer]
+
+
+class PrefillTaskFormRequest(BaseModel):
+    """Request to pre-fill a task's form from protocol data."""
+    project_id: str  # UUID as string
+    task_id: int
+    template_id: Optional[int] = None  # Required if task has no form
+
+
+class FieldConflict(BaseModel):
+    """A conflict between existing form data and new protocol data."""
+    field_id: str
+    field_label: str
+    existing_value: Any
+    new_value: Any
+    source: str  # "protocol_extraction" or "wizard_answer"
+
+
+class PrefillTaskFormResponse(BaseModel):
+    """Response after pre-filling a task's form."""
+    success: bool
+    form_id: int
+    task_id: int
+    conflicts: List[FieldConflict]
+    fields_updated: int
+    fields_skipped: int
+    redirect_url: str

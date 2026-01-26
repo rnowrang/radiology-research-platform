@@ -77,6 +77,9 @@ router.get('/sessions/:sessionId/wizard/questions/:questionId/suggestions', prot
 router.get('/sessions/:sessionId/wizard/form-preview', protocolAssistantController.getFormPrefillPreview);
 router.post('/sessions/:sessionId/wizard/prefill-form', protocolAssistantController.prefillFormFromWizard);
 
+// Task-linked form pre-fill endpoint
+router.post('/sessions/:sessionId/prefill-task-form', protocolAssistantController.prefillTaskForm);
+
 // Admin - stats endpoint (legacy)
 router.get('/admin/stats', protocolAssistantController.getStats);
 

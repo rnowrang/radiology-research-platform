@@ -12,7 +12,13 @@ from app.models.task_definition import TaskDefinition
 from app.models.project import Project
 from app.models.form import FormInstance, FormData
 from app.models.template import Template
-from app.schemas.task import TaskCreateForProject
+from app.schemas.task import (
+    TaskCreateForProject,
+    ProjectFormTaskResponse,
+    TaskBasicResponse,
+    FormBasicResponse,
+    TemplateBasicResponse,
+)
 
 
 # =============================================================================
@@ -493,3 +499,112 @@ def create_task_for_project(
     db.refresh(task)
 
     return task
+
+
+# =============================================================================
+# Get Project Form Task
+# =============================================================================
+
+def _count_template_fields(schema: dict) -> int:
+    """Count the number of fields in a template schema."""
+    if not schema:
+        return 0
+    fields = schema.get("fields", [])
+    return len(fields) if isinstance(fields, list) else 0
+
+
+def get_project_form_task(
+    db: Session,
+    project_id: UUID,
+) -> ProjectFormTaskResponse:
+    """
+    Get the primary form_completion task for a project with form details and available templates.
+
+    This function:
+    1. Queries tasks for the project where task_type='form_completion'
+    2. Orders by created_at and takes the first (primary task)
+    3. If the task has a form_instance_id, fetches form instance details
+    4. Fetches available templates (active and published)
+    5. Returns ProjectFormTaskResponse
+
+    Args:
+        db: Database session
+        project_id: UUID of the project
+
+    Returns:
+        ProjectFormTaskResponse with task, form, available_templates, and has_form
+    """
+    # Query for the primary form_completion task
+    task = (
+        db.query(Task)
+        .filter(
+            Task.project_id == project_id,
+            Task.task_type == "form_completion",
+        )
+        .order_by(Task.created_at.asc())
+        .first()
+    )
+
+    task_response = None
+    form_response = None
+    has_form = False
+
+    if task:
+        # Build task_definition dict from the related task_definition if available
+        task_definition = None
+        if task.task_definition_id:
+            task_def = db.query(TaskDefinition).filter(
+                TaskDefinition.id == task.task_definition_id
+            ).first()
+            if task_def:
+                task_definition = {
+                    "template_id": task_def.template_id,
+                    "name": task_def.name,
+                }
+
+        task_response = TaskBasicResponse(
+            id=task.id,
+            title=task.title,
+            task_type=task.task_type or "form_completion",
+            status=task.status,
+            form_instance_id=task.form_instance_id,
+            task_definition=task_definition,
+        )
+
+        # Fetch form instance details if linked
+        if task.form_instance_id:
+            form_instance = db.query(FormInstance).filter(
+                FormInstance.id == task.form_instance_id
+            ).first()
+            if form_instance:
+                has_form = True
+                form_response = FormBasicResponse(
+                    id=form_instance.id,
+                    title=form_instance.title,
+                    status=form_instance.status,
+                    completion_percentage=float(form_instance.completion_percentage or 0),
+                )
+
+    # Fetch available templates (active and published)
+    templates = (
+        db.query(Template)
+        .filter(Template.is_active == True, Template.is_published == True)
+        .order_by(Template.name)
+        .all()
+    )
+
+    available_templates = [
+        TemplateBasicResponse(
+            id=template.id,
+            name=template.name,
+            field_count=_count_template_fields(template.schema),
+        )
+        for template in templates
+    ]
+
+    return ProjectFormTaskResponse(
+        task=task_response,
+        form=form_response,
+        available_templates=available_templates,
+        has_form=has_form,
+    )

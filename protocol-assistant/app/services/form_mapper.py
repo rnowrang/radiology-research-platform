@@ -5,15 +5,17 @@ This module provides functionality to:
 - Pre-fill existing forms with protocol data
 - Fetch form templates from the forms service
 - Handle nested field mappings
+- Detect conflicts between existing form data and new protocol data
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import httpx
 
 from app.config import get_settings
 from app.schemas.protocol import ExtractedProtocol
+from app.schemas.wizard import FieldConflict
 
 logger = logging.getLogger(__name__)
 
@@ -482,6 +484,112 @@ class IRBFormMapper:
                 field_ids.append(field_id)
 
         return field_ids
+
+    def get_field_label(self, field_id: str) -> str:
+        """
+        Generate a human-readable label for a field ID.
+
+        Args:
+            field_id: Dot-notation field ID (e.g., "investigator.pi_name")
+
+        Returns:
+            Human-readable label (e.g., "Investigator > PI Name")
+        """
+        # Convert dot notation to readable format
+        parts = field_id.split(".")
+        formatted_parts = []
+        for part in parts:
+            # Convert snake_case to Title Case
+            words = part.replace("_", " ").split()
+            formatted = " ".join(word.capitalize() for word in words)
+            formatted_parts.append(formatted)
+        return " > ".join(formatted_parts)
+
+    def detect_conflicts(
+        self,
+        existing_form_data: dict,
+        new_protocol_data: dict,
+        field_mappings: Optional[dict] = None,
+        source: str = "protocol_extraction"
+    ) -> List[FieldConflict]:
+        """
+        Compare existing form data with new protocol data to detect conflicts.
+
+        A conflict exists when both the existing form and new protocol have
+        different non-empty values for the same field.
+
+        Args:
+            existing_form_data: Current data in the form (flat or nested dict)
+            new_protocol_data: New data to apply (flat or nested dict)
+            field_mappings: Optional custom field mappings (protocol_path -> form_field_id)
+                           If not provided, uses the default FIELD_MAPPING
+            source: Source of the new data ("protocol_extraction" or "wizard_answer")
+
+        Returns:
+            List of FieldConflict objects for fields with conflicting values
+        """
+        conflicts = []
+        mappings = field_mappings or self.FIELD_MAPPING
+
+        # Flatten both datasets for easier comparison
+        flat_existing = self._flatten_dict(existing_form_data) if existing_form_data else {}
+        flat_new = self._flatten_dict(new_protocol_data) if new_protocol_data else {}
+
+        # Check each mapping
+        for protocol_path, form_field_id in mappings.items():
+            # Get values from both sources
+            existing_val = flat_existing.get(form_field_id)
+            new_val = flat_new.get(form_field_id)
+
+            # Also try to get new value from protocol path if form_field_id doesn't exist
+            if new_val is None:
+                new_val = flat_new.get(protocol_path)
+
+            # Skip if no new value
+            if new_val is None:
+                continue
+
+            # Skip if no existing value (no conflict)
+            if existing_val is None or existing_val == "":
+                continue
+
+            # Normalize values for comparison
+            existing_str = self._normalize_value_for_comparison(existing_val)
+            new_str = self._normalize_value_for_comparison(new_val)
+
+            # Check if values are different
+            if existing_str != new_str:
+                conflicts.append(FieldConflict(
+                    field_id=form_field_id,
+                    field_label=self.get_field_label(form_field_id),
+                    existing_value=existing_val,
+                    new_value=new_val,
+                    source=source
+                ))
+
+        return conflicts
+
+    def _normalize_value_for_comparison(self, value: Any) -> str:
+        """
+        Normalize a value to a string for comparison.
+
+        Handles lists, nested structures, and whitespace differences.
+        """
+        if value is None:
+            return ""
+
+        if isinstance(value, list):
+            # Sort and join list items
+            normalized_items = [str(item).strip() for item in value if item]
+            return "|".join(sorted(normalized_items))
+
+        if isinstance(value, dict):
+            # Convert dict to sorted key-value string
+            items = [f"{k}:{v}" for k, v in sorted(value.items())]
+            return "|".join(items)
+
+        # Convert to string and normalize whitespace
+        return " ".join(str(value).split())
 
 
 # Module-level instance for convenience

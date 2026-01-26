@@ -39,6 +39,9 @@ router.get('/:projectId/tasks', asyncHandler(taskController.getProjectTasks));
 router.get('/:projectId/task-progress', asyncHandler(taskController.getProjectTaskProgress));
 router.post('/:projectId/tasks', asyncHandler(projectController.createProjectTask));
 
+// Form-task route (for protocol assistant pre-fill integration)
+router.get('/:projectId/form-task', asyncHandler(projectController.getFormTask));
+
 // Project approval workflow routes
 router.post('/:id/submit-for-approval', asyncHandler(projectController.submitForApproval));
 router.post('/:id/approve', asyncHandler(projectController.approveProject));

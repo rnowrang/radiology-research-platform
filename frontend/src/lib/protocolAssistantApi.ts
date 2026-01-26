@@ -155,6 +155,57 @@ export interface WizardPrefillResult {
   redirect_url?: string;
 }
 
+// Task-aware pre-fill types
+export interface ProjectFormTask {
+  task: {
+    id: number;
+    title: string;
+    task_type: string;
+    status: string;
+    form_instance_id: number | null;
+    task_definition: {
+      template_id: number;
+      name: string;
+    } | null;
+  } | null;
+  form: {
+    id: number;
+    title: string;
+    status: string;
+    completion_percentage: number;
+  } | null;
+  available_templates: Array<{
+    id: number;
+    name: string;
+    field_count: number;
+  }>;
+  has_form: boolean;
+}
+
+export interface PrefillTaskFormRequest {
+  project_id: string;
+  task_id: number;
+  template_id?: number;
+}
+
+export interface FieldConflict {
+  field_id: string;
+  field_label: string;
+  existing_value: unknown;
+  new_value: unknown;
+  source: string;
+}
+
+export interface PrefillTaskFormResponse {
+  success: boolean;
+  form_id: number;
+  task_id: number;
+  conflicts: FieldConflict[];
+  fields_updated: number;
+  fields_skipped: number;
+  redirect_url: string;
+}
+
 export const protocolAssistantApi = {
   // Session management
   getOrCreateSession: async (projectId: string): Promise<ChatSession> => {
@@ -341,6 +392,23 @@ export const protocolAssistantApi = {
     const response = await api.post(
       `/protocol-assistant/sessions/${sessionId}/wizard/prefill-form`,
       { formId }
+    );
+    return response.data.data;
+  },
+
+  // Task-aware pre-fill methods
+  getProjectFormTask: async (projectId: string): Promise<ProjectFormTask> => {
+    const response = await api.get(`/api/projects/${projectId}/form-task`);
+    return response.data.data;
+  },
+
+  prefillTaskForm: async (
+    sessionId: string,
+    request: PrefillTaskFormRequest
+  ): Promise<PrefillTaskFormResponse> => {
+    const response = await api.post(
+      `/protocol-assistant/sessions/${sessionId}/prefill-task-form`,
+      request
     );
     return response.data.data;
   },

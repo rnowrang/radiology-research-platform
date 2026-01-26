@@ -910,6 +910,16 @@ export const formsProxy = {
     return formsClient.get(`/api/task-definitions/project-types/${projectType}/tasks`);
   },
 
+  /**
+   * Get the form-completion task for a project
+   * Used to find which task the protocol assistant should link to when pre-filling forms
+   */
+  getProjectFormTask: async (projectId: string, userId: string): Promise<AxiosResponse> => {
+    return formsClient.get(`/api/tasks/projects/${projectId}/form-task`, {
+      headers: { 'X-User-ID': userId },
+    });
+  },
+
   // ==========================================================================
   // Create Form for Task
   // ==========================================================================

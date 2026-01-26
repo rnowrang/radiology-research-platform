@@ -573,6 +573,24 @@ export const protocolAssistantController = {
       next(error);
     }
   },
+
+  /**
+   * Pre-fill a task-linked form using protocol assistant data
+   * POST /api/protocol-assistant/sessions/:sessionId/prefill-task-form
+   */
+  prefillTaskForm: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const response = await protocolAssistantProxy.prefillTaskForm(
+        sessionId,
+        req.body,
+        req.user!.id
+      );
+      res.json({ data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default protocolAssistantController;

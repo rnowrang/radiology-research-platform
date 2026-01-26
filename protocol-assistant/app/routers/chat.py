@@ -20,7 +20,9 @@ from app.schemas.chat import (
     SessionResponse,
     SessionUpdateRequest,
 )
+from app.schemas.wizard import PrefillTaskFormRequest, PrefillTaskFormResponse
 from app.services.chat_service import ChatService
+from app.services.wizard_service import WizardService
 from app.middleware.auth import UserContext, get_current_user
 
 logger = logging.getLogger(__name__)
@@ -425,3 +427,62 @@ async def reset_session_protocol(
         "status": "success",
         "message": f"Protocol data cleared for session {session_id}. You can now re-upload a document.",
     }
+
+
+@router.post(
+    "/sessions/{session_id}/prefill-task-form",
+    response_model=PrefillTaskFormResponse,
+    summary="Pre-fill a task's form from protocol data",
+    description="Pre-fill a task's form with extracted protocol data, detecting conflicts with existing values.",
+)
+async def prefill_task_form(
+    session_id: UUID,
+    request: PrefillTaskFormRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user: UserContext = Depends(get_current_user),
+) -> PrefillTaskFormResponse:
+    """
+    Pre-fill a task's form from protocol data with conflict detection.
+
+    This endpoint:
+    1. Gets the session's extracted protocol data
+    2. Checks if the task has an associated form
+    3. Creates a form if needed (requires template_id)
+    4. Maps protocol data to form fields
+    5. Detects conflicts between existing form data and new protocol data
+    6. Applies pre-fill (skipping conflicting fields)
+    7. Updates task status to 'in_progress' if it was 'pending'
+
+    The response includes:
+    - List of conflicts (fields with different existing values)
+    - Count of fields updated and skipped
+    - Redirect URL to the form (with conflict info in query params)
+
+    Args:
+        session_id: Protocol assistant session ID
+        request: PrefillTaskFormRequest with project_id, task_id, template_id
+        db: Database session
+        user: Authenticated user context
+
+    Returns:
+        PrefillTaskFormResponse with success status, conflicts, and redirect URL
+    """
+    service = WizardService(db)
+
+    try:
+        return await service.prefill_task_form(
+            session_id=str(session_id),
+            user_id=str(user.id),
+            request=request
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to prefill task form: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to prefill task form: {str(e)}",
+        )

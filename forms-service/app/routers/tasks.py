@@ -25,8 +25,9 @@ from app.schemas.task import (
     CreateFormForTaskRequest,
     CreateFormForTaskResponse,
     TaskAssignRequest,
+    ProjectFormTaskResponse,
 )
-from app.services.task import create_form_for_task
+from app.services.task import create_form_for_task, get_project_form_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -155,6 +156,36 @@ def list_tasks(
     ]
 
     return result
+
+
+@router.get("/projects/{project_id}/form-task", response_model=ProjectFormTaskResponse)
+def get_project_form_task_endpoint(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_user_id),
+):
+    """
+    Get the primary form_completion task for a project.
+
+    Returns the task details, linked form instance (if any), and available templates
+    for creating a new form.
+
+    This endpoint is useful for:
+    - Checking if a project has a form_completion task
+    - Getting the current state of the form (if created)
+    - Listing available templates for form creation
+
+    Path Parameters:
+        project_id: UUID of the project
+
+    Returns:
+        ProjectFormTaskResponse with:
+        - task: Basic task info (id, title, task_type, status, form_instance_id, task_definition)
+        - form: Form instance info if linked (id, title, status, completion_percentage)
+        - available_templates: List of published templates (id, name, field_count)
+        - has_form: Boolean indicating if a form is linked to the task
+    """
+    return get_project_form_task(db, project_id)
 
 
 @router.post("", response_model=TaskResponse, status_code=201)

@@ -1,21 +1,25 @@
 """Wizard service for guided protocol question flow."""
 
-import json
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict
+
+import httpx
 from uuid import UUID
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.chat import ChatSession
 from app.schemas.wizard import (
     EnhancedGapQuestion, WizardProgress, SectionInfo,
     WizardQuestionsResponse, AnswerRequest, AnswerResponse,
-    SkipResponse, FormFieldInfo, SuggestedAnswer
+    SkipResponse, FormFieldInfo, SuggestedAnswer,
+    PrefillTaskFormRequest, PrefillTaskFormResponse, FieldConflict
 )
 from app.services.suggestion_generator import SuggestionGenerator
+from app.services.form_mapper import get_form_mapper
 
 logger = logging.getLogger(__name__)
 
@@ -575,3 +579,219 @@ class WizardService:
             "fields_populated": preview["fields_to_populate"],
             "redirect_url": f"/forms/{form_id}"
         }
+
+    async def prefill_task_form(
+        self,
+        session_id: str,
+        user_id: str,
+        request: PrefillTaskFormRequest
+    ) -> PrefillTaskFormResponse:
+        """
+        Pre-fill a task's form from protocol data with conflict detection.
+
+        This method:
+        1. Gets the session and its extracted protocol data
+        2. Calls Forms Service to check if task has a form
+        3. Creates form if needed (requires template_id)
+        4. Maps protocol data to form fields
+        5. Detects conflicts between existing and new data
+        6. Applies pre-fill (skipping conflicts)
+        7. Updates task status if needed
+
+        Args:
+            session_id: Protocol assistant session ID
+            user_id: User ID making the request
+            request: PrefillTaskFormRequest with project_id, task_id, template_id
+
+        Returns:
+            PrefillTaskFormResponse with success status, conflicts, and redirect URL
+
+        Raises:
+            ValueError: If session not found, task not found, or form creation fails
+        """
+        settings = get_settings()
+
+        # Get the session
+        session = await self._get_session(session_id, user_id)
+        if not session:
+            raise ValueError("Session not found")
+
+        # Get extracted protocol data
+        protocol_data = session.extracted_protocol or {}
+        if not protocol_data:
+            raise ValueError("No protocol data extracted in this session")
+
+        # Create HTTP client for Forms Service / Gateway communication
+        async with httpx.AsyncClient(
+            base_url=settings.GATEWAY_URL,
+            timeout=30.0,
+            headers={
+                "X-Internal-API-Key": settings.INTERNAL_API_KEY,
+                "X-User-ID": user_id,
+                "Content-Type": "application/json",
+            },
+        ) as client:
+            # Step 1: Get task details from Forms Service (via Gateway)
+            try:
+                task_response = await client.get(f"/api/tasks/{request.task_id}")
+                task_response.raise_for_status()
+                task_data = task_response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(f"Task {request.task_id} not found")
+                logger.error(f"Failed to fetch task {request.task_id}: {e}")
+                raise ValueError(f"Failed to fetch task: {e.response.text}")
+
+            task = task_data.get("data", task_data)
+            form_instance_id = task.get("form_instance_id")
+            existing_form_data = {}
+            form_id = None
+
+            # Step 2: Check if task has a form
+            if form_instance_id:
+                # Form exists - get current form data
+                form_id = form_instance_id
+                try:
+                    form_response = await client.get(f"/api/forms/{form_id}")
+                    form_response.raise_for_status()
+                    form_data = form_response.json()
+                    existing_form_data = form_data.get("data", form_data).get("data", {})
+                except httpx.HTTPStatusError as e:
+                    logger.warning(f"Failed to fetch form {form_id}: {e}")
+                    # Continue with empty existing data
+            else:
+                # No form - need to create one
+                if not request.template_id:
+                    raise ValueError(
+                        "Task has no form. Provide template_id to create one."
+                    )
+
+                # Create new form
+                try:
+                    create_response = await client.post(
+                        "/api/forms",
+                        json={
+                            "template_id": request.template_id,
+                            "project_id": request.project_id,
+                            "title": f"Form for Task #{request.task_id}",
+                        },
+                    )
+                    create_response.raise_for_status()
+                    created_form = create_response.json()
+                    form_id = created_form.get("data", created_form).get("id")
+
+                    if not form_id:
+                        raise ValueError("Failed to create form: no ID returned")
+
+                    # Link form to task
+                    link_response = await client.patch(
+                        f"/api/tasks/{request.task_id}",
+                        json={"form_instance_id": form_id},
+                    )
+                    link_response.raise_for_status()
+
+                    logger.info(f"Created form {form_id} and linked to task {request.task_id}")
+
+                except httpx.HTTPStatusError as e:
+                    logger.error(f"Failed to create/link form: {e}")
+                    raise ValueError(f"Failed to create form: {e.response.text}")
+
+            # Step 3: Map protocol data to form fields
+            form_mapper = get_form_mapper()
+            # Convert protocol to form data format
+            from app.schemas.protocol import ExtractedProtocol
+            try:
+                # Try to parse as ExtractedProtocol if possible
+                extracted_protocol = ExtractedProtocol(**protocol_data)
+                mapped_form_data = await form_mapper.map_to_form_data(extracted_protocol)
+            except Exception:
+                # If parsing fails, use protocol_data directly as dict
+                mapped_form_data = protocol_data
+
+            # Step 4: Detect conflicts
+            conflicts = form_mapper.detect_conflicts(
+                existing_form_data=existing_form_data,
+                new_protocol_data=mapped_form_data,
+                source="protocol_extraction"
+            )
+
+            # Also check for wizard answer conflicts
+            collected_answers = session.collected_answers or {}
+            answers = collected_answers.get("answers", {})
+            wizard_mapped_data = {}
+            for question_id, answer_record in answers.items():
+                answer_text = answer_record.get("answer", "")
+                if answer_text:
+                    form_field_info = FORM_FIELD_MAPPINGS.get(question_id)
+                    if form_field_info:
+                        wizard_mapped_data[form_field_info.field_name] = answer_text
+
+            wizard_conflicts = form_mapper.detect_conflicts(
+                existing_form_data=existing_form_data,
+                new_protocol_data=wizard_mapped_data,
+                source="wizard_answer"
+            )
+            conflicts.extend(wizard_conflicts)
+
+            # Step 5: Apply pre-fill (skip conflicting fields)
+            conflict_field_ids = {c.field_id for c in conflicts}
+            fields_to_update = {}
+            fields_skipped = 0
+
+            # Flatten mapped data for update
+            flat_mapped = form_mapper._flatten_dict(mapped_form_data) if mapped_form_data else {}
+            for field_id, value in flat_mapped.items():
+                if field_id in conflict_field_ids:
+                    fields_skipped += 1
+                elif value is not None and value != "":
+                    fields_to_update[field_id] = value
+
+            # Add wizard answers (non-conflicting)
+            for field_id, value in wizard_mapped_data.items():
+                if field_id not in conflict_field_ids and value:
+                    fields_to_update[field_id] = value
+
+            fields_updated = 0
+            if fields_to_update and form_id:
+                # Update form data via Forms Service
+                try:
+                    update_response = await client.patch(
+                        f"/api/forms/{form_id}/data",
+                        json={"data": fields_to_update},
+                    )
+                    update_response.raise_for_status()
+                    fields_updated = len(fields_to_update)
+                    logger.info(f"Updated form {form_id} with {fields_updated} fields")
+                except httpx.HTTPStatusError as e:
+                    logger.warning(f"Failed to update form data: {e}")
+                    # Don't fail the whole operation - report partial success
+
+            # Step 6: Update task status to 'in_progress' if it was 'pending'
+            task_status = task.get("status", "").lower()
+            if task_status == "pending":
+                try:
+                    status_response = await client.patch(
+                        f"/api/tasks/{request.task_id}",
+                        json={"status": "in_progress"},
+                    )
+                    status_response.raise_for_status()
+                    logger.info(f"Updated task {request.task_id} status to in_progress")
+                except httpx.HTTPStatusError as e:
+                    logger.warning(f"Failed to update task status: {e}")
+                    # Don't fail - task status update is not critical
+
+            # Build redirect URL with conflict info
+            conflict_fields = [c.field_id for c in conflicts]
+            redirect_url = f"/forms/{form_id}"
+            if conflict_fields:
+                redirect_url += f"?prefill_conflicts={','.join(conflict_fields)}"
+
+            return PrefillTaskFormResponse(
+                success=True,
+                form_id=form_id,
+                task_id=request.task_id,
+                conflicts=conflicts,
+                fields_updated=fields_updated,
+                fields_skipped=fields_skipped,
+                redirect_url=redirect_url
+            )

@@ -904,6 +904,20 @@ export const projectController = {
       next(error);
     }
   },
+  /**
+   * Get form-completion task for a project
+   * GET /api/projects/:projectId/form-task
+   * Returns the form-completion task that can be pre-filled by Protocol Assistant
+   */
+  getFormTask: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const result = await formsProxy.getProjectFormTask(projectId, req.user!.id);
+      res.json({ data: result.data });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default projectController;

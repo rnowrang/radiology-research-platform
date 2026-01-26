@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Collapsible,
   CollapsibleContent,
@@ -25,7 +28,11 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react';
-import { protocolAssistantApi, WizardProgress } from '@/lib/protocolAssistantApi';
+import {
+  protocolAssistantApi,
+  WizardProgress,
+  PrefillTaskFormRequest,
+} from '@/lib/protocolAssistantApi';
 import { useWizardStore, GeneratedDocument } from '@/stores/wizardStore';
 import { toast } from '@/hooks/useToast';
 import { FormTemplatePicker } from './FormTemplatePicker';
@@ -49,6 +56,7 @@ export function CompletionPanel({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [generatingType, setGeneratingType] = useState<string>();
   const [showFormPicker, setShowFormPicker] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null);
   const queryClient = useQueryClient();
@@ -87,6 +95,43 @@ export function CompletionPanel({
     enabled: !!projectId,
   });
 
+  // Fetch project's form task info
+  const { data: formTaskData, isLoading: taskLoading } = useQuery({
+    queryKey: ['projectFormTask', projectId],
+    queryFn: () => protocolAssistantApi.getProjectFormTask(projectId!),
+    enabled: !!projectId,
+  });
+
+  // Task-based pre-fill mutation
+  const prefillTaskMutation = useMutation({
+    mutationFn: (request: PrefillTaskFormRequest) =>
+      protocolAssistantApi.prefillTaskForm(sessionId, request),
+    onSuccess: (data) => {
+      setShowTemplatePicker(false);
+      // Build redirect URL with conflicts
+      const conflictIds = data.conflicts.map((c) => c.field_id).join(',');
+      const url = conflictIds
+        ? `/forms/${data.form_id}?prefill_conflicts=${conflictIds}`
+        : `/forms/${data.form_id}`;
+      window.open(url, '_blank');
+      toast({
+        title: 'Form pre-filled successfully',
+        description: `${data.fields_updated} fields updated${
+          data.conflicts.length > 0
+            ? `, ${data.conflicts.length} conflicts to review`
+            : ''
+        }`,
+      });
+    },
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      toast({
+        title: 'Pre-fill failed',
+        description: error.response?.data?.detail || 'Failed to pre-fill form',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Build answers by section
   const answersBySection = questions.reduce((acc, q) => {
     const answer = answers[q.id];
@@ -101,6 +146,13 @@ export function CompletionPanel({
     }
     return acc;
   }, {} as Record<string, Array<{ question: string; answer: string }>>);
+
+  // Calculate skipped questions that affect form fields
+  const skippedFieldCount = useMemo(() => {
+    return questions.filter(
+      (q) => skippedQuestions.includes(q.id) && q.form_field
+    ).length;
+  }, [questions, skippedQuestions]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -227,6 +279,25 @@ export function CompletionPanel({
 
   const handleSelectExisting = (formId: number) => {
     prefillMutation.mutate({ formId, isNew: false });
+  };
+
+  // Task-based pre-fill handlers
+  const handlePrefillExisting = () => {
+    if (!formTaskData?.task || !formTaskData.form || !projectId) return;
+    prefillTaskMutation.mutate({
+      project_id: projectId,
+      task_id: formTaskData.task.id,
+    });
+  };
+
+  const handlePrefillWithTemplate = (templateId: number) => {
+    if (!formTaskData?.task || !projectId) return;
+    setShowTemplatePicker(false);
+    prefillTaskMutation.mutate({
+      project_id: projectId,
+      task_id: formTaskData.task.id,
+      template_id: templateId,
+    });
   };
 
   const handleCopyDocument = () => {
@@ -442,29 +513,123 @@ export function CompletionPanel({
             </div>
           </div>
 
-          {/* Pre-fill Form */}
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">Pre-fill IRB Form</p>
-            <Button
-              onClick={handlePrefillForm}
-              disabled={hasSkippedQuestions || isGenerating || prefillMutation.isPending}
-              className="w-full gap-2"
-              size="sm"
-            >
-              {prefillMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
+          {/* Legacy Pre-fill Form (fallback when no task found) */}
+          {!formTaskData?.task && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Pre-fill IRB Form</p>
+              <Button
+                onClick={handlePrefillForm}
+                disabled={hasSkippedQuestions || isGenerating || prefillMutation.isPending}
+                className="w-full gap-2"
+                size="sm"
+              >
+                {prefillMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Pre-fill IRB Form
+              </Button>
+              {hasSkippedQuestions && (
+                <p className="text-xs text-yellow-600">
+                  Review skipped questions first
+                </p>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Task-Aware Pre-fill Card */}
+        <Card className="shrink-0">
+          <CardHeader className="p-3 pb-0">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <FileText className="h-4 w-4" />
               Pre-fill IRB Form
-            </Button>
-            {hasSkippedQuestions && (
-              <p className="text-xs text-yellow-600">
-                Review skipped questions first
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 space-y-3">
+            {taskLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : formTaskData?.task ? (
+              <>
+                <div className="space-y-2">
+                  <p className="text-xs">
+                    <span className="font-medium">Task:</span> {formTaskData.task.title}
+                  </p>
+                  {formTaskData.has_form && formTaskData.form ? (
+                    <div className="text-xs space-y-1">
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">Form:</span> {formTaskData.form.title}
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {formTaskData.form.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </p>
+                      <p>
+                        <span className="font-medium">Completion:</span>{' '}
+                        {Math.round(formTaskData.form.completion_percentage)}%
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No form created yet. Select a template to create and pre-fill.
+                    </p>
+                  )}
+                </div>
+
+                {/* Skipped questions warning */}
+                {skippedFieldCount > 0 && (
+                  <Alert variant="warning" className="py-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      {skippedFieldCount} field{skippedFieldCount !== 1 ? 's' : ''} may be
+                      incomplete due to skipped questions
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Action button */}
+                {formTaskData.has_form ? (
+                  <Button
+                    onClick={handlePrefillExisting}
+                    disabled={prefillTaskMutation.isPending || isGenerating}
+                    className="w-full"
+                    size="sm"
+                  >
+                    {prefillTaskMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Pre-filling...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Pre-fill Form
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setShowTemplatePicker(true)}
+                    disabled={prefillTaskMutation.isPending || isGenerating}
+                    className="w-full"
+                    size="sm"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Select Template & Pre-fill
+                  </Button>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No form task found for this project.
               </p>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Generated Documents Card */}
         <div className="border rounded-lg bg-background p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -534,7 +699,7 @@ export function CompletionPanel({
         </div>
       </div>
 
-      {/* Form Template Picker Modal */}
+      {/* Form Template Picker Modal (legacy) */}
       <FormTemplatePicker
         open={showFormPicker}
         onClose={() => setShowFormPicker(false)}
@@ -544,6 +709,74 @@ export function CompletionPanel({
         existingForms={existingForms}
         isLoading={prefillMutation.isPending}
       />
+
+      {/* Task Template Picker Dialog */}
+      <Dialog open={showTemplatePicker} onOpenChange={setShowTemplatePicker}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Select Form Template
+            </DialogTitle>
+            <DialogDescription>
+              Choose a template to create and pre-fill your IRB form.
+              {formTaskData?.task?.task_definition && (
+                <span className="block mt-1 text-primary">
+                  Recommended: {formTaskData.task.task_definition.name}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[300px]">
+            <div className="space-y-2 py-2">
+              {formTaskData?.available_templates.map((template) => {
+                const isRecommended =
+                  formTaskData.task?.task_definition?.template_id === template.id;
+                return (
+                  <button
+                    key={template.id}
+                    onClick={() => handlePrefillWithTemplate(template.id)}
+                    disabled={prefillTaskMutation.isPending}
+                    className={`flex items-center justify-between w-full p-3 rounded-lg border transition-colors text-left hover:bg-muted/50 ${
+                      isRecommended ? 'border-primary bg-primary/5' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded bg-muted">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{template.name}</p>
+                          {isRecommended && (
+                            <Badge variant="secondary" className="text-xs">
+                              Recommended
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {template.field_count} fields
+                        </p>
+                      </div>
+                    </div>
+                    {prefillTaskMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                );
+              })}
+              {(!formTaskData?.available_templates ||
+                formTaskData.available_templates.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No templates available
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Generated Document Modal */}
       <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>

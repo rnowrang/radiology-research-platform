@@ -1,7 +1,7 @@
 """Task schemas for request/response validation."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime, date
 from uuid import UUID
 
@@ -174,3 +174,40 @@ class CreateFormForTaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# Project Form Task Response Schemas
+# =============================================================================
+
+class TemplateBasicResponse(BaseModel):
+    """Basic template information for selection."""
+    id: int
+    name: str
+    field_count: int
+
+
+class FormBasicResponse(BaseModel):
+    """Basic form instance information."""
+    id: int
+    title: str
+    status: str
+    completion_percentage: float
+
+
+class TaskBasicResponse(BaseModel):
+    """Basic task information."""
+    id: int
+    title: str
+    task_type: str
+    status: str
+    form_instance_id: Optional[int]
+    task_definition: Optional[dict]
+
+
+class ProjectFormTaskResponse(BaseModel):
+    """Response for project form task endpoint."""
+    task: Optional[TaskBasicResponse]
+    form: Optional[FormBasicResponse]
+    available_templates: List[TemplateBasicResponse]
+    has_form: bool
