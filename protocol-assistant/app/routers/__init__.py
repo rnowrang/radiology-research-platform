@@ -5,6 +5,7 @@ from app.routers.documents import router as documents_router
 from app.routers.generation import router as generation_router
 from app.routers.admin import router as admin_router
 from app.routers.integrations import router as integrations_router
+from app.routers.wizard import router as wizard_router
 
 __all__ = [
     "chat_router",
@@ -12,4 +13,5 @@ __all__ = [
     "generation_router",
     "admin_router",
     "integrations_router",
+    "wizard_router",
 ]

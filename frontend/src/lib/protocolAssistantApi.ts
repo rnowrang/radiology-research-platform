@@ -55,6 +55,105 @@ export interface PrefillResponse {
   confidence_scores: Record<string, number>;
 }
 
+// Wizard types
+export interface SuggestedAnswer {
+  id: string;
+  text: string;
+  source: 'document' | 'ai' | 'common';
+  confidence?: number;
+}
+
+export interface FormFieldInfo {
+  form_type: string;
+  section: string;
+  field_name: string;
+  field_label: string;
+}
+
+export interface EnhancedGapQuestion {
+  id: string;
+  question: string;
+  section: string;
+  priority: 'high' | 'medium' | 'low';
+  rationale?: string;
+  suggested_answers: SuggestedAnswer[];
+  extracted_value?: string;
+  extracted_confidence?: number;
+  form_field?: FormFieldInfo;
+  average_time_seconds: number;
+  answered: boolean;
+  skipped: boolean;
+}
+
+export interface SectionInfo {
+  name: string;
+  icon: string;
+  question_count: number;
+}
+
+export interface AnswerRecord {
+  answer: string;
+  source: 'suggested' | 'freetext' | 'extracted';
+  timestamp: string;
+}
+
+export interface WizardProgress {
+  total_questions: number;
+  answered_count: number;
+  skipped_count: number;
+  current_index: number;
+  sections_progress: Record<string, { total: number; answered: number }>;
+  estimated_remaining_minutes: number;
+  percent_complete: number;
+}
+
+export interface WizardQuestionsResponse {
+  questions: EnhancedGapQuestion[];
+  sections: SectionInfo[];
+  total_estimated_minutes: number;
+}
+
+export interface AnswerRequest {
+  answer: string;
+  source: 'suggested' | 'freetext' | 'extracted';
+}
+
+export interface AnswerResponse {
+  success: boolean;
+  updated_protocol?: Record<string, unknown>;
+  next_question_id?: string;
+  progress: WizardProgress;
+}
+
+export interface SkipResponse {
+  success: boolean;
+  next_question_id?: string;
+  progress: WizardProgress;
+}
+
+export interface SuggestionsResponse {
+  suggestions: SuggestedAnswer[];
+}
+
+export interface FormPrefillPreview {
+  form_fields: Array<{
+    field_name: string;
+    field_label: string;
+    current_value?: string;
+    new_value?: string;
+    confidence?: number;
+  }>;
+  total_fields: number;
+  fields_to_populate: number;
+}
+
+export interface WizardPrefillResult {
+  success: boolean;
+  form_id: number;
+  fields_populated: number;
+  redirect_url?: string;
+}
+
 export const protocolAssistantApi = {
   // Session management
   getOrCreateSession: async (projectId: string): Promise<ChatSession> => {
@@ -180,6 +279,68 @@ export const protocolAssistantApi = {
   // Progress
   getProgress: async (sessionId: string): Promise<{ completion_percentage: number; stages: Record<string, boolean> }> => {
     const response = await api.get(`/protocol-assistant/sessions/${sessionId}/progress`);
+    return response.data.data;
+  },
+
+  // Wizard methods
+  getWizardQuestions: async (sessionId: string): Promise<WizardQuestionsResponse> => {
+    const response = await api.get(`/protocol-assistant/sessions/${sessionId}/wizard/questions`);
+    return response.data.data;
+  },
+
+  submitWizardAnswer: async (
+    sessionId: string,
+    questionId: string,
+    answer: AnswerRequest
+  ): Promise<AnswerResponse> => {
+    const response = await api.post(
+      `/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/answer`,
+      answer
+    );
+    return response.data.data;
+  },
+
+  skipWizardQuestion: async (sessionId: string, questionId: string): Promise<SkipResponse> => {
+    const response = await api.post(
+      `/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/skip`
+    );
+    return response.data.data;
+  },
+
+  getWizardProgress: async (sessionId: string): Promise<WizardProgress> => {
+    const response = await api.get(`/protocol-assistant/sessions/${sessionId}/wizard/progress`);
+    return response.data.data;
+  },
+
+  getQuestionSuggestions: async (
+    sessionId: string,
+    questionId: string
+  ): Promise<SuggestionsResponse> => {
+    const response = await api.get(
+      `/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/suggestions`
+    );
+    return response.data.data;
+  },
+
+  getFormPrefillPreview: async (
+    sessionId: string,
+    formId?: number
+  ): Promise<FormPrefillPreview> => {
+    const response = await api.get(
+      `/protocol-assistant/sessions/${sessionId}/wizard/form-preview`,
+      { params: formId ? { formId } : {} }
+    );
+    return response.data.data;
+  },
+
+  prefillFormFromWizard: async (
+    sessionId: string,
+    formId: number
+  ): Promise<WizardPrefillResult> => {
+    const response = await api.post(
+      `/protocol-assistant/sessions/${sessionId}/wizard/prefill-form`,
+      { formId }
+    );
     return response.data.data;
   },
 };

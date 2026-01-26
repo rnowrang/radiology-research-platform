@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Send, Loader2, Paperclip, FileText, Sparkles, X } from 'lucide-react';
+import { Plus, Send, Loader2, Paperclip, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -7,8 +7,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-
 interface ChatInputProps {
   onSend: (message: string) => void;
   onUpload: (file: File) => void;

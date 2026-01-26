@@ -480,6 +480,99 @@ export const protocolAssistantController = {
       next(error);
     }
   },
+
+  // Wizard endpoints
+  getWizardQuestions: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const response = await protocolAssistantProxy.getWizardQuestions(sessionId, req.user!.id);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  submitWizardAnswer: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId, questionId } = req.params;
+      const response = await protocolAssistantProxy.submitWizardAnswer(
+        sessionId,
+        questionId,
+        req.body,
+        req.user!.id
+      );
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  skipWizardQuestion: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId, questionId } = req.params;
+      const response = await protocolAssistantProxy.skipWizardQuestion(
+        sessionId,
+        questionId,
+        req.user!.id
+      );
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getWizardProgress: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const response = await protocolAssistantProxy.getWizardProgress(sessionId, req.user!.id);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getQuestionSuggestions: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId, questionId } = req.params;
+      const response = await protocolAssistantProxy.getQuestionSuggestions(
+        sessionId,
+        questionId,
+        req.user!.id
+      );
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getFormPrefillPreview: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const formId = req.query.formId as string | undefined;
+      const response = await protocolAssistantProxy.getFormPrefillPreview(
+        sessionId,
+        formId,
+        req.user!.id
+      );
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  prefillFormFromWizard: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+      const response = await protocolAssistantProxy.prefillFormFromWizard(
+        sessionId,
+        req.body,
+        req.user!.id
+      );
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default protocolAssistantController;

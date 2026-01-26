@@ -12,6 +12,9 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { GenerationActions } from './GenerationActions';
 import { GapQuestions } from './GapQuestions';
+import { ModeSelectionModal } from './ModeSelectionModal';
+import { ModeToggle } from './ModeToggle';
+import { GuidedWizardPanel } from './GuidedWizardPanel';
 import { toast } from '@/hooks/useToast';
 
 interface ChatPanelProps {
@@ -21,6 +24,9 @@ interface ChatPanelProps {
 export function ChatPanel({ projectId }: ChatPanelProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [generatingType, setGeneratingType] = useState<string>();
+  const [mode, setMode] = useState<'guided' | 'chat'>('chat');
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [hasSeenModeModal, setHasSeenModeModal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -130,12 +136,28 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     handleSend(question.question);
   };
 
+  const hasProtocol = session?.has_extracted_protocol;
+  const gaps = session?.current_gaps || [];
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [historyData?.messages]);
+
+  // Show mode selection modal after successful upload with gaps
+  useEffect(() => {
+    if (hasProtocol && gaps.length > 0 && !hasSeenModeModal) {
+      setShowModeModal(true);
+    }
+  }, [hasProtocol, gaps.length, hasSeenModeModal]);
+
+  const handleModeSelect = (selectedMode: 'guided' | 'chat') => {
+    setMode(selectedMode);
+    setShowModeModal(false);
+    setHasSeenModeModal(true);
+  };
 
   if (sessionLoading) {
     return (
@@ -145,77 +167,101 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     );
   }
 
-  const hasProtocol = session?.has_extracted_protocol;
-  const gaps = session?.current_gaps || [];
-
   return (
-    <Card className="h-[600px] flex flex-col">
-      <CardHeader className="pb-3 border-b">
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Protocol Assistant
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        {/* Chat Messages */}
-        <ScrollArea className="flex-1 px-4">
-          <div className="space-y-4 py-4" ref={scrollRef}>
-            {/* Welcome message if no history */}
-            {!historyData?.messages?.length && (
-              <div className="py-8 text-center">
-                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-xl font-medium">Ready when you are.</h3>
-                <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                  Upload a research protocol using the + button below, or ask me questions about
-                  preparing your IRB submission.
-                </p>
-              </div>
-            )}
-
-            {/* Gap Questions */}
-            {hasProtocol && gaps.length > 0 && (
-              <GapQuestions gaps={gaps} onQuestionClick={handleQuestionClick} />
-            )}
-
-            {/* Messages */}
-            {historyData?.messages?.map((msg: ChatMessageType) => (
-              <ChatMessage key={msg.id} message={msg} />
-            ))}
-
-            {/* Loading indicator */}
-            {sendMutation.isPending && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Thinking...</span>
-              </div>
+    <>
+      <Card className="h-[600px] flex flex-col">
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Protocol Assistant
+            </CardTitle>
+            {hasProtocol && (
+              <ModeToggle
+                mode={mode}
+                onChange={setMode}
+                disabled={sessionLoading}
+              />
             )}
           </div>
-        </ScrollArea>
+        </CardHeader>
 
-        {/* Action Buttons (when protocol is analyzed) */}
-        {hasProtocol && (
-          <GenerationActions
-            onGenerateAbstract={() => generateMutation.mutate('abstract')}
-            onGenerateConsent={() => generateMutation.mutate('consent')}
-            onGenerateProtocol={() => generateMutation.mutate('protocol')}
-            onGenerateAll={() => generateMutation.mutate('all')}
-            isGenerating={generateMutation.isPending}
-            generatingType={generatingType}
-            disabled={!sessionId}
-          />
-        )}
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          {mode === 'guided' && sessionId ? (
+            <GuidedWizardPanel
+              sessionId={sessionId}
+              projectId={projectId}
+              onSwitchToChat={() => setMode('chat')}
+            />
+          ) : (
+            <>
+              {/* Chat Messages */}
+              <ScrollArea className="flex-1 px-4">
+                <div className="space-y-4 py-4" ref={scrollRef}>
+                  {/* Welcome message if no history */}
+                  {!historyData?.messages?.length && (
+                    <div className="py-8 text-center">
+                      <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-medium">Ready when you are.</h3>
+                      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                        Upload a research protocol using the + button below, or ask me questions about
+                        preparing your IRB submission.
+                      </p>
+                    </div>
+                  )}
 
-        {/* Input Area - ChatGPT style */}
-        <ChatInput
-          onSend={handleSend}
-          onUpload={handleUpload}
-          isSending={sendMutation.isPending}
-          isUploading={uploadMutation.isPending}
-          placeholder={hasProtocol ? 'Ask about your protocol...' : 'Ask anything'}
-          disabled={!sessionId}
-        />
-      </CardContent>
-    </Card>
+                  {/* Gap Questions */}
+                  {hasProtocol && gaps.length > 0 && (
+                    <GapQuestions gaps={gaps} onQuestionClick={handleQuestionClick} />
+                  )}
+
+                  {/* Messages */}
+                  {historyData?.messages?.map((msg: ChatMessageType) => (
+                    <ChatMessage key={msg.id} message={msg} />
+                  ))}
+
+                  {/* Loading indicator */}
+                  {sendMutation.isPending && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Thinking...</span>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {/* Action Buttons (when protocol is analyzed) */}
+              {hasProtocol && (
+                <GenerationActions
+                  onGenerateAbstract={() => generateMutation.mutate('abstract')}
+                  onGenerateConsent={() => generateMutation.mutate('consent')}
+                  onGenerateProtocol={() => generateMutation.mutate('protocol')}
+                  onGenerateAll={() => generateMutation.mutate('all')}
+                  isGenerating={generateMutation.isPending}
+                  generatingType={generatingType}
+                  disabled={!sessionId}
+                />
+              )}
+
+              {/* Input Area - ChatGPT style */}
+              <ChatInput
+                onSend={handleSend}
+                onUpload={handleUpload}
+                isSending={sendMutation.isPending}
+                isUploading={uploadMutation.isPending}
+                placeholder={hasProtocol ? 'Ask about your protocol...' : 'Ask anything'}
+                disabled={!sessionId}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <ModeSelectionModal
+        open={showModeModal}
+        onSelect={handleModeSelect}
+        gapCount={gaps.length}
+      />
+    </>
   );
 }

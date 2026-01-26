@@ -66,6 +66,17 @@ router.post('/sessions/:sessionId/create-prefilled-form', protocolAssistantContr
 // Progress
 router.get('/sessions/:sessionId/progress', protocolAssistantController.getProgress);
 
+// Wizard endpoints
+router.get('/sessions/:sessionId/wizard/questions', protocolAssistantController.getWizardQuestions);
+router.post('/sessions/:sessionId/wizard/questions/:questionId/answer', protocolAssistantController.submitWizardAnswer);
+router.post('/sessions/:sessionId/wizard/questions/:questionId/skip', protocolAssistantController.skipWizardQuestion);
+router.get('/sessions/:sessionId/wizard/progress', protocolAssistantController.getWizardProgress);
+router.get('/sessions/:sessionId/wizard/questions/:questionId/suggestions', protocolAssistantController.getQuestionSuggestions);
+
+// Form pre-fill endpoints (for later use)
+router.get('/sessions/:sessionId/wizard/form-preview', protocolAssistantController.getFormPrefillPreview);
+router.post('/sessions/:sessionId/wizard/prefill-form', protocolAssistantController.prefillFormFromWizard);
+
 // Admin - stats endpoint (legacy)
 router.get('/admin/stats', protocolAssistantController.getStats);
 

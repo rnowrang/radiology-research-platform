@@ -48,6 +48,18 @@ from app.schemas.generation import (
     GenerationStatus,
     GenerationJobStatus,
 )
+from app.schemas.wizard import (
+    AnswerSource,
+    FormFieldInfo,
+    SuggestedAnswer,
+    EnhancedGapQuestion,
+    SectionInfo,
+    WizardQuestionsResponse,
+    AnswerRequest,
+    AnswerResponse,
+    SkipResponse,
+    WizardProgress,
+)
 
 __all__ = [
     # Chat schemas
@@ -94,4 +106,15 @@ __all__ = [
     "BulkGenerationResponse",
     "GenerationStatus",
     "GenerationJobStatus",
+    # Wizard schemas
+    "AnswerSource",
+    "FormFieldInfo",
+    "SuggestedAnswer",
+    "EnhancedGapQuestion",
+    "SectionInfo",
+    "WizardQuestionsResponse",
+    "AnswerRequest",
+    "AnswerResponse",
+    "SkipResponse",
+    "WizardProgress",
 ]

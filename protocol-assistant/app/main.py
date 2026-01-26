@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import chat, documents, generation, admin, integrations, progress
+from app.routers import chat, documents, generation, admin, integrations, progress, wizard
 from app.routers import audit
 from app.middleware.audit import AuditMiddleware
 
@@ -86,4 +86,5 @@ app.include_router(generation.router)
 app.include_router(admin.router)
 app.include_router(integrations.router)
 app.include_router(progress.router)
+app.include_router(wizard.router)
 app.include_router(audit.router)

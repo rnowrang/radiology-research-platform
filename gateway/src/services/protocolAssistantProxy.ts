@@ -391,6 +391,86 @@ export const protocolAssistantProxy = {
     });
   },
 
+  // Wizard endpoints
+  getWizardQuestions: async (sessionId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/protocol-assistant/sessions/${sessionId}/wizard/questions`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  submitWizardAnswer: async (
+    sessionId: string,
+    questionId: string,
+    answerData: { answer: string; source: string },
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(
+      `/api/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/answer`,
+      answerData,
+      { headers: buildUserHeaders(userContext) }
+    );
+  },
+
+  skipWizardQuestion: async (
+    sessionId: string,
+    questionId: string,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(
+      `/api/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/skip`,
+      {},
+      { headers: buildUserHeaders(userContext) }
+    );
+  },
+
+  getWizardProgress: async (sessionId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/protocol-assistant/sessions/${sessionId}/wizard/progress`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  getQuestionSuggestions: async (
+    sessionId: string,
+    questionId: string,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(
+      `/api/protocol-assistant/sessions/${sessionId}/wizard/questions/${questionId}/suggestions`,
+      { headers: buildUserHeaders(userContext) }
+    );
+  },
+
+  getFormPrefillPreview: async (
+    sessionId: string,
+    formId: string | undefined,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    const params = formId ? { formId } : undefined;
+    return protocolClient.get(`/api/protocol-assistant/sessions/${sessionId}/wizard/form-preview`, {
+      params,
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  prefillFormFromWizard: async (
+    sessionId: string,
+    prefillData: { formId: number },
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(
+      `/api/protocol-assistant/sessions/${sessionId}/wizard/prefill-form`,
+      prefillData,
+      { headers: buildUserHeaders(userContext) }
+    );
+  },
+
   // Health check
   healthCheck: async (): Promise<AxiosResponse> => {
     return protocolClient.get('/health');
