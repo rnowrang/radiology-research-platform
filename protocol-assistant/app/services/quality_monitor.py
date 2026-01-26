@@ -120,7 +120,7 @@ class QualityMonitor:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         # Build query for recent feedback
-        query = select(Feedback).where(AIFeedback.created_at >= cutoff)
+        query = select(AIFeedback).where(AIFeedback.created_at >= cutoff)
 
         if prompt_key:
             # Get active prompt version
