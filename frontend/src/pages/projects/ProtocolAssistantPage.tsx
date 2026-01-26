@@ -1,9 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ChatPanel } from '@/components/protocol-assistant/ChatPanel';
 import { projectsApi } from '@/lib/api';
 
@@ -26,9 +25,8 @@ export function ProtocolAssistantPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-[600px] w-full" />
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -46,44 +44,28 @@ export function ProtocolAssistantPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col h-[calc(100vh-7rem)] overflow-hidden">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between py-1 px-1 shrink-0">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" asChild>
             <Link to={`/projects/${projectId}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Project
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <h1 className="text-2xl font-bold tracking-tight">Protocol Assistant</h1>
-            </div>
-            <p className="text-muted-foreground">
-              AI-powered assistance for {projectData.title}
-            </p>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h1 className="text-lg font-semibold">Protocol Assistant</h1>
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              — {projectData.title}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Instructions */}
-      <Alert>
-        <Sparkles className="h-4 w-4" />
-        <AlertTitle>How to use Protocol Assistant</AlertTitle>
-        <AlertDescription>
-          <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
-            <li>Upload your research protocol document (PDF, Word, or text)</li>
-            <li>The assistant will analyze it and identify any gaps</li>
-            <li>Answer the gap questions to complete your protocol</li>
-            <li>Generate IRB-ready documents: abstract, consent form, and full protocol</li>
-          </ol>
-        </AlertDescription>
-      </Alert>
-
-      {/* Chat Panel */}
-      <div className="max-w-4xl mx-auto">
+      {/* Chat Panel - Fills remaining space */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         <ChatPanel projectId={projectId!} />
       </div>
     </div>

@@ -384,7 +384,7 @@ class DocumentGenerator:
             generation_metadata={
                 "provider": response.provider,
                 "model": response.model,
-                "tokens_used": response.usage.total_tokens if response.usage else 0,
+                "tokens_used": response.usage.get("total_tokens", 0) if response.usage else 0,
                 "options": options,
             },
         )

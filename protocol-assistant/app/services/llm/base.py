@@ -26,6 +26,7 @@ class LLMResponse(BaseModel):
 
     content: str = Field(..., description="Generated content")
     model: str = Field(..., description="Model used for generation")
+    provider: str = Field(default="unknown", description="LLM provider name")
     usage: dict = Field(default_factory=dict, description="Token usage information")
     finish_reason: Optional[str] = Field(default=None, description="Reason for completion")
 

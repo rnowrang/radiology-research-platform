@@ -86,7 +86,8 @@ export interface EnhancedGapQuestion {
 }
 
 export interface SectionInfo {
-  name: string;
+  key: string;  // Original section key (e.g., "study_info", "methodology")
+  name: string; // Display name (e.g., "Study Information", "Methodology")
   icon: string;
   question_count: number;
 }
@@ -224,7 +225,7 @@ export const protocolAssistantApi = {
   generateAbstract: async (sessionId: string, wordLimit = 350): Promise<GeneratedDocument> => {
     const response = await api.post(
       `/protocol-assistant/sessions/${sessionId}/generate/abstract`,
-      null,
+      {},
       { params: { word_limit: wordLimit } }
     );
     return response.data.data;

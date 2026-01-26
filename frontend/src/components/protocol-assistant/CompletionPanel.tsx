@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,11 +9,12 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -22,13 +22,18 @@ import {
   Sparkles,
   ChevronDown,
   Loader2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { protocolAssistantApi, WizardProgress } from '@/lib/protocolAssistantApi';
-import { useWizardStore } from '@/stores/wizardStore';
+import { useWizardStore, GeneratedDocument } from '@/stores/wizardStore';
 import { toast } from '@/hooks/useToast';
+import { FormTemplatePicker } from './FormTemplatePicker';
+import { templatesApi, formsApi } from '@/lib/api';
 
 interface CompletionPanelProps {
   sessionId: string;
+  projectId?: string;
   progress: WizardProgress;
   skippedQuestions: string[];
   onReviewSkipped: (questionId: string) => void;
@@ -36,19 +41,51 @@ interface CompletionPanelProps {
 
 export function CompletionPanel({
   sessionId,
+  projectId,
   progress,
   skippedQuestions,
   onReviewSkipped,
 }: CompletionPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [generatingType, setGeneratingType] = useState<string>();
+  const [showFormPicker, setShowFormPicker] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null);
   const queryClient = useQueryClient();
-  const { questions, answers } = useWizardStore();
+
+  // Use wizard store for generated documents (persists across component remounts)
+  const {
+    questions,
+    answers,
+    generatedDocuments,
+    addGeneratedDocument,
+    addGeneratedDocuments,
+  } = useWizardStore();
 
   const hasSkippedQuestions = skippedQuestions.length > 0;
   const answeredCount = progress.answered_count;
   const skippedCount = progress.skipped_count;
   const totalQuestions = progress.total_questions;
+
+  // Fetch templates for form picker
+  const { data: templatesData } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      const response = await templatesApi.list();
+      return response.data.data || [];
+    },
+  });
+
+  // Fetch existing forms for the project
+  const { data: existingFormsData } = useQuery({
+    queryKey: ['forms', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const response = await formsApi.list({ projectId, status: 'draft' });
+      return response.data.data || [];
+    },
+    enabled: !!projectId,
+  });
 
   // Build answers by section
   const answersBySection = questions.reduce((acc, q) => {
@@ -75,7 +112,6 @@ export function CompletionPanel({
   // Generate document mutation
   const generateMutation = useMutation({
     mutationFn: async (type: 'abstract' | 'consent' | 'protocol' | 'all') => {
-      setGeneratingType(type);
       switch (type) {
         case 'abstract':
           return protocolAssistantApi.generateAbstract(sessionId);
@@ -89,226 +125,484 @@ export function CompletionPanel({
           throw new Error('Unknown generation type');
       }
     },
-    onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Document generated successfully',
-      });
+    onMutate: (type) => {
+      setGeneratingType(type);
+    },
+    onSuccess: (result) => {
       setGeneratingType(undefined);
       queryClient.invalidateQueries({ queryKey: ['chatHistory', sessionId] });
+
+      // Handle single document vs bulk generation
+      if (Array.isArray(result)) {
+        // Bulk generation - add all to list
+        const successfulDocs = result
+          .filter((d: GeneratedDocument) => d.quality_score > 0)
+          .map((d: GeneratedDocument) => ({
+            doc_type: d.doc_type,
+            content: d.content,
+            word_count: d.word_count || 0,
+            quality_score: d.quality_score || 0,
+            suggestions: d.suggestions || [],
+          }));
+        addGeneratedDocuments(successfulDocs);
+        toast({
+          title: 'Documents Generated',
+          description: `Successfully generated ${successfulDocs.length} documents.`,
+        });
+      } else if (result && typeof result === 'object' && 'doc_type' in result) {
+        // Single document - add to store and show in modal
+        const doc: GeneratedDocument = {
+          doc_type: result.doc_type,
+          content: result.content,
+          word_count: result.word_count || 0,
+          quality_score: result.quality_score || 0,
+          suggestions: result.suggestions || [],
+        };
+        addGeneratedDocument(doc);
+        setGeneratedDoc(doc);
+        setShowDocumentModal(true);
+
+        toast({
+          title: 'Document Generated',
+          description: `Successfully generated ${doc.doc_type?.replace(/_/g, ' ') || 'document'}.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Received unexpected response format from server',
+        });
+      }
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to generate document',
+        description: error.message || 'Failed to generate document',
       });
       setGeneratingType(undefined);
     },
   });
 
+  // Prefill form mutation
+  const prefillMutation = useMutation({
+    mutationFn: async ({ formId, isNew }: { formId: number; isNew: boolean }) => {
+      if (isNew) {
+        // Create new form and prefill
+        return protocolAssistantApi.prefillFormFromWizard(sessionId, formId);
+      } else {
+        // Prefill existing form
+        return protocolAssistantApi.prefillForm(sessionId, formId);
+      }
+    },
+    onSuccess: (result) => {
+      setShowFormPicker(false);
+      toast({
+        title: 'Form Pre-filled',
+        description: `Successfully pre-filled ${result.prefilled_fields?.length || result.fields_populated || 0} fields.`,
+      });
+
+      // Redirect to the form if we have a URL
+      const formId = result.form_id;
+      if (formId) {
+        window.open(`/forms/${formId}`, '_blank');
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to pre-fill form',
+      });
+    },
+  });
+
   const handlePrefillForm = () => {
-    // TODO: Implement form prefill - open FormTemplatePicker modal
-    toast({
-      title: 'Coming Soon',
-      description: 'Form pre-fill functionality will be available soon',
-    });
+    setShowFormPicker(true);
+  };
+
+  const handleSelectTemplate = (templateId: number) => {
+    prefillMutation.mutate({ formId: templateId, isNew: true });
+  };
+
+  const handleSelectExisting = (formId: number) => {
+    prefillMutation.mutate({ formId, isNew: false });
+  };
+
+  const handleCopyDocument = () => {
+    if (generatedDoc?.content) {
+      const textContent = typeof generatedDoc.content === 'string'
+        ? generatedDoc.content
+        : JSON.stringify(generatedDoc.content, null, 2);
+      navigator.clipboard.writeText(textContent);
+      toast({
+        title: 'Copied',
+        description: 'Document content copied to clipboard',
+      });
+    }
   };
 
   const sectionNames = Object.keys(answersBySection);
   const isGenerating = generateMutation.isPending;
 
+  // Transform data for FormTemplatePicker
+  const templates = (templatesData || []).map((t: { id: number; name: string; schema?: { sections?: unknown[] } }) => ({
+    id: t.id,
+    name: t.name,
+    fieldCount: t.schema?.sections?.length || 0,
+  }));
+
+  const existingForms = (existingFormsData || []).map((f: { id: number; title: string; status: string }) => ({
+    id: f.id,
+    name: f.title,
+    fieldCount: 0,
+    status: f.status,
+  }));
+
   return (
-    <div className="flex flex-col h-full p-4">
-      {/* Celebratory Header */}
-      <Card className="mb-4 border-green-200 bg-green-50/50">
-        <CardHeader className="pb-2">
+    <div className="flex h-full gap-4 p-3 overflow-hidden">
+      {/* Left Panel - Answers Summary (scrollable) */}
+      <div className="flex-1 flex flex-col min-w-0 border rounded-lg bg-background overflow-hidden">
+        {/* Header */}
+        <div className="shrink-0 p-2.5 border-b">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-green-100">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div className="p-1.5 rounded-full bg-green-100">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <CardTitle className="text-xl text-green-800">
-                Protocol Review Complete!
-              </CardTitle>
-              <p className="text-sm text-green-700 mt-1">
-                You've completed the protocol questionnaire
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Summary Stats */}
-          <div className="flex gap-4 mt-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-sm bg-green-100 text-green-800">
-                {answeredCount} answered
-              </Badge>
-            </div>
-            {skippedCount > 0 && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-sm bg-yellow-100 text-yellow-800">
-                  {skippedCount} skipped
+              <h3 className="font-semibold text-green-800">Protocol Review Complete!</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                  {answeredCount} answered
                 </Badge>
-              </div>
-            )}
-            <span className="text-sm text-muted-foreground">
-              of {totalQuestions} total questions
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Warning for Skipped Questions */}
-      {hasSkippedQuestions && (
-        <Card className="mb-4 border-yellow-200 bg-yellow-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="font-medium text-yellow-800">
-                  Review required before form pre-fill
-                </h4>
-                <p className="text-sm text-yellow-700 mt-1">
-                  You have {skippedCount} skipped question{skippedCount !== 1 ? 's' : ''}.
-                  Complete these for the best form pre-fill results.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => skippedQuestions[0] && onReviewSkipped(skippedQuestions[0])}
-                  className="mt-3 border-yellow-400 text-yellow-800 hover:bg-yellow-100"
-                >
-                  Review Skipped Questions
-                </Button>
+                {skippedCount > 0 && (
+                  <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                    {skippedCount} skipped
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  of {totalQuestions} questions
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
 
-      {/* Answers by Section */}
-      <Card className="flex-1 flex flex-col min-h-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Your Answers
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden p-0">
-          <ScrollArea className="h-full px-6 pb-4">
-            <div className="space-y-2">
-              {sectionNames.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No answers recorded yet.
-                </p>
-              ) : (
-                sectionNames.map((section) => {
-                  const sectionAnswers = answersBySection[section];
-                  const isExpanded = expandedSections[section] ?? false;
+        {/* Warning for Skipped Questions */}
+        {hasSkippedQuestions && (
+          <div className="shrink-0 mx-2.5 mt-2 flex items-center justify-between p-2 rounded-lg border border-yellow-200 bg-yellow-50/50">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+              <span className="text-sm text-yellow-800">
+                {skippedCount} skipped question{skippedCount !== 1 ? 's' : ''} need review
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => skippedQuestions[0] && onReviewSkipped(skippedQuestions[0])}
+              className="h-7 text-xs border-yellow-400 text-yellow-800 hover:bg-yellow-100"
+            >
+              Review
+            </Button>
+          </div>
+        )}
 
-                  return (
-                    <Collapsible
-                      key={section}
-                      open={isExpanded}
-                      onOpenChange={() => toggleSection(section)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <button className="flex items-center justify-between w-full p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium capitalize">
-                              {section.replace(/_/g, ' ')}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {sectionAnswers.length} answer{sectionAnswers.length !== 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              isExpanded ? 'rotate-180' : ''
-                            }`}
-                          />
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="pl-4 pt-2 space-y-3">
-                          {sectionAnswers.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="p-3 rounded-lg bg-muted/30 border-l-2 border-primary/30"
-                            >
-                              <p className="text-sm font-medium text-muted-foreground">
-                                {item.question}
-                              </p>
-                              <p className="text-sm mt-1">{item.answer}</p>
-                            </div>
-                          ))}
+        {/* Answers by Section - Scrollable */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-2.5 space-y-1">
+            <h4 className="text-sm font-medium flex items-center gap-2 mb-2">
+              <FileText className="h-4 w-4" />
+              Your Answers
+            </h4>
+            {sectionNames.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">
+                No answers recorded yet.
+              </p>
+            ) : (
+              sectionNames.map((section) => {
+                const sectionAnswers = answersBySection[section];
+                const isExpanded = expandedSections[section] ?? false;
+
+                return (
+                  <Collapsible
+                    key={section}
+                    open={isExpanded}
+                    onOpenChange={() => toggleSection(section)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-center justify-between w-full p-2.5 rounded-lg border hover:bg-muted/50 transition-colors text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium capitalize">
+                            {section.replace(/_/g, ' ')}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {sectionAnswers.length}
+                          </Badge>
                         </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                })
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="pl-3 pt-1.5 space-y-2">
+                        {sectionAnswers.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 rounded-lg bg-muted/30 border-l-2 border-primary/30"
+                          >
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {item.question}
+                            </p>
+                            <p className="text-sm mt-0.5">{item.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Right Panel - Actions & Generated Documents */}
+      <div className="w-72 shrink-0 flex flex-col gap-3 overflow-hidden">
+        {/* Actions Card */}
+        <div className="border rounded-lg bg-background p-3 space-y-3">
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Actions
+          </h4>
+
+          {/* Generate Documents */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Generate Documents</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => generateMutation.mutate('abstract')}
+                disabled={isGenerating}
+              >
+                {generatingType === 'abstract' ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <FileText className="mr-1 h-3 w-3" />
+                )}
+                Abstract
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => generateMutation.mutate('consent')}
+                disabled={isGenerating}
+              >
+                {generatingType === 'consent' ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <FileText className="mr-1 h-3 w-3" />
+                )}
+                Consent
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => generateMutation.mutate('protocol')}
+                disabled={isGenerating}
+              >
+                {generatingType === 'protocol' ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <FileText className="mr-1 h-3 w-3" />
+                )}
+                Protocol
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => generateMutation.mutate('all')}
+                disabled={isGenerating}
+              >
+                {generatingType === 'all' ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1 h-3 w-3" />
+                )}
+                All
+              </Button>
+            </div>
+          </div>
+
+          {/* Pre-fill Form */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Pre-fill IRB Form</p>
+            <Button
+              onClick={handlePrefillForm}
+              disabled={hasSkippedQuestions || isGenerating || prefillMutation.isPending}
+              className="w-full gap-2"
+              size="sm"
+            >
+              {prefillMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
               )}
+              Pre-fill IRB Form
+            </Button>
+            {hasSkippedQuestions && (
+              <p className="text-xs text-yellow-600">
+                Review skipped questions first
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Generated Documents Card */}
+        <div className="border rounded-lg bg-background p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <h4 className="text-sm font-medium flex items-center gap-2 mb-2 shrink-0">
+            <FileText className="h-4 w-4 text-primary" />
+            Generated Documents
+            {generatedDocuments.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {generatedDocuments.length}
+              </Badge>
+            )}
+          </h4>
+
+          {generatedDocuments.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No documents generated yet. Use the actions above to generate documents.
+            </p>
+          ) : (
+            <ScrollArea className="flex-1 -mx-1 px-1">
+              <div className="space-y-2">
+                {generatedDocuments.map((doc, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded-md border bg-muted/30"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <span className="text-sm capitalize truncate">
+                        {doc.doc_type?.replace(/_/g, ' ') || 'Document'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          const textContent = typeof doc.content === 'string'
+                            ? doc.content
+                            : JSON.stringify(doc.content, null, 2);
+                          navigator.clipboard.writeText(textContent);
+                          toast({
+                            title: 'Copied',
+                            description: 'Document copied to clipboard',
+                          });
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setGeneratedDoc(doc);
+                          setShowDocumentModal(true);
+                        }}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </div>
+
+      {/* Form Template Picker Modal */}
+      <FormTemplatePicker
+        open={showFormPicker}
+        onClose={() => setShowFormPicker(false)}
+        onSelectTemplate={handleSelectTemplate}
+        onSelectExisting={handleSelectExisting}
+        templates={templates}
+        existingForms={existingForms}
+        isLoading={prefillMutation.isPending}
+      />
+
+      {/* Generated Document Modal */}
+      <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Generated {generatedDoc?.doc_type?.replace(/_/g, ' ') || 'Document'}
+            </DialogTitle>
+            <DialogDescription>
+              {generatedDoc?.word_count && (
+                <span>~{generatedDoc.word_count} words</span>
+              )}
+              {generatedDoc?.quality_score !== undefined && (
+                <span className="ml-3">
+                  Quality Score: {Math.round(generatedDoc.quality_score)}%
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[50vh] mt-4">
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <pre className="whitespace-pre-wrap text-sm font-sans">
+                {generatedDoc?.content
+                  ? typeof generatedDoc.content === 'string'
+                    ? generatedDoc.content
+                    : JSON.stringify(generatedDoc.content, null, 2)
+                  : 'No content available'}
+              </pre>
             </div>
           </ScrollArea>
-        </CardContent>
-      </Card>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" disabled={isGenerating}>
-              {isGenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="mr-2 h-4 w-4" />
-              )}
-              {isGenerating ? `Generating ${generatingType}...` : 'Generate Documents'}
-              <ChevronDown className="ml-2 h-4 w-4" />
+          {generatedDoc?.suggestions && generatedDoc.suggestions.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2">Suggestions</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {generatedDoc.suggestions.map((suggestion: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    {suggestion}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={handleCopyDocument}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem
-              onClick={() => generateMutation.mutate('abstract')}
-              disabled={isGenerating}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Abstract
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => generateMutation.mutate('consent')}
-              disabled={isGenerating}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Consent Form
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => generateMutation.mutate('protocol')}
-              disabled={isGenerating}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Full Protocol
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => generateMutation.mutate('all')}
-              disabled={isGenerating}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate All
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          onClick={handlePrefillForm}
-          disabled={hasSkippedQuestions || isGenerating}
-          className="gap-2"
-        >
-          <Sparkles className="h-4 w-4" />
-          Pre-fill IRB Form
-        </Button>
-      </div>
+            <Button onClick={() => setShowDocumentModal(false)}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

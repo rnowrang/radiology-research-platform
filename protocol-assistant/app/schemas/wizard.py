@@ -54,7 +54,8 @@ class EnhancedGapQuestion(BaseModel):
 
 class SectionInfo(BaseModel):
     """Information about a section of wizard questions."""
-    name: str
+    key: str  # Original section key (e.g., "study_info", "methodology")
+    name: str  # Display name (e.g., "Study Information", "Methodology")
     icon: str
     question_count: int
 

@@ -32,6 +32,7 @@ interface WizardProgressProps {
 interface WizardProgressAltProps {
   progress: WizardProgressType;
   sections: SectionInfo[];
+  currentSectionName?: string;
   onSectionClick?: (sectionName: string) => void;
 }
 
@@ -72,6 +73,7 @@ export function WizardProgress(props: WizardProgressProps | WizardProgressAltPro
         estimatedMinutesRemaining: props.progress.estimated_remaining_minutes,
         percentComplete: props.progress.percent_complete,
         sectionsProgress: props.progress.sections_progress,
+        currentSectionName: props.currentSectionName,
         onSectionClick: props.onSectionClick,
       };
     }
@@ -84,6 +86,7 @@ export function WizardProgress(props: WizardProgressProps | WizardProgressAltPro
       estimatedMinutesRemaining: props.estimatedMinutesRemaining,
       percentComplete: Math.round((props.answeredCount / props.totalQuestions) * 100),
       sectionsProgress: undefined as Record<string, { total: number; answered: number }> | undefined,
+      currentSectionName: undefined as string | undefined,
       onSectionClick: props.onSectionClick,
     };
   }, [props]);
@@ -97,11 +100,25 @@ export function WizardProgress(props: WizardProgressProps | WizardProgressAltPro
     estimatedMinutesRemaining,
     percentComplete,
     sectionsProgress,
+    currentSectionName,
     onSectionClick,
   } = normalizedProps;
 
   // Calculate which section the current question belongs to
   const currentSectionIndex = useMemo(() => {
+    // Match using section key (e.g., "methodology") which matches question.section
+    if (currentSectionName) {
+      // Try exact match on key first
+      const idx = sections.findIndex(s => s.key === currentSectionName);
+      if (idx >= 0) return idx;
+      // Fallback: try case-insensitive match
+      const normalizedCurrent = currentSectionName.toLowerCase();
+      const idxFallback = sections.findIndex(s =>
+        s.key?.toLowerCase() === normalizedCurrent
+      );
+      if (idxFallback >= 0) return idxFallback;
+    }
+    // Fallback: estimate based on cumulative question count (less accurate)
     let questionsSoFar = 0;
     for (let i = 0; i < sections.length; i++) {
       questionsSoFar += sections[i].question_count;
@@ -110,7 +127,7 @@ export function WizardProgress(props: WizardProgressProps | WizardProgressAltPro
       }
     }
     return sections.length - 1;
-  }, [sections, currentIndex]);
+  }, [sections, currentIndex, currentSectionName]);
 
   // Handle section click with proper type handling
   const handleSectionClick = (section: SectionInfo, index: number) => {

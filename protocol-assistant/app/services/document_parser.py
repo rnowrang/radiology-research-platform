@@ -607,14 +607,29 @@ class DocumentParser:
         """Extract metadata from PDF document."""
         metadata = {}
         if reader.metadata:
-            if reader.metadata.title:
-                metadata["title"] = reader.metadata.title
-            if reader.metadata.author:
-                metadata["author"] = reader.metadata.author
-            if reader.metadata.subject:
-                metadata["subject"] = reader.metadata.subject
-            if reader.metadata.creation_date:
-                metadata["creation_date"] = str(reader.metadata.creation_date)
+            # Each metadata field access can trigger date parsing which may fail
+            # on malformed PDF dates, so wrap each in try-except
+            try:
+                if reader.metadata.title:
+                    metadata["title"] = reader.metadata.title
+            except Exception:
+                pass
+            try:
+                if reader.metadata.author:
+                    metadata["author"] = reader.metadata.author
+            except Exception:
+                pass
+            try:
+                if reader.metadata.subject:
+                    metadata["subject"] = reader.metadata.subject
+            except Exception:
+                pass
+            try:
+                if reader.metadata.creation_date:
+                    metadata["creation_date"] = str(reader.metadata.creation_date)
+            except Exception:
+                # PDF has malformed date string - skip it
+                pass
         return metadata
 
     def _extract_docx_metadata(self, document: Document) -> dict:

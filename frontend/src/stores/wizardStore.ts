@@ -32,7 +32,8 @@ export interface EnhancedGapQuestion {
 }
 
 export interface SectionInfo {
-  name: string;
+  key: string;  // Original section key (e.g., "study_info", "methodology")
+  name: string; // Display name (e.g., "Study Information", "Methodology")
   icon: string;
   question_count: number;
 }
@@ -53,6 +54,14 @@ export interface WizardProgress {
   percent_complete: number;
 }
 
+export interface GeneratedDocument {
+  doc_type: string;
+  content: Record<string, unknown>;
+  word_count: number;
+  quality_score: number;
+  suggestions: string[];
+}
+
 interface WizardState {
   // State
   sessionId: string | null;
@@ -64,6 +73,7 @@ interface WizardState {
   isLoading: boolean;
   error: string | null;
   totalEstimatedMinutes: number;
+  generatedDocuments: GeneratedDocument[];
 
   // Actions
   initWizard: (
@@ -82,6 +92,10 @@ interface WizardState {
   setError: (error: string | null) => void;
   updateQuestionsFromServer: (questions: EnhancedGapQuestion[]) => void;
   resetWizard: () => void;
+  setSessionId: (sessionId: string) => void;
+  addGeneratedDocument: (doc: GeneratedDocument) => void;
+  addGeneratedDocuments: (docs: GeneratedDocument[]) => void;
+  clearGeneratedDocuments: () => void;
 
   // Computed (implemented as getters through selectors)
   getCurrentQuestion: () => EnhancedGapQuestion | null;
@@ -102,6 +116,7 @@ const initialState = {
   isLoading: false,
   error: null,
   totalEstimatedMinutes: 0,
+  generatedDocuments: [] as GeneratedDocument[],
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -114,21 +129,47 @@ export const useWizardStore = create<WizardState>()(
 
         // If same session, preserve existing progress
         if (currentState.sessionId === sessionId) {
+          // Get valid question IDs
+          const validQuestionIds = new Set(questions.map(q => q.id));
+
+          // Clean up answers that don't match current questions
+          const cleanedAnswers: Record<string, AnswerRecord> = {};
+          for (const [id, answer] of Object.entries(currentState.answers)) {
+            if (validQuestionIds.has(id)) {
+              cleanedAnswers[id] = answer;
+            }
+          }
+
+          // Clean up skipped questions that don't match
+          const cleanedSkipped = currentState.skippedQuestions.filter(id => validQuestionIds.has(id));
+
           // Update questions while preserving answered/skipped status
           const updatedQuestions = questions.map((q) => ({
             ...q,
-            answered: currentState.answers[q.id] !== undefined,
-            skipped: currentState.skippedQuestions.includes(q.id),
+            answered: cleanedAnswers[q.id] !== undefined,
+            skipped: cleanedSkipped.includes(q.id),
           }));
+
+          // Find first unanswered question to set as current index
+          const firstUnansweredIdx = updatedQuestions.findIndex(
+            q => !q.answered && !q.skipped
+          );
+          // Use first unanswered, or last question if all answered/skipped
+          const newCurrentIndex = firstUnansweredIdx >= 0
+            ? firstUnansweredIdx
+            : Math.min(currentState.currentIndex, questions.length - 1);
 
           set({
             questions: updatedQuestions,
             sections,
             totalEstimatedMinutes,
+            answers: cleanedAnswers,
+            skippedQuestions: cleanedSkipped,
+            currentIndex: newCurrentIndex,
             error: null,
           });
         } else {
-          // New session - reset everything
+          // New session - reset everything including generated documents
           set({
             sessionId,
             questions,
@@ -137,6 +178,7 @@ export const useWizardStore = create<WizardState>()(
             currentIndex: 0,
             answers: {},
             skippedQuestions: [],
+            generatedDocuments: [],
             error: null,
           });
         }
@@ -220,6 +262,39 @@ export const useWizardStore = create<WizardState>()(
 
       resetWizard: () => set(initialState),
 
+      setSessionId: (sessionId) => {
+        const currentState = get();
+        // If session changed, reset all session-specific data
+        if (currentState.sessionId !== sessionId) {
+          set({
+            sessionId,
+            questions: [],
+            sections: [],
+            currentIndex: 0,
+            answers: {},
+            skippedQuestions: [],
+            generatedDocuments: [],
+            error: null,
+          });
+        }
+      },
+
+      addGeneratedDocument: (doc) => {
+        set((state) => ({
+          generatedDocuments: [...state.generatedDocuments, doc],
+        }));
+      },
+
+      addGeneratedDocuments: (docs) => {
+        set((state) => ({
+          generatedDocuments: [...state.generatedDocuments, ...docs],
+        }));
+      },
+
+      clearGeneratedDocuments: () => {
+        set({ generatedDocuments: [] });
+      },
+
       // Computed getters
       getCurrentQuestion: () => {
         const state = get();
@@ -293,6 +368,7 @@ export const useWizardStore = create<WizardState>()(
         currentIndex: state.currentIndex,
         answers: state.answers,
         skippedQuestions: state.skippedQuestions,
+        generatedDocuments: state.generatedDocuments,
       }),
     }
   )

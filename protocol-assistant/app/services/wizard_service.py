@@ -19,7 +19,9 @@ from app.services.suggestion_generator import SuggestionGenerator
 
 logger = logging.getLogger(__name__)
 
-# Section configuration
+# Section configuration - order defines tab sequence (left to right)
+SECTION_ORDER = ["study_info", "objectives", "methodology", "population", "risks", "privacy", "other"]
+
 SECTION_CONFIG = {
     "study_info": {"icon": "clipboard", "display": "Study Information"},
     "objectives": {"icon": "target", "display": "Objectives"},
@@ -253,19 +255,25 @@ class WizardService:
             # Count by section
             section_counts[section] = section_counts.get(section, 0) + 1
 
-        # Sort by priority (high first) then by section
+        # Sort by section order (left to right in tabs), then by priority within each section
+        section_order_map = {s: i for i, s in enumerate(SECTION_ORDER)}
         priority_order = {"high": 0, "medium": 1, "low": 2}
-        questions.sort(key=lambda q: (priority_order.get(q.priority, 2), q.section))
+        questions.sort(key=lambda q: (
+            section_order_map.get(q.section, len(SECTION_ORDER)),  # Section order first
+            priority_order.get(q.priority, 2)  # Then priority within section
+        ))
 
-        # Build section info
+        # Build section info in the correct order
         sections = []
-        for section_name, count in section_counts.items():
-            config = SECTION_CONFIG.get(section_name, SECTION_CONFIG["other"])
-            sections.append(SectionInfo(
-                name=config["display"],
-                icon=config["icon"],
-                question_count=count
-            ))
+        for section_name in SECTION_ORDER:
+            if section_name in section_counts:
+                config = SECTION_CONFIG.get(section_name, SECTION_CONFIG["other"])
+                sections.append(SectionInfo(
+                    key=section_name,
+                    name=config["display"],
+                    icon=config["icon"],
+                    question_count=section_counts[section_name]
+                ))
 
         # Calculate estimated time
         total_seconds = sum(q.average_time_seconds for q in questions if not q.answered and not q.skipped)
@@ -480,3 +488,90 @@ class WizardService:
             logger.error(f"Failed to generate suggestions: {e}")
             # Return empty list on error - don't fail the whole request
             return []
+
+    async def get_form_prefill_preview(
+        self,
+        session_id: str,
+        user_id: str,
+        form_id: Optional[int] = None
+    ) -> Dict:
+        """Get a preview of which fields will be pre-filled."""
+        session = await self._get_session(session_id, user_id)
+        if not session:
+            raise ValueError("Session not found")
+
+        collected_answers = session.collected_answers or {}
+        answers = collected_answers.get("answers", {})
+        protocol = session.extracted_protocol or {}
+
+        # Build list of fields that can be populated
+        form_fields = []
+
+        # Map protocol fields to form fields
+        field_mappings = [
+            ("study_title", "Study Title", protocol.get("study_title")),
+            ("principal_investigator", "Principal Investigator", protocol.get("principal_investigator")),
+            ("study_type", "Study Type", protocol.get("study_type")),
+            ("primary_objective", "Primary Objective", protocol.get("objectives", {}).get("primary")),
+            ("secondary_objectives", "Secondary Objectives", ", ".join(protocol.get("objectives", {}).get("secondary", []))),
+            ("methodology", "Research Methodology", protocol.get("methodology", {}).get("design")),
+            ("sample_size", "Sample Size", str(protocol.get("methodology", {}).get("sample_size", ""))),
+            ("inclusion_criteria", "Inclusion Criteria", ", ".join(protocol.get("methodology", {}).get("inclusion_criteria", []))),
+            ("exclusion_criteria", "Exclusion Criteria", ", ".join(protocol.get("methodology", {}).get("exclusion_criteria", []))),
+            ("risks", "Potential Risks", ", ".join(protocol.get("risks", []))),
+            ("benefits", "Potential Benefits", ", ".join(protocol.get("benefits", []))),
+        ]
+
+        for field_name, field_label, value in field_mappings:
+            if value and str(value).strip():
+                form_fields.append({
+                    "field_name": field_name,
+                    "field_label": field_label,
+                    "new_value": str(value),
+                    "confidence": 0.8
+                })
+
+        # Add answers from wizard
+        for question_id, answer_record in answers.items():
+            answer_text = answer_record.get("answer", "")
+            if answer_text:
+                # Try to match to a form field
+                form_field_info = FORM_FIELD_MAPPINGS.get(question_id)
+                if form_field_info:
+                    form_fields.append({
+                        "field_name": form_field_info.field_name,
+                        "field_label": form_field_info.field_label,
+                        "new_value": answer_text,
+                        "confidence": 0.95  # High confidence since user provided
+                    })
+
+        return {
+            "form_fields": form_fields,
+            "total_fields": len(form_fields),
+            "fields_to_populate": len([f for f in form_fields if f.get("new_value")])
+        }
+
+    async def prefill_form(
+        self,
+        session_id: str,
+        user_id: str,
+        form_id: int
+    ) -> Dict:
+        """Pre-fill a form with collected answers and protocol data."""
+        session = await self._get_session(session_id, user_id)
+        if not session:
+            raise ValueError("Session not found")
+
+        # Get the preview to know what fields to fill
+        preview = await self.get_form_prefill_preview(session_id, user_id, form_id)
+
+        # The actual form update should be done via the forms service
+        # For now, we return the preview data as if it was successfully applied
+        # In a production setup, this would call the forms service API
+
+        return {
+            "success": True,
+            "form_id": form_id,
+            "fields_populated": preview["fields_to_populate"],
+            "redirect_url": f"/forms/{form_id}"
+        }

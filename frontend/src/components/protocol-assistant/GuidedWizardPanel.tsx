@@ -23,6 +23,7 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
   const {
     questions,
     currentIndex,
+    answers,  // Subscribe to answers so component re-renders when last answer is submitted
     skippedQuestions,
     initWizard,
     setAnswer,
@@ -71,6 +72,17 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
       // Auto-advance to next question
       if (data.next_question_id) {
         goNext();
+      } else {
+        // Check if there are any unanswered questions we missed
+        const currentAnswers = useWizardStore.getState().answers;
+        const currentSkipped = useWizardStore.getState().skippedQuestions;
+        const firstUnansweredIdx = questions.findIndex(
+          q => !currentAnswers[q.id] && !currentSkipped.includes(q.id)
+        );
+        if (firstUnansweredIdx >= 0) {
+          goToQuestion(firstUnansweredIdx);
+        }
+        // If no unanswered questions, component will re-render and show completion panel
       }
     },
     onError: (error: Error) => {
@@ -125,7 +137,7 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
 
   if (questionsLoading) {
     return (
-      <div className="flex items-center justify-center h-[400px]">
+      <div className="flex items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -133,7 +145,7 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[400px] text-center">
+      <div className="flex flex-col items-center justify-center h-full text-center">
         <p className="text-destructive mb-4">Failed to load wizard questions</p>
         <Button variant="outline" onClick={onSwitchToChat}>
           Switch to Chat Mode
@@ -144,13 +156,20 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
 
   const currentQuestion = getCurrentQuestion();
   const progress = getProgress();
-  const complete = isComplete();
+
+  // Compute completion from reactive values - only count answers for CURRENT questions
+  const questionIds = new Set(questions.map(q => q.id));
+  const answeredCount = Object.keys(answers).filter(id => questionIds.has(id)).length;
+  const skippedCount = skippedQuestions.filter(id => questionIds.has(id)).length;
+  const totalQuestions = questions.length;
+  const complete = totalQuestions > 0 && (answeredCount + skippedCount >= totalQuestions);
 
   // Show completion panel when done
   if (complete) {
     return (
       <CompletionPanel
         sessionId={sessionId}
+        projectId={projectId}
         progress={progress}
         skippedQuestions={skippedQuestions}
         onReviewSkipped={(qId: string) => {
@@ -162,11 +181,12 @@ export function GuidedWizardPanel({ sessionId, projectId, onSwitchToChat }: Guid
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Progress Bar */}
       <WizardProgress
         progress={progress}
         sections={wizardData?.sections || []}
+        currentSectionName={currentQuestion?.section}
         onSectionClick={(sectionName: string) => {
           const idx = questions.findIndex((q) => q.section === sectionName);
           if (idx >= 0) goToQuestion(idx);

@@ -101,6 +101,7 @@ class OpenAIProvider(BaseLLMProvider):
             return LLMResponse(
                 content=content,
                 model=response.model,
+                provider="openai",
                 usage=usage,
                 finish_reason=finish_reason,
             )
