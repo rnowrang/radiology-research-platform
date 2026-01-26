@@ -81,6 +81,10 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
+      // Set req.user so audit log captures the user ID
+      req.user = result.user;
+      req.sessionId = result.session.id;
+
       await logAudit(req, {
         action: AUDIT_ACTIONS.LOGIN,
         resourceType: 'session',
