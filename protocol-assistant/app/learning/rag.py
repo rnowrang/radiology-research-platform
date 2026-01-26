@@ -3,23 +3,29 @@ RAG (Retrieval-Augmented Generation) knowledge base for Protocol Assistant.
 
 This module provides:
 - Admin-curated document management
-- Keyword and semantic search
+- Keyword and semantic search (with optional pgvector)
+- Hybrid search combining keyword and semantic approaches
 - Context augmentation for LLM prompts
 - Category-based organization
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, text
 from uuid import UUID, uuid4
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 from pydantic import BaseModel, Field
 import logging
 import re
+import os
 
 from app.models.knowledge import KnowledgeDocument, KnowledgeQuery
+from app.services.embedding import get_embedding_service, EmbeddingError
 
 logger = logging.getLogger(__name__)
+
+# Feature flag for semantic search (can be overridden by feature flag service)
+SEMANTIC_SEARCH_ENABLED = os.environ.get("FEATURE_FLAG_SEMANTIC_SEARCH", "false").lower() == "true"
 
 
 class SearchResult(BaseModel):
@@ -266,6 +272,284 @@ class CuratedKnowledgeBase:
             )
 
         return results
+
+    async def semantic_search(
+        self,
+        query: str,
+        categories: Optional[list[str]] = None,
+        institution_id: Optional[UUID] = None,
+        limit: int = 5,
+        similarity_threshold: float = 0.7,
+    ) -> list[SearchResult]:
+        """
+        Semantic search using vector embeddings.
+
+        Uses OpenAI embeddings and pgvector for similarity search.
+        Falls back to keyword search if embeddings are not available.
+
+        Args:
+            query: Search query string
+            categories: Optional category filter
+            institution_id: Optional institution filter
+            limit: Maximum results to return
+            similarity_threshold: Minimum similarity score (0-1)
+
+        Returns:
+            List of SearchResult objects sorted by similarity
+        """
+        start_time = datetime.utcnow()
+
+        try:
+            # Generate query embedding
+            embedding_service = get_embedding_service()
+            query_embedding = await embedding_service.embed(query)
+        except EmbeddingError as e:
+            logger.warning(f"Failed to generate query embedding: {e}. Falling back to keyword search.")
+            return await self.search(query, categories, institution_id, limit=limit)
+
+        # Build SQL for vector similarity search using pgvector
+        # This assumes the embedding column exists and pgvector extension is installed
+        sql = """
+            SELECT
+                id,
+                title,
+                content,
+                category,
+                source_url,
+                metadata,
+                1 - (embedding <=> :query_embedding::vector) as similarity
+            FROM knowledge_documents
+            WHERE is_active = true
+              AND has_embeddings = true
+              AND 1 - (embedding <=> :query_embedding::vector) >= :threshold
+        """
+
+        params = {
+            "query_embedding": str(query_embedding),
+            "threshold": similarity_threshold,
+        }
+
+        # Add filters
+        if categories:
+            sql += " AND category = ANY(:categories)"
+            params["categories"] = categories
+
+        if institution_id:
+            sql += " AND (institution_id = :institution_id OR institution_id IS NULL OR is_public = true)"
+            params["institution_id"] = str(institution_id)
+        else:
+            sql += " AND (institution_id IS NULL OR is_public = true)"
+
+        sql += " ORDER BY similarity DESC LIMIT :limit"
+        params["limit"] = limit
+
+        try:
+            result = await self.db.execute(text(sql), params)
+            rows = result.fetchall()
+        except Exception as e:
+            logger.error(f"Vector search failed: {e}. Falling back to keyword search.")
+            return await self.search(query, categories, institution_id, limit=limit)
+
+        results = [
+            SearchResult(
+                id=str(row.id),
+                title=row.title,
+                content=row.content[:500] + "..." if len(row.content) > 500 else row.content,
+                category=row.category,
+                relevance=round(row.similarity, 3),
+                source_url=row.source_url,
+                metadata=row.metadata,
+            )
+            for row in rows
+        ]
+
+        # Log query
+        latency_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        await self._log_query(
+            query=query,
+            result_count=len(results),
+            result_ids=[r.id for r in results],
+            top_score=results[0].relevance if results else None,
+            latency_ms=latency_ms,
+            institution_id=institution_id,
+        )
+
+        return results
+
+    async def hybrid_search(
+        self,
+        query: str,
+        categories: Optional[list[str]] = None,
+        institution_id: Optional[UUID] = None,
+        limit: int = 5,
+        semantic_weight: float = 0.7,
+    ) -> list[SearchResult]:
+        """
+        Hybrid search combining keyword and semantic approaches.
+
+        Uses Reciprocal Rank Fusion (RRF) to combine results from both
+        keyword and semantic search for best results.
+
+        Args:
+            query: Search query string
+            categories: Optional category filter
+            institution_id: Optional institution filter
+            limit: Maximum results to return
+            semantic_weight: Weight for semantic results (0-1)
+
+        Returns:
+            List of SearchResult objects with combined ranking
+        """
+        # Get keyword results
+        keyword_results = await self.search(
+            query,
+            categories=categories,
+            institution_id=institution_id,
+            limit=limit * 2,  # Get more for fusion
+            log_query=False,
+        )
+
+        # Try semantic search if enabled
+        semantic_results = []
+        if SEMANTIC_SEARCH_ENABLED:
+            try:
+                semantic_results = await self.semantic_search(
+                    query,
+                    categories=categories,
+                    institution_id=institution_id,
+                    limit=limit * 2,
+                )
+            except Exception as e:
+                logger.warning(f"Semantic search failed in hybrid mode: {e}")
+
+        if not semantic_results:
+            # Just use keyword results if semantic failed or disabled
+            return keyword_results[:limit]
+
+        # Reciprocal Rank Fusion
+        k = 60  # RRF constant
+        scores: dict[str, float] = {}
+        doc_map: dict[str, SearchResult] = {}
+
+        # Score keyword results
+        keyword_weight = 1 - semantic_weight
+        for rank, result in enumerate(keyword_results, 1):
+            rrf_score = keyword_weight / (k + rank)
+            scores[result.id] = scores.get(result.id, 0) + rrf_score
+            doc_map[result.id] = result
+
+        # Score semantic results
+        for rank, result in enumerate(semantic_results, 1):
+            rrf_score = semantic_weight / (k + rank)
+            scores[result.id] = scores.get(result.id, 0) + rrf_score
+            if result.id not in doc_map:
+                doc_map[result.id] = result
+
+        # Sort by combined score and return top results
+        sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+
+        results = []
+        for doc_id in sorted_ids[:limit]:
+            result = doc_map[doc_id]
+            # Update relevance to combined score
+            result.relevance = round(scores[doc_id], 4)
+            results.append(result)
+
+        return results
+
+    async def index_document(
+        self,
+        document_id: UUID,
+    ) -> bool:
+        """
+        Index a document by generating its embedding.
+
+        Args:
+            document_id: ID of the document to index
+
+        Returns:
+            True if indexing succeeded
+        """
+        doc = await self.db.get(KnowledgeDocument, document_id)
+        if not doc:
+            logger.warning(f"Document {document_id} not found for indexing")
+            return False
+
+        try:
+            embedding_service = get_embedding_service()
+            embedding = await embedding_service.embed(doc.content)
+
+            # Update document with embedding
+            # Note: This requires the embedding column to exist
+            await self.db.execute(
+                text("""
+                    UPDATE knowledge_documents
+                    SET embedding = :embedding::vector,
+                        has_embeddings = true,
+                        embedding_model = :model,
+                        last_indexed_at = NOW()
+                    WHERE id = :doc_id
+                """),
+                {
+                    "embedding": str(embedding),
+                    "model": "text-embedding-ada-002",
+                    "doc_id": str(document_id),
+                },
+            )
+            await self.db.commit()
+
+            logger.info(f"Indexed document {document_id}")
+            return True
+
+        except EmbeddingError as e:
+            logger.error(f"Failed to index document {document_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error indexing document {document_id}: {e}")
+            return False
+
+    async def reindex_all(
+        self,
+        batch_size: int = 10,
+    ) -> dict:
+        """
+        Reindex all documents in the knowledge base.
+
+        Args:
+            batch_size: Number of documents to process at once
+
+        Returns:
+            Dict with success/failure counts
+        """
+        # Get all active documents without embeddings
+        result = await self.db.execute(
+            select(KnowledgeDocument.id)
+            .where(KnowledgeDocument.is_active == True)
+            .where(
+                or_(
+                    KnowledgeDocument.has_embeddings == False,
+                    KnowledgeDocument.has_embeddings == None,
+                )
+            )
+        )
+        doc_ids = [row[0] for row in result.fetchall()]
+
+        logger.info(f"Reindexing {len(doc_ids)} documents")
+
+        success = 0
+        failed = 0
+
+        for doc_id in doc_ids:
+            if await self.index_document(doc_id):
+                success += 1
+            else:
+                failed += 1
+
+        return {
+            "total": len(doc_ids),
+            "success": success,
+            "failed": failed,
+        }
 
     def _calculate_relevance(
         self,

@@ -20,22 +20,20 @@ from app.schemas.generation import (
 from app.schemas.protocol import ExtractedProtocol
 from app.services.form_mapper import get_form_mapper
 from app.services.generator import get_document_generator
+from app.middleware.auth import UserContext, get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/protocol-assistant", tags=["generation"])
 
 
-# Temporary user ID extraction (replace with real auth integration)
-def get_current_user_id() -> UUID:
+async def get_current_user_id(user: UserContext = Depends(get_current_user)) -> UUID:
     """
     Get the current user ID from authentication.
 
-    This is a placeholder implementation. In production, this should
-    extract the user ID from JWT token or session.
+    This dependency wraps the auth middleware to return just the user ID.
     """
-    # Default development user ID
-    return UUID("00000000-0000-0000-0000-000000000001")
+    return user.id
 
 
 async def _get_session_protocol(

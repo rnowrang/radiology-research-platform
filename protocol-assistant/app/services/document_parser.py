@@ -3,11 +3,14 @@
 import io
 import logging
 import re
+import subprocess
+import tempfile
 from typing import Optional
 
 import PyPDF2
 from docx import Document
 from docx.shared import Pt
+from striprtf.striprtf import rtf_to_text
 
 from app.schemas.document import DocumentSection, ParsedDocument
 
@@ -34,7 +37,7 @@ class DocumentParser:
     - Word and page counting
     """
 
-    SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc"]
+    SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".rtf"]
 
     # Common section headers in research protocols
     SECTION_PATTERNS = [
@@ -73,12 +76,32 @@ class DocumentParser:
         if filename_lower.endswith(".pdf"):
             return await self._parse_pdf(file_content, filename)
         elif filename_lower.endswith(".docx"):
-            return await self._parse_docx(file_content, filename)
+            try:
+                return await self._parse_docx(file_content, filename)
+            except DocumentParserError as e:
+                # If docx parsing fails with "not a zip file", try other parsers
+                if "zip file" in str(e.message).lower():
+                    logger.info(f"File {filename} appears to be .doc format despite .docx extension, trying .doc parser")
+                    try:
+                        return await self._parse_doc(file_content, filename)
+                    except DocumentParserError as doc_error:
+                        # If .doc also fails, try RTF parser as last resort
+                        if "not a Word Document" in str(doc_error.message):
+                            logger.info(f"File {filename} also not .doc, trying RTF parser")
+                            return await self._parse_rtf(file_content, filename)
+                        raise
+                raise
         elif filename_lower.endswith(".doc"):
-            raise DocumentParserError(
-                "Legacy .doc format is not supported. Please convert to .docx",
-                filename=filename,
-            )
+            try:
+                return await self._parse_doc(file_content, filename)
+            except DocumentParserError as e:
+                # If .doc parsing fails, try RTF as fallback
+                if "not a Word Document" in str(e.message):
+                    logger.info(f"File {filename} not a valid .doc, trying RTF parser")
+                    return await self._parse_rtf(file_content, filename)
+                raise
+        elif filename_lower.endswith(".rtf"):
+            return await self._parse_rtf(file_content, filename)
         else:
             raise DocumentParserError(
                 f"Unsupported file type. Supported types: {', '.join(self.SUPPORTED_EXTENSIONS)}",
@@ -297,6 +320,239 @@ class DocumentParser:
             logger.error(f"Failed to parse DOCX {filename}: {e}")
             raise DocumentParserError(
                 f"Failed to parse Word document: {str(e)}", filename=filename
+            )
+
+    async def _parse_doc(self, content: bytes, filename: str) -> ParsedDocument:
+        """
+        Parse a legacy Word document (.doc) using antiword.
+
+        Args:
+            content: DOC file content as bytes
+            filename: Original filename
+
+        Returns:
+            ParsedDocument with extracted content
+        """
+        try:
+            # Write content to a temporary file (antiword needs a file path)
+            with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as tmp_file:
+                tmp_file.write(content)
+                tmp_path = tmp_file.name
+
+            try:
+                # Use antiword to extract text
+                result = subprocess.run(
+                    ["antiword", "-w", "0", tmp_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() or "Unknown error"
+                    raise DocumentParserError(
+                        f"antiword failed to parse document: {error_msg}",
+                        filename=filename,
+                    )
+
+                full_text = result.stdout
+
+            finally:
+                # Clean up temp file
+                import os
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+            if not full_text.strip():
+                raise DocumentParserError(
+                    "No text could be extracted from the document",
+                    filename=filename,
+                )
+
+            # Parse sections from extracted text
+            sections = []
+            current_section_title = None
+            current_section_content = []
+
+            lines = full_text.split("\n")
+            for line in lines:
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+
+                # Check if this line is a section header
+                is_header = self._is_section_header(line_stripped)
+
+                if is_header:
+                    # Save previous section if exists
+                    if current_section_title and current_section_content:
+                        sections.append(
+                            DocumentSection(
+                                title=current_section_title,
+                                content="\n".join(current_section_content).strip(),
+                                page_number=None,
+                                heading_level=self._estimate_heading_level(
+                                    current_section_title
+                                ),
+                            )
+                        )
+                    # Start new section
+                    current_section_title = line_stripped
+                    current_section_content = []
+                elif current_section_title:
+                    current_section_content.append(line_stripped)
+
+            # Save final section
+            if current_section_title and current_section_content:
+                sections.append(
+                    DocumentSection(
+                        title=current_section_title,
+                        content="\n".join(current_section_content).strip(),
+                        page_number=None,
+                        heading_level=self._estimate_heading_level(current_section_title),
+                    )
+                )
+
+            # If no sections were detected, create a single section from all content
+            if not sections and full_text.strip():
+                sections.append(
+                    DocumentSection(
+                        title="Document Content",
+                        content=full_text.strip(),
+                        page_number=None,
+                        heading_level=1,
+                    )
+                )
+
+            return ParsedDocument(
+                full_text=full_text,
+                sections=sections,
+                metadata={},
+                word_count=self._count_words(full_text),
+                page_count=self._estimate_docx_pages(full_text),
+                filename=filename,
+                file_type=".doc",
+            )
+
+        except DocumentParserError:
+            raise
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout parsing DOC {filename}")
+            raise DocumentParserError(
+                "Document parsing timed out", filename=filename
+            )
+        except FileNotFoundError:
+            logger.error("antiword not found - is it installed?")
+            raise DocumentParserError(
+                "Server cannot process .doc files - antiword not installed",
+                filename=filename,
+            )
+        except Exception as e:
+            logger.error(f"Failed to parse DOC {filename}: {e}")
+            raise DocumentParserError(
+                f"Failed to parse legacy Word document: {str(e)}", filename=filename
+            )
+
+    async def _parse_rtf(self, content: bytes, filename: str) -> ParsedDocument:
+        """
+        Parse an RTF (Rich Text Format) document.
+
+        Args:
+            content: RTF file content as bytes
+            filename: Original filename
+
+        Returns:
+            ParsedDocument with extracted content
+        """
+        try:
+            # Decode bytes to string - RTF is text-based
+            try:
+                rtf_content = content.decode('utf-8')
+            except UnicodeDecodeError:
+                rtf_content = content.decode('latin-1')
+
+            # Convert RTF to plain text
+            full_text = rtf_to_text(rtf_content)
+
+            if not full_text or not full_text.strip():
+                raise DocumentParserError(
+                    "No text could be extracted from the RTF document",
+                    filename=filename,
+                )
+
+            # Parse sections from extracted text
+            sections = []
+            current_section_title = None
+            current_section_content = []
+
+            lines = full_text.split("\n")
+            for line in lines:
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+
+                # Check if this line is a section header
+                is_header = self._is_section_header(line_stripped)
+
+                if is_header:
+                    # Save previous section if exists
+                    if current_section_title and current_section_content:
+                        sections.append(
+                            DocumentSection(
+                                title=current_section_title,
+                                content="\n".join(current_section_content).strip(),
+                                page_number=None,
+                                heading_level=self._estimate_heading_level(
+                                    current_section_title
+                                ),
+                            )
+                        )
+                    # Start new section
+                    current_section_title = line_stripped
+                    current_section_content = []
+                elif current_section_title:
+                    current_section_content.append(line_stripped)
+
+            # Save final section
+            if current_section_title and current_section_content:
+                sections.append(
+                    DocumentSection(
+                        title=current_section_title,
+                        content="\n".join(current_section_content).strip(),
+                        page_number=None,
+                        heading_level=self._estimate_heading_level(current_section_title),
+                    )
+                )
+
+            # If no sections were detected, create a single section from all content
+            if not sections and full_text.strip():
+                sections.append(
+                    DocumentSection(
+                        title="Document Content",
+                        content=full_text.strip(),
+                        page_number=None,
+                        heading_level=1,
+                    )
+                )
+
+            return ParsedDocument(
+                full_text=full_text,
+                sections=sections,
+                metadata={},
+                word_count=self._count_words(full_text),
+                page_count=self._estimate_docx_pages(full_text),
+                filename=filename,
+                file_type=".rtf",
+            )
+
+        except DocumentParserError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to parse RTF {filename}: {e}")
+            raise DocumentParserError(
+                f"Failed to parse RTF document: {str(e)}", filename=filename
             )
 
     def _is_section_header(self, text: str) -> bool:

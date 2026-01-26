@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { protocolAssistantProxy } from '../services/protocolAssistantProxy.js';
+import { protocolAssistantProxy, UserContext } from '../services/protocolAssistantProxy.js';
 import { logger } from '../utils/logger.js';
 import { ValidationError, ForbiddenError } from '../utils/errors.js';
 import { logAudit, AUDIT_ACTIONS } from '../middleware/audit.js';
@@ -8,7 +8,22 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
+    full_name?: string;
     role: string;
+    institution_id?: string;
+  };
+}
+
+/**
+ * Build UserContext from authenticated request user.
+ */
+function getUserContext(user: AuthenticatedRequest['user']): UserContext {
+  return {
+    userId: user!.id,
+    role: user!.role,
+    email: user!.email,
+    name: user!.full_name,
+    institutionId: user!.institution_id,
   };
 }
 
@@ -430,7 +445,8 @@ export const protocolAssistantController = {
         throw new ForbiddenError('Admin or reviewer access required');
       }
 
-      const response = await protocolAssistantProxy.getStats(req.user.id, req.user.role);
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getStats(userContext);
       res.json({ success: true, data: response.data });
     } catch (error) {
       next(error);

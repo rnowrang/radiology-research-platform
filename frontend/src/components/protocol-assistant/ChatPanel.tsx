@@ -6,12 +6,10 @@ import {
   GapQuestion,
 } from '@/lib/protocolAssistantApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
-import { DocumentUpload } from './DocumentUpload';
+import { ChatInput } from './ChatInput';
 import { GenerationActions } from './GenerationActions';
 import { GapQuestions } from './GapQuestions';
 import { toast } from '@/hooks/useToast';
@@ -21,7 +19,6 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ projectId }: ChatPanelProps) {
-  const [message, setMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [generatingType, setGeneratingType] = useState<string>();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,7 +48,6 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     mutationFn: (msg: string) => protocolAssistantApi.sendMessage(sessionId!, msg),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chatHistory', sessionId] });
-      setMessage('');
     },
     onError: () => {
       toast({
@@ -117,21 +113,21 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     },
   });
 
-  const handleSend = () => {
-    if (message.trim() && sessionId) {
-      sendMutation.mutate(message);
+  const handleSend = (msg: string) => {
+    if (sessionId) {
+      sendMutation.mutate(msg);
+    }
+  };
+
+  const handleUpload = (file: File) => {
+    if (sessionId) {
+      uploadMutation.mutate(file);
     }
   };
 
   const handleQuestionClick = (question: GapQuestion) => {
-    setMessage(question.question);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    // Send the question directly
+    handleSend(question.question);
   };
 
   // Auto-scroll to bottom
@@ -166,22 +162,14 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
         <ScrollArea className="flex-1 px-4">
           <div className="space-y-4 py-4" ref={scrollRef}>
             {/* Welcome message if no history */}
-            {!historyData?.messages?.length && !hasProtocol && (
-              <div className="py-8">
-                <div className="text-center mb-6">
-                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium">Welcome to Protocol Assistant</h3>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Upload a research protocol to get started, or ask me questions about preparing
-                    your IRB submission.
-                  </p>
-                </div>
-                <DocumentUpload
-                  onUpload={async (file) => {
-                    await uploadMutation.mutateAsync(file);
-                  }}
-                  isUploading={uploadMutation.isPending}
-                />
+            {!historyData?.messages?.length && (
+              <div className="py-8 text-center">
+                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-medium">Ready when you are.</h3>
+                <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                  Upload a research protocol using the + button below, or ask me questions about
+                  preparing your IRB submission.
+                </p>
               </div>
             )}
 
@@ -218,25 +206,15 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
           />
         )}
 
-        {/* Input Area */}
-        <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={hasProtocol ? 'Ask about your protocol...' : 'Ask a question...'}
-              onKeyDown={handleKeyDown}
-              disabled={sendMutation.isPending}
-            />
-            <Button onClick={handleSend} disabled={!message.trim() || sendMutation.isPending}>
-              {sendMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
+        {/* Input Area - ChatGPT style */}
+        <ChatInput
+          onSend={handleSend}
+          onUpload={handleUpload}
+          isSending={sendMutation.isPending}
+          isUploading={uploadMutation.isPending}
+          placeholder={hasProtocol ? 'Ask about your protocol...' : 'Ask anything'}
+          disabled={!sessionId}
+        />
       </CardContent>
     </Card>
   );

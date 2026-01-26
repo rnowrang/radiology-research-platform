@@ -2,9 +2,14 @@
 
 import logging
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_async_session
+from app.models.chat import ChatSession
 from app.schemas.document import (
     DocumentParseResponse,
     ParsedDocument,
@@ -54,7 +59,7 @@ def validate_file(file: UploadFile) -> None:
 
     # Check file extension
     filename_lower = file.filename.lower()
-    valid_extensions = [".pdf", ".docx"]
+    valid_extensions = [".pdf", ".docx", ".doc", ".rtf"]
     if not any(filename_lower.endswith(ext) for ext in valid_extensions):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -146,6 +151,8 @@ async def extract_protocol(
     include_quality_assessment: bool = Query(
         False, description="Whether to include quality assessment"
     ),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    db: AsyncSession = Depends(get_async_session),
 ) -> ProtocolExtractionResponse:
     """
     Parse document and extract protocol information.
@@ -228,6 +235,30 @@ async def extract_protocol(
             f"'{protocol.study_title}', score={protocol.quality_score}"
         )
 
+        # Store extracted protocol in session if session ID provided
+        if x_session_id:
+            try:
+                session_uuid = UUID(x_session_id)
+                update_values = {
+                    "extracted_protocol": protocol.model_dump(),
+                    "document_filename": file.filename,
+                }
+                if gap_analysis:
+                    update_values["current_gaps"] = [g.model_dump() for g in gap_analysis.gaps]
+
+                await db.execute(
+                    update(ChatSession)
+                    .where(ChatSession.id == session_uuid)
+                    .values(**update_values)
+                )
+                await db.commit()
+                logger.info(f"Stored extracted protocol in session {x_session_id}")
+            except ValueError as e:
+                logger.warning(f"Invalid session ID format: {x_session_id}, error: {e}")
+            except Exception as e:
+                logger.error(f"Failed to store protocol in session: {e}")
+                # Don't fail the request, just log the error
+
         return ProtocolExtractionResponse(
             success=True,
             protocol=protocol,
@@ -237,19 +268,15 @@ async def extract_protocol(
 
     except DocumentParserError as e:
         logger.warning(f"Document parsing failed: {e.message}")
-        return ProtocolExtractionResponse(
-            success=False,
-            protocol=None,
-            gap_analysis=None,
-            error=f"Failed to parse document: {e.message}",
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to parse document: {e.message}",
         )
     except ProtocolAnalyzerError as e:
         logger.warning(f"Protocol analysis failed: {e.message}")
-        return ProtocolExtractionResponse(
-            success=False,
-            protocol=None,
-            gap_analysis=None,
-            error=f"Failed to analyze protocol: {e.message}",
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to analyze protocol: {e.message}",
         )
     except HTTPException:
         raise

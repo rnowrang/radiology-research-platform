@@ -21,45 +21,18 @@ from app.learning.prompt_management import PromptManager
 from app.learning.feedback import FeedbackService, FeedbackRequest
 from app.learning.rag import CuratedKnowledgeBase
 from app.analytics.service import AnalyticsService
+from app.middleware.auth import (
+    UserContext,
+    get_current_user,
+    require_admin,
+    get_current_admin_id,
+    get_current_institution_id,
+    get_optional_institution_id,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-# ============================================================
-# Authentication Placeholder
-# ============================================================
-
-def require_admin():
-    """
-    Require admin privileges for endpoint access.
-
-    This is a placeholder implementation. In production, this should:
-    - Validate JWT token
-    - Check admin role/permissions
-    - Return user info
-    """
-    # Placeholder - always returns True
-    return True
-
-
-def get_current_admin_id() -> UUID:
-    """
-    Get the current admin user ID.
-
-    Placeholder implementation.
-    """
-    return UUID("00000000-0000-0000-0000-000000000001")
-
-
-def get_current_institution_id() -> UUID:
-    """
-    Get the current institution ID from auth context.
-
-    Placeholder implementation.
-    """
-    return UUID("00000000-0000-0000-0000-000000000001")
 
 
 # ============================================================
@@ -155,7 +128,7 @@ class FeedbackSubmitRequest(BaseModel):
 @router.get("/prompts/keys")
 async def list_prompt_keys(
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     List all unique prompt keys.
@@ -172,7 +145,7 @@ async def list_prompt_versions(
     prompt_key: str,
     include_inactive: bool = Query(True, description="Include inactive versions"),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     List all versions of a prompt.
@@ -207,7 +180,6 @@ async def list_prompt_versions(
 async def create_prompt_version(
     request: PromptCreateRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
     admin_id: UUID = Depends(get_current_admin_id),
 ):
     """
@@ -248,7 +220,7 @@ async def create_prompt_version(
 async def get_prompt_version(
     version_id: int,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get a specific prompt version by ID."""
     manager = PromptManager(db)
@@ -281,7 +253,6 @@ async def activate_prompt(
     version_id: int,
     request: PromptActivateRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
     admin_id: UUID = Depends(get_current_admin_id),
 ):
     """
@@ -328,7 +299,7 @@ async def activate_prompt(
 async def deactivate_prompt(
     version_id: int,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """Deactivate a prompt version."""
     manager = PromptManager(db)
@@ -352,7 +323,7 @@ async def compare_prompt_versions(
     version_a: int,
     version_b: int,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Compare performance metrics between two prompt versions.
@@ -380,7 +351,7 @@ async def compare_prompt_versions(
 async def submit_feedback(
     request: FeedbackSubmitRequest,
     db: AsyncSession = Depends(get_async_session),
-    admin_id: UUID = Depends(get_current_admin_id),
+    user: UserContext = Depends(get_current_user),
 ):
     """
     Submit feedback on AI output.
@@ -399,7 +370,7 @@ async def submit_feedback(
     fb = await service.record_feedback(
         session_id=request.session_id,
         output_id=request.output_id,
-        user_id=admin_id,  # Would be actual user in production
+        user_id=user.id,
         feedback=feedback_data,
         prompt_version_id=request.prompt_version_id,
     )
@@ -415,8 +386,8 @@ async def get_feedback_summary(
     days: int = Query(30, ge=1, le=365, description="Number of days to include"),
     prompt_version_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Get aggregated feedback summary.
@@ -438,8 +409,8 @@ async def get_low_rated_outputs(
     days: int = Query(30, ge=1, le=365),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Get low-rated outputs for review.
@@ -475,7 +446,7 @@ async def get_common_issues(
     days: int = Query(30, ge=1, le=365),
     min_occurrences: int = Query(3, ge=1),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Get common issue patterns from feedback.
@@ -497,8 +468,8 @@ async def get_common_issues(
 @router.get("/knowledge/categories")
 async def list_knowledge_categories(
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """List all knowledge base categories."""
     kb = CuratedKnowledgeBase(db)
@@ -509,8 +480,8 @@ async def list_knowledge_categories(
 @router.get("/knowledge/stats")
 async def get_knowledge_stats(
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get knowledge base statistics."""
     kb = CuratedKnowledgeBase(db)
@@ -522,9 +493,8 @@ async def get_knowledge_stats(
 async def add_knowledge_document(
     request: KnowledgeDocRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
     admin_id: UUID = Depends(get_current_admin_id),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
 ):
     """
     Add document to knowledge base.
@@ -561,7 +531,7 @@ async def add_knowledge_document(
 async def get_knowledge_document(
     document_id: UUID,
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get a specific knowledge document."""
     kb = CuratedKnowledgeBase(db)
@@ -596,7 +566,6 @@ async def delete_knowledge_document(
     document_id: UUID,
     hard_delete: bool = Query(False, description="Permanently delete"),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
     admin_id: UUID = Depends(get_current_admin_id),
 ):
     """
@@ -629,7 +598,7 @@ async def search_knowledge(
     category: Optional[str] = Query(None),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_async_session),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
 ):
     """
     Search knowledge base.
@@ -652,8 +621,8 @@ async def get_documents_by_category(
     category: str,
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get all documents in a category."""
     kb = CuratedKnowledgeBase(db)
@@ -690,8 +659,8 @@ async def get_usage_analytics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Get usage analytics summary.
@@ -720,8 +689,8 @@ async def get_quality_analytics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get quality metrics for AI outputs."""
     if not start_date:
@@ -746,8 +715,8 @@ async def get_cost_analytics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """
     Get cost analytics.
@@ -776,8 +745,8 @@ async def get_daily_trends(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get daily trends for visualization."""
     if not start_date:
@@ -803,8 +772,8 @@ async def get_feature_usage(
     end_date: Optional[date] = Query(None),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_async_session),
-    _: bool = Depends(require_admin),
-    institution_id: UUID = Depends(get_current_institution_id),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
 ):
     """Get top features by usage."""
     if not start_date:
@@ -826,4 +795,509 @@ async def get_feature_usage(
             "end_date": str(end_date),
         },
         "features": features,
+    }
+
+
+# ============================================================
+# Feature Flag Endpoints
+# ============================================================
+
+from app.services.feature_flags import get_feature_flag_service
+
+
+class FeatureFlagUpdateRequest(BaseModel):
+    """Request to update a feature flag."""
+
+    is_enabled: bool = Field(..., description="Enable or disable the flag")
+    rollout_percentage: Optional[float] = Field(
+        None, ge=0, le=100, description="Rollout percentage (0-100)"
+    )
+    reason: Optional[str] = Field(None, description="Reason for the change")
+
+
+class InstitutionOverrideRequest(BaseModel):
+    """Request to set an institution override."""
+
+    is_enabled: bool = Field(..., description="Override value")
+    reason: Optional[str] = Field(None, description="Reason for the override")
+    expires_at: Optional[datetime] = Field(None, description="Optional expiration")
+
+
+@router.get("/feature-flags")
+async def list_feature_flags(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    List all feature flags with their effective values.
+
+    Returns flags with institution-specific overrides applied if available.
+    """
+    service = get_feature_flag_service(db)
+    flags = await service.get_all_flags(
+        institution_id=institution_id,
+        user_id=user.id,
+        category=category,
+    )
+
+    return {"flags": flags}
+
+
+@router.get("/feature-flags/{flag_name}")
+async def get_feature_flag(
+    flag_name: str,
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """Get details for a specific feature flag."""
+    service = get_feature_flag_service(db)
+    details = await service.get_flag_details(flag_name, institution_id)
+
+    if not details:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feature flag '{flag_name}' not found",
+        )
+
+    # Add effective value for this context
+    details["effective_value"] = await service.is_enabled(
+        flag_name,
+        institution_id=institution_id,
+        user_id=user.id,
+    )
+
+    return details
+
+
+@router.put("/feature-flags/{flag_name}")
+async def update_feature_flag(
+    flag_name: str,
+    request: FeatureFlagUpdateRequest,
+    db: AsyncSession = Depends(get_async_session),
+    admin_id: UUID = Depends(get_current_admin_id),
+):
+    """
+    Update a feature flag's global default.
+
+    This changes the default value for all users/institutions
+    that don't have an override.
+    """
+    service = get_feature_flag_service(db)
+
+    try:
+        flag = await service.set_flag(
+            flag_name=flag_name,
+            is_enabled=request.is_enabled,
+            admin_id=admin_id,
+            rollout_percentage=request.rollout_percentage,
+            reason=request.reason,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+    return {
+        "status": "success",
+        "message": f"Flag '{flag_name}' updated to {request.is_enabled}",
+        "flag": {
+            "name": flag.name,
+            "is_enabled": flag.is_enabled,
+            "rollout_percentage": flag.rollout_percentage,
+        },
+    }
+
+
+@router.get("/feature-flags/institution/{institution_id}/overrides")
+async def get_institution_overrides(
+    institution_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    user: UserContext = Depends(require_admin()),
+):
+    """Get all feature flag overrides for an institution."""
+    service = get_feature_flag_service(db)
+    overrides = await service.get_institution_overrides(institution_id)
+    return {"institution_id": str(institution_id), "overrides": overrides}
+
+
+@router.put("/feature-flags/{flag_name}/institution/{institution_id}")
+async def set_institution_override(
+    flag_name: str,
+    institution_id: UUID,
+    request: InstitutionOverrideRequest,
+    db: AsyncSession = Depends(get_async_session),
+    admin_id: UUID = Depends(get_current_admin_id),
+):
+    """
+    Set an institution-level override for a feature flag.
+
+    Institution overrides take precedence over global defaults.
+    """
+    service = get_feature_flag_service(db)
+
+    try:
+        override = await service.set_institution_override(
+            flag_name=flag_name,
+            institution_id=institution_id,
+            is_enabled=request.is_enabled,
+            admin_id=admin_id,
+            reason=request.reason,
+            expires_at=request.expires_at,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+    return {
+        "status": "success",
+        "message": f"Override for '{flag_name}' set to {request.is_enabled} for institution {institution_id}",
+        "override": {
+            "flag_name": flag_name,
+            "institution_id": str(institution_id),
+            "is_enabled": override.is_enabled,
+            "expires_at": override.expires_at,
+        },
+    }
+
+
+@router.delete("/feature-flags/{flag_name}/institution/{institution_id}")
+async def remove_institution_override(
+    flag_name: str,
+    institution_id: UUID,
+    reason: Optional[str] = Query(None, description="Reason for removal"),
+    db: AsyncSession = Depends(get_async_session),
+    admin_id: UUID = Depends(get_current_admin_id),
+):
+    """Remove an institution-level override."""
+    service = get_feature_flag_service(db)
+
+    removed = await service.remove_institution_override(
+        flag_name=flag_name,
+        institution_id=institution_id,
+        admin_id=admin_id,
+        reason=reason,
+    )
+
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No override found for '{flag_name}' in institution {institution_id}",
+        )
+
+    return {
+        "status": "success",
+        "message": f"Override for '{flag_name}' removed from institution {institution_id}",
+    }
+
+
+@router.get("/feature-flags/audit")
+async def get_feature_flag_audit(
+    flag_name: Optional[str] = Query(None, description="Filter by flag name"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """Get audit log for feature flag changes."""
+    service = get_feature_flag_service(db)
+    audit_entries = await service.get_audit_log(
+        flag_name=flag_name,
+        institution_id=institution_id,
+        limit=limit,
+    )
+
+    return {
+        "entries": [
+            {
+                "id": str(entry.id),
+                "flag_name": entry.flag_name,
+                "action": entry.action,
+                "actor_id": str(entry.actor_id) if entry.actor_id else None,
+                "previous_value": entry.previous_value,
+                "new_value": entry.new_value,
+                "reason": entry.reason,
+                "created_at": entry.created_at,
+            }
+            for entry in audit_entries
+        ]
+    }
+
+
+@router.post("/feature-flags/seed")
+async def seed_default_flags(
+    db: AsyncSession = Depends(get_async_session),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Seed the database with default feature flags.
+
+    This is typically called once during initial setup.
+    Only creates flags that don't already exist.
+    """
+    service = get_feature_flag_service(db)
+    created = await service.seed_default_flags()
+
+    return {
+        "status": "success",
+        "message": f"Created {created} new feature flags",
+    }
+
+
+# ============================================================
+# Quality Monitoring Endpoints
+# ============================================================
+
+from app.services.quality_monitor import get_quality_monitor, QualityStatus
+
+
+class QualityCheckRequest(BaseModel):
+    """Request for quality check."""
+
+    prompt_key: Optional[str] = Field(None, description="Specific prompt to check")
+    hours: int = Field(24, ge=1, le=168, description="Hours of data to analyze")
+
+
+class RollbackRequest(BaseModel):
+    """Request for manual rollback."""
+
+    prompt_key: str = Field(..., description="Prompt key to rollback")
+    reason: Optional[str] = Field(None, description="Reason for rollback")
+
+
+@router.get("/quality/status")
+async def get_quality_status(
+    prompt_key: Optional[str] = Query(None, description="Specific prompt to check"),
+    hours: int = Query(24, ge=1, le=168, description="Hours of data to analyze"),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Get current quality status.
+
+    Returns overall or prompt-specific quality metrics including:
+    - Average rating
+    - Success rate
+    - Quality status (healthy/warning/degraded/critical)
+    - Trend direction
+    - Deviation from baseline
+    """
+    monitor = get_quality_monitor(db)
+    metrics = await monitor.check_quality(
+        prompt_key=prompt_key,
+        hours=hours,
+        institution_id=institution_id,
+    )
+
+    return {
+        "prompt_key": prompt_key,
+        "hours_analyzed": hours,
+        "metrics": {
+            "avg_rating": metrics.avg_rating,
+            "rating_count": metrics.rating_count,
+            "success_rate": metrics.success_rate,
+            "low_rating_count": metrics.low_rating_count,
+            "status": metrics.status.value,
+            "trend": metrics.trend,
+            "baseline_rating": metrics.baseline_rating,
+            "deviation_percentage": metrics.deviation_percentage,
+        },
+    }
+
+
+@router.get("/quality/trends")
+async def get_quality_trends(
+    prompt_key: Optional[str] = Query(None, description="Specific prompt to analyze"),
+    days: int = Query(7, ge=1, le=30, description="Days of history"),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Get daily quality trends.
+
+    Returns daily metrics for charting quality over time.
+    """
+    monitor = get_quality_monitor(db)
+    trends = await monitor.get_quality_trends(
+        prompt_key=prompt_key,
+        days=days,
+        institution_id=institution_id,
+    )
+
+    return {
+        "prompt_key": prompt_key,
+        "days": days,
+        "trends": trends,
+    }
+
+
+@router.post("/quality/check-rollback")
+async def check_and_rollback(
+    prompt_key: str = Query(..., description="Prompt key to check"),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Check quality and trigger auto-rollback if needed.
+
+    This manually triggers the auto-rollback check for a specific prompt.
+    Useful for testing or immediate response to issues.
+    """
+    monitor = get_quality_monitor(db)
+    alert = await monitor.check_and_auto_rollback(
+        prompt_key=prompt_key,
+        institution_id=institution_id,
+    )
+
+    if alert:
+        return {
+            "status": "rollback_triggered",
+            "alert": {
+                "type": alert.type.value,
+                "severity": alert.severity,
+                "message": alert.message,
+                "details": alert.details,
+            },
+        }
+    else:
+        return {
+            "status": "no_action_needed",
+            "message": "Quality is within acceptable thresholds or insufficient data for analysis",
+        }
+
+
+@router.post("/quality/manual-rollback")
+async def manual_rollback(
+    request: RollbackRequest,
+    db: AsyncSession = Depends(get_async_session),
+    admin_id: UUID = Depends(get_current_admin_id),
+):
+    """
+    Manually rollback a prompt to its previous version.
+
+    Use this for immediate response to quality issues without waiting
+    for automatic threshold triggers.
+    """
+    from app.learning.prompt_management import PromptManager
+
+    manager = PromptManager(db)
+
+    # Get current and previous versions
+    versions = await manager.get_versions(request.prompt_key)
+
+    if len(versions) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot rollback: only one version exists",
+        )
+
+    # Find current active version
+    current = next((v for v in versions if v.is_active and v.traffic_percentage == 100), None)
+    if not current:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot rollback: no fully active version found",
+        )
+
+    # Find previous version
+    sorted_versions = sorted(versions, key=lambda v: v.version, reverse=True)
+    previous = next((v for v in sorted_versions if v.version < current.version), None)
+
+    if not previous:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot rollback: no previous version available",
+        )
+
+    # Execute rollback
+    await manager.deactivate_version(current.id)
+    await manager.activate_version(previous.id, admin_id, traffic_percentage=100)
+
+    logger.info(
+        f"Manual rollback of '{request.prompt_key}' from v{current.version} to v{previous.version} "
+        f"by admin {admin_id}. Reason: {request.reason}"
+    )
+
+    return {
+        "status": "success",
+        "message": f"Rolled back '{request.prompt_key}' from v{current.version} to v{previous.version}",
+        "from_version": current.version,
+        "to_version": previous.version,
+        "reason": request.reason,
+    }
+
+
+@router.get("/quality/alerts")
+async def get_quality_alerts(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: Optional[UUID] = Depends(get_optional_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Get recent quality and cost alerts.
+
+    Returns alerts triggered by automatic monitoring including:
+    - Quality degradation alerts
+    - Cost threshold warnings
+    - Auto-rollback notifications
+    """
+    monitor = get_quality_monitor(db)
+    alerts = await monitor.get_recent_alerts(
+        institution_id=institution_id,
+        limit=limit,
+    )
+
+    return {
+        "alerts": [
+            {
+                "type": alert.type.value,
+                "severity": alert.severity,
+                "message": alert.message,
+                "details": alert.details,
+                "prompt_key": alert.prompt_key,
+                "created_at": alert.created_at.isoformat(),
+            }
+            for alert in alerts
+        ]
+    }
+
+
+@router.post("/quality/check-costs")
+async def check_cost_alerts(
+    monthly_threshold: float = Query(..., ge=0, description="Monthly cost threshold in dollars"),
+    db: AsyncSession = Depends(get_async_session),
+    institution_id: UUID = Depends(get_current_institution_id),
+    user: UserContext = Depends(require_admin()),
+):
+    """
+    Check if costs are approaching or exceeding thresholds.
+
+    Returns any cost-related alerts for the institution.
+    """
+    monitor = get_quality_monitor(db)
+    alerts = await monitor.check_cost_alerts(
+        institution_id=institution_id,
+        monthly_threshold=monthly_threshold,
+    )
+
+    return {
+        "alerts_count": len(alerts),
+        "alerts": [
+            {
+                "type": alert.type.value,
+                "severity": alert.severity,
+                "message": alert.message,
+                "details": alert.details,
+            }
+            for alert in alerts
+        ],
     }

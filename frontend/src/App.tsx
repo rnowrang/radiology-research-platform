@@ -32,6 +32,7 @@ import { WorkflowConfigPage } from '@/pages/admin/WorkflowConfigPage';
 import { TaskReviewPage } from '@/pages/admin/TaskReviewPage';
 import { AdminProjectReviewPage } from '@/pages/admin/AdminProjectReviewPage';
 import { AdminProjectsPage } from '@/pages/admin/AdminProjectsPage';
+import { ProtocolAssistantAdminPage } from '@/pages/admin/ProtocolAssistantAdminPage';
 import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { useAuthStore } from '@/stores/authStore';
 import { authApi } from '@/lib/api';
@@ -195,6 +196,14 @@ function App() {
           element={
             <ProtectedRoute requiredRoles={['admin']}>
               <AdminProjectReviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/protocol-assistant"
+          element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <ProtocolAssistantAdminPage />
             </ProtectedRoute>
           }
         />

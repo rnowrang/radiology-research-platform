@@ -21,22 +21,20 @@ from app.schemas.chat import (
     SessionUpdateRequest,
 )
 from app.services.chat_service import ChatService
+from app.middleware.auth import UserContext, get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/protocol-assistant", tags=["protocol-assistant"])
 
 
-# Temporary user ID extraction (replace with real auth integration)
-def get_current_user_id() -> UUID:
+async def get_current_user_id(user: UserContext = Depends(get_current_user)) -> UUID:
     """
     Get the current user ID from authentication.
 
-    This is a placeholder implementation. In production, this should
-    extract the user ID from JWT token or session.
+    This dependency wraps the auth middleware to return just the user ID.
     """
-    # Default development user ID
-    return UUID("00000000-0000-0000-0000-000000000001")
+    return user.id
 
 
 @router.post(
