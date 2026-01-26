@@ -13,6 +13,7 @@ import {
   Workflow,
   BarChart3,
   Mail,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -169,6 +170,11 @@ const adminNavItems: AdminNavItem[] = [
     title: 'Email',
     href: '/admin/email',
     icon: Mail,
+  },
+  {
+    title: 'Protocol Assistant',
+    href: '/admin/protocol-assistant',
+    icon: Bot,
   },
 ];
 
