@@ -1,9 +1,21 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { protocolAssistantController } from '../controllers/protocolAssistantController.js';
 import { authenticate } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
+import { protocolAssistantProxy, UserContext } from '../services/protocolAssistantProxy.js';
+import { ForbiddenError } from '../utils/errors.js';
 
 const router = Router();
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    full_name?: string;
+    role: string;
+    institution_id?: string;
+  };
+}
 
 // Health check - no auth required
 router.get('/health', protocolAssistantController.healthCheck);
@@ -53,7 +65,55 @@ router.post('/sessions/:sessionId/create-prefilled-form', protocolAssistantContr
 // Progress
 router.get('/sessions/:sessionId/progress', protocolAssistantController.getProgress);
 
-// Admin
+// Admin - stats endpoint (legacy)
 router.get('/admin/stats', protocolAssistantController.getStats);
+
+// Admin - generic proxy for all admin endpoints
+// This forwards /admin/* requests to the protocol-assistant service
+router.all('/admin/*', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    // Require admin role for admin endpoints
+    if (req.user?.role !== 'admin') {
+      throw new ForbiddenError('Admin access required');
+    }
+
+    const userContext: UserContext = {
+      userId: req.user.id,
+      role: req.user.role,
+      email: req.user.email,
+      name: req.user.full_name,
+      institutionId: req.user.institution_id,
+    };
+
+    // Build the target path - remove /protocol-assistant prefix if present
+    const targetPath = `/api${req.path}`;
+
+    // Forward the request using axios
+    const axios = (await import('axios')).default;
+    const config = (await import('../config/index.js')).config;
+
+    const response = await axios({
+      method: req.method,
+      url: `${config.protocolAssistant.url}${targetPath}`,
+      params: req.query,
+      data: req.body,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-API-Key': config.protocolAssistant.apiKey,
+        'X-User-ID': userContext.userId,
+        'X-User-Role': userContext.role,
+        ...(userContext.email && { 'X-User-Email': userContext.email }),
+        ...(userContext.name && { 'X-User-Name': userContext.name }),
+        ...(userContext.institutionId && { 'X-Institution-ID': userContext.institutionId }),
+      },
+      validateStatus: () => true, // Don't throw on non-2xx status
+    });
+
+    // Forward the response
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;
