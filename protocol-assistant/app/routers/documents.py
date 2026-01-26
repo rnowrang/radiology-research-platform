@@ -235,6 +235,24 @@ async def extract_protocol(
             f"'{protocol.study_title}', score={protocol.quality_score}"
         )
 
+        # Check if extraction actually succeeded - if quality score is 0 or title
+        # indicates no content was found, the document likely wasn't readable
+        if protocol.quality_score == 0 or "no document" in (protocol.study_title or "").lower():
+            logger.warning(
+                f"Document {file.filename} was parsed but no meaningful content extracted. "
+                f"Title: '{protocol.study_title}', score: {protocol.quality_score}"
+            )
+            return ProtocolExtractionResponse(
+                success=False,
+                protocol=None,
+                gap_analysis=None,
+                error=(
+                    "Could not extract meaningful content from the document. "
+                    "The file may be corrupted, password-protected, or in an unsupported format. "
+                    "Please try: (1) Saving as PDF from Microsoft Word, or (2) Re-saving as .docx format."
+                ),
+            )
+
         # Store extracted protocol in session if session ID provided
         if x_session_id:
             try:
