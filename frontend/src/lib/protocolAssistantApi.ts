@@ -398,7 +398,7 @@ export const protocolAssistantApi = {
 
   // Task-aware pre-fill methods
   getProjectFormTask: async (projectId: string): Promise<ProjectFormTask> => {
-    const response = await api.get(`/api/projects/${projectId}/form-task`);
+    const response = await api.get(`/projects/${projectId}/form-task`);
     return response.data.data;
   },
 
