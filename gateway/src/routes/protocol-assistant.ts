@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { protocolAssistantController } from '../controllers/protocolAssistantController.js';
 import { authenticate } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { uploadMemory } from '../middleware/upload.js';
 import { protocolAssistantProxy, UserContext } from '../services/protocolAssistantProxy.js';
 import { ForbiddenError } from '../utils/errors.js';
 
@@ -41,7 +41,7 @@ router.get('/sessions/:sessionId/history', protocolAssistantController.getHistor
 router.get('/sessions/:sessionId/stream', protocolAssistantController.streamResponse);
 
 // Documents
-router.post('/sessions/:sessionId/documents/upload', upload.single('file'), protocolAssistantController.uploadDocument);
+router.post('/sessions/:sessionId/documents/upload', uploadMemory.single('file'), protocolAssistantController.uploadDocument);
 router.get('/sessions/:sessionId/documents', protocolAssistantController.getDocuments);
 router.get('/sessions/:sessionId/protocol', protocolAssistantController.getExtractedProtocol);
 

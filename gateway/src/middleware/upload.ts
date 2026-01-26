@@ -91,13 +91,24 @@ const fileFilter = (
   cb(null, true);
 };
 
-// Create multer upload instance
+// Create multer upload instance (disk storage for general uploads)
 export const upload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: MAX_FILE_SIZE,
     files: 1, // Only allow single file upload per request
+  },
+});
+
+// Create multer upload instance with memory storage (for protocol assistant)
+// This is needed because we forward the file buffer to the microservice
+export const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: {
+    fileSize: MAX_FILE_SIZE,
+    files: 1,
   },
 });
 
