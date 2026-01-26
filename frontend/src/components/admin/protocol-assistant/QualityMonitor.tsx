@@ -127,12 +127,12 @@ export function QualityMonitor() {
       {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Select value={selectedPrompt} onValueChange={setSelectedPrompt}>
+          <Select value={selectedPrompt || '__all__'} onValueChange={(v) => setSelectedPrompt(v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="All prompts" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All prompts</SelectItem>
+              <SelectItem value="__all__">All prompts</SelectItem>
               {promptKeys.map((key) => (
                 <SelectItem key={key} value={key}>
                   {key}

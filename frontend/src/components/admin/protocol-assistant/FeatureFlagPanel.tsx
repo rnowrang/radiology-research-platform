@@ -106,12 +106,12 @@ export function FeatureFlagPanel() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter || '__all__'} onValueChange={(v) => setCategoryFilter(v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All categories</SelectItem>
+              <SelectItem value="__all__">All categories</SelectItem>
               <SelectItem value="ai">AI</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="ux">UX</SelectItem>
