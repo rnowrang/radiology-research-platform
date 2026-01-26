@@ -103,7 +103,12 @@ export const protocolAssistantApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
       }
     );
-    return response.data.data;
+    const result = response.data.data;
+    // Check if extraction was successful (backend returns success: false on error)
+    if (result && result.success === false) {
+      throw new Error(result.error || 'Failed to extract protocol from document');
+    }
+    return result;
   },
 
   // Gap questions

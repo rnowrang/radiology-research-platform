@@ -69,11 +69,11 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
         description: 'Protocol analyzed successfully',
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to analyze document',
+        description: error.message || 'Failed to analyze document',
       });
     },
   });

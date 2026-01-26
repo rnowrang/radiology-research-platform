@@ -42,7 +42,8 @@ class PHIDetector:
         # Medical Record Number - typically 7-10 digit numbers
         "mrn": r"\b(?:MRN|Medical Record(?:\s+Number)?|Patient(?:\s+ID)?)\s*[:#]?\s*(\d{7,10})\b",
         # Also catch standalone 7-10 digit numbers in certain contexts
-        "mrn_standalone": r"(?<=[Pp]atient|[Ss]ubject|[Rr]ecord)\s*(?:#|ID|:)?\s*(\d{7,10})\b",
+        # Note: Can't use variable-width lookbehind in Python, so we match the prefix and extract the number
+        "mrn_standalone": r"\b(?:[Pp]atient|[Ss]ubject|[Rr]ecord)\s*(?:#|ID|:)?\s*(\d{7,10})\b",
         # Social Security Number - XXX-XX-XXXX format
         "ssn": r"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b",
         # Phone numbers - various formats
