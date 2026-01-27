@@ -197,12 +197,30 @@ export interface GeneratedDocument {
 
 export async function getOrCreateSession(projectId: string): Promise<ChatSession> {
   const response = await api.post('/protocol-assistant/sessions', { project_id: projectId });
-  return response.data;
+  // Map snake_case response to camelCase
+  const data = response.data;
+  return {
+    sessionId: data.session_id,
+    projectId: data.project_id,
+    createdAt: data.created_at,
+    lastActivityAt: data.updated_at || data.created_at,
+    messageCount: 0,
+    documentsUploaded: 0,
+  };
 }
 
 export async function getSession(sessionId: string): Promise<ChatSession> {
   const response = await api.get(`/protocol-assistant/sessions/${sessionId}`);
-  return response.data;
+  // Map snake_case response to camelCase
+  const data = response.data;
+  return {
+    sessionId: data.session_id,
+    projectId: data.project_id,
+    createdAt: data.created_at,
+    lastActivityAt: data.updated_at || data.created_at,
+    messageCount: 0,
+    documentsUploaded: 0,
+  };
 }
 
 export async function closeSession(sessionId: string): Promise<void> {
