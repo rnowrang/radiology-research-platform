@@ -701,11 +701,11 @@ export function ProjectDetailPage() {
             </Button>
           )}
 
-          {/* Protocol Assistant Button */}
+          {/* Research Intelligence Button (Unified Assistant) */}
           <Button variant="outline" asChild>
-            <Link to={`/projects/${id}/protocol-assistant`}>
+            <Link to={`/projects/${id}/intelligence`}>
               <Sparkles className="mr-2 h-4 w-4" />
-              Protocol Assistant
+              Research Intelligence
             </Link>
           </Button>
 

@@ -492,6 +492,242 @@ export const protocolAssistantProxy = {
   healthCheck: async (): Promise<AxiosResponse> => {
     return protocolClient.get('/health');
   },
+
+  // ============================================================
+  // Intelligent Form Filling - Questionnaire Endpoints
+  // ============================================================
+
+  /**
+   * Get unified questionnaire for a project
+   */
+  getProjectQuestionnaire: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/projects/${projectId}/questionnaire`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Submit answer to questionnaire question
+   */
+  submitQuestionnaireAnswer: async (
+    projectId: string,
+    answerData: { question_id: string; answer: string; source?: string },
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/questionnaire/answer`, answerData, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Skip a questionnaire question
+   */
+  skipQuestionnaireQuestion: async (
+    projectId: string,
+    questionId: string,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/questionnaire/skip/${questionId}`, {}, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Get questionnaire progress
+   */
+  getQuestionnaireProgress: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/projects/${projectId}/questionnaire/progress`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Reset questionnaire
+   */
+  resetQuestionnaire: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/questionnaire/reset`, {}, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Knowledge Base Endpoints
+  // ============================================================
+
+  /**
+   * Get project knowledge base
+   */
+  getProjectKnowledge: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/projects/${projectId}/knowledge`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Add facts to knowledge base
+   */
+  addKnowledgeFacts: async (
+    projectId: string,
+    facts: Array<{ key: string; value: string; source?: string; confidence?: number }>,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/knowledge/facts`, { facts }, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Semantic search in knowledge base
+   */
+  searchKnowledgeBase: async (
+    projectId: string,
+    query: string,
+    topK: number = 5,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/knowledge/search`, { query, top_k: topK }, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Get knowledge base stats
+   */
+  getKnowledgeStats: async (projectId: string, user: string | UserContext): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/projects/${projectId}/knowledge/stats`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Upload document to knowledge base
+   */
+  uploadKnowledgeDocument: async (
+    projectId: string,
+    file: Express.Multer.File,
+    docType: string = 'protocol',
+    extractFacts: boolean = true,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+
+    // Create FormData for multipart upload
+    const FormData = (await import('form-data')).default;
+    const formData = new FormData();
+    formData.append('file', file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype,
+    });
+    formData.append('doc_type', docType);
+    formData.append('extract_facts', String(extractFacts));
+
+    return protocolClient.post(`/api/projects/${projectId}/documents`, formData, {
+      headers: {
+        ...buildUserHeaders(userContext),
+        ...formData.getHeaders(),
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Form Fill Endpoints
+  // ============================================================
+
+  /**
+   * Fill a form using project knowledge base
+   */
+  fillForm: async (
+    projectId: string,
+    templateId: number,
+    options: { fill_mode?: string; overwrite_existing?: boolean } = {},
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/projects/${projectId}/fill-form`, {
+      template_id: templateId,
+      ...options,
+    }, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Preview form fill results
+   */
+  previewFormFill: async (
+    projectId: string,
+    templateId: number,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/projects/${projectId}/fill-preview/${templateId}`, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Record form correction for learning
+   */
+  recordFormCorrection: async (
+    formId: number,
+    corrections: Array<{
+      field_id: string;
+      field_label?: string;
+      original_value: unknown;
+      corrected_value: unknown;
+    }>,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.post(`/api/forms/${formId}/correction`, {
+      form_id: formId,
+      corrections,
+    }, {
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Get institution patterns (learned entities)
+   */
+  getInstitutionPatterns: async (
+    institutionId: string,
+    patternType?: string,
+    user: string | UserContext = { userId: '', role: 'researcher' }
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    const params = patternType ? { pattern_type: patternType } : undefined;
+    return protocolClient.get(`/api/institutions/${institutionId}/patterns`, {
+      params,
+      headers: buildUserHeaders(userContext),
+    });
+  },
+
+  /**
+   * Suggest PI information
+   */
+  suggestPI: async (
+    institutionId: string,
+    query: string,
+    user: string | UserContext
+  ): Promise<AxiosResponse> => {
+    const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;
+    return protocolClient.get(`/api/institutions/${institutionId}/suggest-pi`, {
+      params: { query },
+      headers: buildUserHeaders(userContext),
+    });
+  },
 };
 
 // Export types and utility functions

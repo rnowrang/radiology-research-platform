@@ -591,6 +591,245 @@ export const protocolAssistantController = {
       next(error);
     }
   },
+
+  // ============================================================
+  // Intelligent Form Filling - Questionnaire Endpoints
+  // ============================================================
+
+  getProjectQuestionnaire: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getProjectQuestionnaire(projectId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  submitQuestionnaireAnswer: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.submitQuestionnaireAnswer(projectId, req.body, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  skipQuestionnaireQuestion: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId, questionId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.skipQuestionnaireQuestion(projectId, questionId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getQuestionnaireProgressByProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getQuestionnaireProgress(projectId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  resetQuestionnaire: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.resetQuestionnaire(projectId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Knowledge Base Endpoints
+  // ============================================================
+
+  getProjectKnowledge: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getProjectKnowledge(projectId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  addKnowledgeFacts: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const { facts } = req.body;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.addKnowledgeFacts(projectId, facts, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  searchKnowledgeBase: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const { query, top_k } = req.body;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.searchKnowledgeBase(projectId, query, top_k || 5, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getKnowledgeStats: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getKnowledgeStats(projectId, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  uploadKnowledgeDocument: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const file = req.file;
+      const userContext = getUserContext(req.user);
+
+      if (!file) {
+        throw new ValidationError('File is required');
+      }
+
+      const response = await protocolAssistantProxy.uploadKnowledgeDocument(
+        projectId,
+        file,
+        req.body.doc_type || 'protocol',
+        req.body.extract_facts !== 'false',
+        userContext
+      );
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: 'knowledge_document',
+        resourceId: projectId,
+        details: { filename: file.originalname },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Form Fill Endpoints
+  // ============================================================
+
+  fillFormByProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const { template_id, fill_mode, overwrite_existing } = req.body;
+      const userContext = getUserContext(req.user);
+
+      if (!template_id) {
+        throw new ValidationError('template_id is required');
+      }
+
+      const response = await protocolAssistantProxy.fillForm(
+        projectId,
+        template_id,
+        { fill_mode, overwrite_existing },
+        userContext
+      );
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: 'form_fill',
+        resourceId: projectId,
+        details: { template_id, fill_mode },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  previewFormFill: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { projectId, templateId } = req.params;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.previewFormFill(projectId, parseInt(templateId), userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  recordFormCorrection: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { formId } = req.params;
+      const { corrections } = req.body;
+      const userContext = getUserContext(req.user);
+
+      const response = await protocolAssistantProxy.recordFormCorrection(
+        parseInt(formId),
+        corrections,
+        userContext
+      );
+
+      await logAudit(req, {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: 'form_correction',
+        resourceId: formId,
+        details: { corrections_count: corrections?.length || 0 },
+      });
+
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getInstitutionPatterns: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { institutionId } = req.params;
+      const patternType = req.query.pattern_type as string | undefined;
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.getInstitutionPatterns(institutionId, patternType, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  suggestPI: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { institutionId } = req.params;
+      const query = req.query.query as string;
+
+      if (!query) {
+        throw new ValidationError('query parameter is required');
+      }
+
+      const userContext = getUserContext(req.user);
+      const response = await protocolAssistantProxy.suggestPI(institutionId, query, userContext);
+      res.json({ success: true, data: response.data });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default protocolAssistantController;

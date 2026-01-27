@@ -31,42 +31,34 @@ class IRBFormMapper:
 
     # Field mappings from ExtractedProtocol paths to form field IDs
     # Format: "protocol_path" -> "form_field_id"
+    # These IDs match the actual IRB Application template field IDs
     FIELD_MAPPING = {
-        # Study identification
-        "study_title": "investigator.study_title",
+        # Study identification - maps to actual template field IDs
+        "study_title": "protocol.title",
         "principal_investigator": "investigator.pi_name",
-        "study_type": "study_design.type",
-        # Objectives
-        "objectives.primary": "objectives.primary_objective",
-        "objectives.secondary": "objectives.secondary_objectives",
-        # Methodology
-        "methodology.design": "methodology.study_design",
-        "methodology.population": "methodology.study_population",
-        "methodology.sample_size": "methodology.sample_size",
-        "methodology.inclusion_criteria": "methodology.inclusion_criteria",
-        "methodology.exclusion_criteria": "methodology.exclusion_criteria",
-        # Data collection
-        "data_collection.sources": "data_collection.data_sources",
-        "data_collection.variables": "data_collection.variables",
-        "data_collection.timeline": "data_collection.timeline",
-        # Risks and benefits
-        "risks_benefits.risks": "risks.potential_risks",
-        "risks_benefits.benefits": "risks.potential_benefits",
-        "risks_benefits.mitigation": "risks.mitigation_strategies",
-        # Confidentiality
-        "confidentiality_measures": "data_security.confidentiality_measures",
+        # Population/methodology
+        "methodology.population": "population.description",
+        "methodology.sample_size": "population.total_studywide",
+        "methodology.inclusion_criteria": "population.inclusion_criteria",
+        "methodology.exclusion_criteria": "population.exclusion_criteria",
+        # Risks and benefits - maps to actual template field IDs
+        "risks_benefits.risks": "methods.risks",
+        "risks_benefits.benefits": "benefits.to_subjects",
+        "risks_benefits.mitigation": "methods.risk_prevention",
     }
 
     # Alternative field name mappings for different form templates
     # Some templates use different field IDs
     ALTERNATIVE_MAPPINGS = {
-        "investigator.study_title": ["study_info.title", "protocol.title", "title"],
+        "protocol.title": ["study_info.title", "investigator.study_title", "title"],
         "investigator.pi_name": ["study_info.pi", "protocol.investigator", "pi_name"],
-        "methodology.study_design": ["study_info.design", "design.type"],
-        "methodology.study_population": ["population.description", "subjects.population"],
-        "methodology.sample_size": ["population.size", "subjects.sample_size"],
-        "objectives.primary_objective": ["study_info.objective", "aims.primary"],
-        "objectives.secondary_objectives": ["aims.secondary", "secondary_objectives"],
+        "population.description": ["methodology.study_population", "subjects.population"],
+        "population.total_studywide": ["methodology.sample_size", "population.size"],
+        "population.inclusion_criteria": ["methodology.inclusion_criteria", "inclusion_criteria"],
+        "population.exclusion_criteria": ["methodology.exclusion_criteria", "exclusion_criteria"],
+        "methods.risks": ["risks.potential_risks", "risks"],
+        "benefits.to_subjects": ["risks.potential_benefits", "benefits"],
+        "methods.risk_prevention": ["risks.mitigation_strategies", "mitigation"],
     }
 
     def __init__(self):

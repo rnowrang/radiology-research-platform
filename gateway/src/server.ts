@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { checkConnection } from './database/connection.js';
+import { initEventService, getEventService } from './services/eventService.js';
 
 const startServer = async (): Promise<void> => {
   try {
@@ -12,6 +13,14 @@ const startServer = async (): Promise<void> => {
       process.exit(1);
     }
     logger.info('Database connection established');
+
+    // Initialize Redis event service
+    try {
+      await initEventService();
+      logger.info('Redis event service connected');
+    } catch (error) {
+      logger.warn('Redis not available, real-time events disabled:', error);
+    }
 
     // Create and start Express app
     const app = createApp();
@@ -25,6 +34,15 @@ const startServer = async (): Promise<void> => {
     // Graceful shutdown
     const shutdown = async (signal: string): Promise<void> => {
       logger.info(`${signal} received. Starting graceful shutdown...`);
+
+      // Close event service
+      try {
+        const eventService = getEventService();
+        await eventService.close();
+        logger.info('Event service closed');
+      } catch (error) {
+        logger.error('Error closing event service:', error);
+      }
 
       server.close(() => {
         logger.info('HTTP server closed');

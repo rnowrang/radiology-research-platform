@@ -206,6 +206,179 @@ export interface PrefillTaskFormResponse {
   redirect_url: string;
 }
 
+// ============================================================
+// Intelligent Form Filling Types
+// ============================================================
+
+export interface QuestionnaireQuestion {
+  id: string;
+  question: string;
+  section: string;
+  priority: 'required' | 'recommended' | 'optional';
+  why_needed: string;
+  used_in_forms: string[];
+  answer_type: 'text' | 'number' | 'select' | 'multiselect' | 'date' | 'boolean';
+  options?: string[];
+  suggested_answer?: string;
+  suggestion_source?: string;
+  suggestion_confidence?: number;
+  protocol_field: string;
+  answered: boolean;
+  skipped: boolean;
+}
+
+export interface QuestionnaireSectionInfo {
+  key: string;
+  name: string;
+  icon: string;
+  questions: QuestionnaireQuestion[];
+  completed_count: number;
+  total_count: number;
+}
+
+export interface QuestionnaireResponse {
+  project_id: string;
+  project_type: string | null;
+  sections: QuestionnaireSectionInfo[];
+  total_questions: number;
+  estimated_minutes: number;
+}
+
+export interface QuestionnaireAnswerRequest {
+  answer: string | number | boolean | string[];
+  source: 'wizard' | 'user_input' | 'document' | 'extracted' | 'learned';
+}
+
+export interface QuestionnaireAnswerResponse {
+  success: boolean;
+  next_question_id?: string;
+  progress: QuestionnaireProgressResponse;
+  facts_added: number;
+}
+
+export interface QuestionnaireProgressResponse {
+  total_questions: number;
+  answered_count: number;
+  skipped_count: number;
+  completion_percentage: number;
+  sections_progress: Record<string, { total: number; answered: number; skipped: number }>;
+  is_complete: boolean;
+  estimated_remaining_minutes: number;
+}
+
+export interface KnowledgeFact {
+  key: string;
+  value: string | number | boolean | string[];
+  source: 'document' | 'wizard' | 'user' | 'learned';
+  confidence: number;
+}
+
+export interface KnowledgeBaseResponse {
+  project_id: string;
+  protocol_data: Record<string, unknown>;
+  facts: KnowledgeFact[];
+  documents: Array<{
+    doc_id: string;
+    filename: string;
+    doc_type: string;
+    extracted_at: string;
+  }>;
+  questionnaire_complete: boolean;
+  completion_percentage: number;
+}
+
+export interface DocumentUploadResponse {
+  success: boolean;
+  document_id: string | null;
+  filename: string;
+  doc_type: string;
+  facts_extracted: number;
+  quality_score: number | null;
+  message: string;
+}
+
+export interface KnowledgeSearchResult {
+  content: string;
+  content_type: string;
+  source_key: string;
+  score: number;
+}
+
+export interface KnowledgeStats {
+  total_facts: number;
+  facts_by_source: Record<string, number>;
+  documents_count: number;
+  embeddings_count: number;
+  completion_percentage: number;
+}
+
+export interface FillFormRequest {
+  template_id: number;
+  form_id?: number;
+  fill_mode: 'all' | 'high_confidence' | 'preview';
+  create_if_missing?: boolean;
+}
+
+export interface FilledField {
+  field_id: string;
+  field_label: string;
+  value: unknown;
+  confidence: number;
+  confidence_level: 'high' | 'medium' | 'low';
+  source: string;
+  evidence?: string;
+}
+
+export interface FillFormResponse {
+  success: boolean;
+  form_id: number;
+  filled_fields: FilledField[];
+  skipped_fields: string[];
+  fill_rate: number;
+  high_confidence_count: number;
+  medium_confidence_count: number;
+  low_confidence_count: number;
+}
+
+export interface FormFillPreviewResponse {
+  template_id: number;
+  template_name: string;
+  total_fields: number;
+  fillable_fields: number;
+  fill_rate: number;
+  fields: FilledField[];
+  high_confidence_count: number;
+  medium_confidence_count: number;
+  low_confidence_count: number;
+}
+
+export interface FormCorrectionRequest {
+  field_id: string;
+  field_label?: string;
+  field_type?: string;
+  original_value: unknown;
+  corrected_value: unknown;
+  project_id?: string;
+}
+
+export interface InstitutionPattern {
+  id: string;
+  pattern_type: string;
+  pattern_key: string;
+  pattern_value: Record<string, unknown>;
+  usage_count: number;
+  last_used_at: string;
+}
+
+export interface PersonSuggestion {
+  name: string;
+  title?: string;
+  department?: string;
+  email?: string;
+  phone?: string;
+  confidence: number;
+}
+
 export const protocolAssistantApi = {
   // Session management
   getOrCreateSession: async (projectId: string): Promise<ChatSession> => {
@@ -410,6 +583,197 @@ export const protocolAssistantApi = {
       `/protocol-assistant/sessions/${sessionId}/prefill-task-form`,
       request
     );
+    return response.data.data;
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Questionnaire API
+  // ============================================================
+
+  /**
+   * Get the unified questionnaire for a project.
+   * This analyzes all tasks/forms and generates questions for missing information.
+   */
+  getProjectQuestionnaire: async (projectId: string): Promise<QuestionnaireResponse> => {
+    const response = await api.get(`/projects/${projectId}/questionnaire`);
+    return response.data.data;
+  },
+
+  /**
+   * Submit an answer to a questionnaire question.
+   */
+  submitQuestionnaireAnswer: async (
+    projectId: string,
+    questionId: string,
+    answer: QuestionnaireAnswerRequest
+  ): Promise<QuestionnaireAnswerResponse> => {
+    const response = await api.post(`/projects/${projectId}/questionnaire/answer`, {
+      question_id: questionId,
+      ...answer,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Skip a questionnaire question.
+   */
+  skipQuestionnaireQuestion: async (
+    projectId: string,
+    questionId: string
+  ): Promise<QuestionnaireProgressResponse> => {
+    const response = await api.post(`/projects/${projectId}/questionnaire/skip/${questionId}`);
+    return response.data.data;
+  },
+
+  /**
+   * Get questionnaire progress for a project.
+   */
+  getQuestionnaireProgress: async (projectId: string): Promise<QuestionnaireProgressResponse> => {
+    const response = await api.get(`/projects/${projectId}/questionnaire/progress`);
+    return response.data.data;
+  },
+
+  /**
+   * Reset the questionnaire (clear answers and restart).
+   */
+  resetQuestionnaire: async (projectId: string): Promise<{ success: boolean }> => {
+    const response = await api.post(`/projects/${projectId}/questionnaire/reset`);
+    return response.data.data;
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Knowledge Base API
+  // ============================================================
+
+  /**
+   * Upload a document to extract facts for the knowledge base.
+   * This parses the document and uses AI to extract relevant information.
+   */
+  uploadKnowledgeDocument: async (
+    projectId: string,
+    file: File,
+    docType: string = 'protocol',
+    extractFacts: boolean = true
+  ): Promise<DocumentUploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', docType);
+    formData.append('extract_facts', String(extractFacts));
+
+    const response = await api.post(`/projects/${projectId}/documents`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Get the project knowledge base.
+   */
+  getProjectKnowledge: async (projectId: string): Promise<KnowledgeBaseResponse> => {
+    const response = await api.get(`/projects/${projectId}/knowledge`);
+    return response.data.data;
+  },
+
+  /**
+   * Add facts to the project knowledge base.
+   */
+  addKnowledgeFacts: async (
+    projectId: string,
+    facts: KnowledgeFact[]
+  ): Promise<{ success: boolean; facts_added: number }> => {
+    const response = await api.post(`/projects/${projectId}/knowledge/facts`, { facts });
+    return response.data.data;
+  },
+
+  /**
+   * Search the knowledge base using semantic search.
+   */
+  searchKnowledge: async (
+    projectId: string,
+    query: string,
+    topK = 5
+  ): Promise<KnowledgeSearchResult[]> => {
+    const response = await api.post(`/projects/${projectId}/knowledge/search`, {
+      query,
+      top_k: topK,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Get knowledge base statistics.
+   */
+  getKnowledgeStats: async (projectId: string): Promise<KnowledgeStats> => {
+    const response = await api.get(`/projects/${projectId}/knowledge/stats`);
+    return response.data.data;
+  },
+
+  // ============================================================
+  // Intelligent Form Filling - Form Fill API
+  // ============================================================
+
+  /**
+   * Fill a form using the project knowledge base.
+   */
+  fillFormByProject: async (
+    projectId: string,
+    request: FillFormRequest
+  ): Promise<FillFormResponse> => {
+    const response = await api.post(`/projects/${projectId}/fill-form`, request);
+    return response.data.data;
+  },
+
+  /**
+   * Preview what form filling would produce.
+   */
+  previewFormFill: async (
+    projectId: string,
+    templateId: number
+  ): Promise<FormFillPreviewResponse> => {
+    const response = await api.get(`/projects/${projectId}/fill-preview/${templateId}`);
+    return response.data.data;
+  },
+
+  /**
+   * Record a user correction for learning.
+   */
+  recordFormCorrection: async (
+    formId: number,
+    correction: FormCorrectionRequest
+  ): Promise<{ success: boolean }> => {
+    const response = await api.post(`/forms/${formId}/correction`, correction);
+    return response.data.data;
+  },
+
+  // ============================================================
+  // Institution Patterns API
+  // ============================================================
+
+  /**
+   * Get institution patterns (learned entities).
+   */
+  getInstitutionPatterns: async (
+    institutionId: string,
+    patternType?: string
+  ): Promise<InstitutionPattern[]> => {
+    const response = await api.get(`/protocol-assistant/institutions/${institutionId}/patterns`, {
+      params: patternType ? { pattern_type: patternType } : undefined,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Suggest PI information based on partial name.
+   */
+  suggestPI: async (
+    institutionId: string,
+    query: string
+  ): Promise<PersonSuggestion[]> => {
+    const response = await api.get(`/protocol-assistant/institutions/${institutionId}/suggest-pi`, {
+      params: { query },
+    });
     return response.data.data;
   },
 };

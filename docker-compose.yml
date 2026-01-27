@@ -41,8 +41,11 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       FORMS_SERVICE_URL: http://forms-service:8000
       PROTOCOL_ASSISTANT_URL: http://protocol-assistant:8000
+      COHERENCE_SERVICE_URL: http://coherence-service:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
+      # Redis Event Bus
+      REDIS_URL: redis://redis:6379
     volumes:
       - ./gateway/src:/app/src
       - ./gateway/package.json:/app/package.json
@@ -51,6 +54,8 @@ services:
       - gateway_node_modules:/app/node_modules
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: npm run dev
     networks:
@@ -114,6 +119,12 @@ services:
       AUDIT_LOGGING_ENABLED: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DEBUG: "true"
+      # Neo4j Graph Database
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secret}
+      # Redis Event Bus
+      REDIS_URL: redis://redis:6379
     volumes:
       - ./protocol-assistant/app:/app/app
       - ./protocol-assistant/alembic:/app/alembic
@@ -121,6 +132,44 @@ services:
       - ./storage:/app/storage
     depends_on:
       db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - radiology-network
+
+  # Python FastAPI Coherence Service
+  coherence-service:
+    build:
+      context: ./coherence-service
+      dockerfile: Dockerfile
+    container_name: radiology-coherence
+    ports:
+      - "${COHERENCE_PORT:-8003}:8000"
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-radiology}:${DB_PASSWORD:-radiology_secret}@db:5432/${DB_NAME:-radiology_research}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
+      GATEWAY_URL: http://gateway:3000
+      PROTOCOL_ASSISTANT_URL: http://protocol-assistant:8000
+      # Neo4j Graph Database
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secret}
+      # Redis Event Bus
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: "true"
+    volumes:
+      - ./coherence-service/app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
@@ -152,6 +201,50 @@ services:
     networks:
       - radiology-network
 
+  # Neo4j Graph Database (for Research Graph)
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: radiology-neo4j
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"   # Browser UI
+      - "${NEO4J_BOLT_PORT:-7687}:7687"   # Bolt protocol
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-neo4j_secret}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - radiology-network
+
+  # Redis (for Event Streaming and Caching)
+  redis:
+    image: redis:7-alpine
+    container_name: radiology-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - radiology-network
+
 networks:
   radiology-network:
     driver: bridge
@@ -160,3 +253,7 @@ volumes:
   postgres_data:
   gateway_node_modules:
   frontend_node_modules:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_plugins:
+  redis_data:

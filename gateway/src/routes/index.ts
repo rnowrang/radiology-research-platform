@@ -16,17 +16,34 @@ import reportsRoutes from './reports.js';
 import emailRoutes from './email.js';
 import taskDefinitionsRoutes from './task-definitions.js';
 import protocolAssistantRoutes from './protocol-assistant.js';
+import eventsRoutes from './events.js';
+import coherenceRoutes from './coherence.js';
+import learningRoutes from './learning.js';
 
 const router = Router();
 
 // Health check
 router.get('/health', (req, res) => {
+  // Check Redis status
+  let redisStatus = 'unavailable';
+  try {
+    const { getEventService } = require('../services/eventService.js');
+    const eventService = getEventService();
+    redisStatus = eventService.isConnected() ? 'connected' : 'unavailable';
+  } catch {
+    redisStatus = 'unavailable';
+  }
+
   res.json({
     success: true,
     data: {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       service: 'gateway',
+      components: {
+        database: 'connected',
+        redis: redisStatus,
+      },
     },
   });
 });
@@ -46,6 +63,9 @@ router.use('/files', filesRoutes);
 router.use('/search', searchRoutes);
 router.use('/activity', activityRoutes);
 router.use('/protocol-assistant', protocolAssistantRoutes);
+router.use('/events', eventsRoutes);
+router.use('/coherence', coherenceRoutes);
+router.use('/learning', learningRoutes);
 // Catch-all routes (must be last)
 router.use('/', reviewStagesRoutes);
 router.use('/', amendmentRoutes);

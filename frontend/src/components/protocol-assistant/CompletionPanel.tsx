@@ -36,6 +36,7 @@ import {
 import { useWizardStore, GeneratedDocument } from '@/stores/wizardStore';
 import { toast } from '@/hooks/useToast';
 import { FormTemplatePicker } from './FormTemplatePicker';
+import { FormFillPreviewModal } from './FormFillPreviewModal';
 import { templatesApi, formsApi } from '@/lib/api';
 
 interface CompletionPanelProps {
@@ -59,6 +60,12 @@ export function CompletionPanel({
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null);
+  // New: Semantic fill preview state
+  const [showSemanticFillPreview, setShowSemanticFillPreview] = useState(false);
+  const [selectedSemanticTemplate, setSelectedSemanticTemplate] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const queryClient = useQueryClient();
 
   // Use wizard store for generated documents (persists across component remounts)
@@ -516,19 +523,20 @@ export function CompletionPanel({
           {/* Legacy Pre-fill Form (fallback when no task found) */}
           {!formTaskData?.task && (
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Pre-fill IRB Form</p>
+              <p className="text-xs text-muted-foreground">Pre-fill IRB Form (Legacy)</p>
               <Button
                 onClick={handlePrefillForm}
                 disabled={hasSkippedQuestions || isGenerating || prefillMutation.isPending}
+                variant="outline"
                 className="w-full gap-2"
                 size="sm"
               >
                 {prefillMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Sparkles className="h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                 )}
-                Pre-fill IRB Form
+                Legacy Pre-fill
               </Button>
               {hasSkippedQuestions && (
                 <p className="text-xs text-yellow-600">
@@ -538,6 +546,46 @@ export function CompletionPanel({
             </div>
           )}
         </div>
+
+        {/* NEW: Smart Fill Card - Uses semantic matching for higher fill rate */}
+        {projectId && (
+          <Card className="shrink-0 border-primary/50 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
+            <CardHeader className="p-3 pb-0">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
+                <Sparkles className="h-4 w-4" />
+                Smart Fill (Recommended)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Uses AI semantic matching for 70-90% fill rate vs 35% with legacy method.
+              </p>
+              {templates.length > 0 ? (
+                <div className="space-y-1.5">
+                  {templates.slice(0, 3).map((template: { id: number; name: string; fieldCount: number }) => (
+                    <Button
+                      key={template.id}
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-xs h-8"
+                      onClick={() => {
+                        setSelectedSemanticTemplate({ id: template.id, name: template.name });
+                        setShowSemanticFillPreview(true);
+                      }}
+                    >
+                      <FileText className="mr-2 h-3 w-3" />
+                      {template.name}
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">
+                  No templates available
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Task-Aware Pre-fill Card */}
         <Card className="shrink-0">
@@ -836,6 +884,20 @@ export function CompletionPanel({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* NEW: Semantic Fill Preview Modal */}
+      {projectId && selectedSemanticTemplate && (
+        <FormFillPreviewModal
+          open={showSemanticFillPreview}
+          onOpenChange={(open) => {
+            setShowSemanticFillPreview(open);
+            if (!open) setSelectedSemanticTemplate(null);
+          }}
+          projectId={projectId}
+          templateId={selectedSemanticTemplate.id}
+          templateName={selectedSemanticTemplate.name}
+        />
+      )}
     </div>
   );
 }

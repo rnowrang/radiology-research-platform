@@ -754,10 +754,15 @@ class WizardService:
             fields_updated = 0
             if fields_to_update and form_id:
                 # Update form data via Forms Service
+                # Convert flat dict to changes array format expected by forms service
+                changes = [
+                    {"field_id": field_id, "new_value": value}
+                    for field_id, value in fields_to_update.items()
+                ]
                 try:
-                    update_response = await client.patch(
+                    update_response = await client.post(
                         f"/api/forms/{form_id}/data",
-                        json={"data": fields_to_update},
+                        json={"changes": changes},
                     )
                     update_response.raise_for_status()
                     fields_updated = len(fields_to_update)

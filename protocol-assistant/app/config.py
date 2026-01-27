@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # Redis Configuration (for Celery queue and caching)
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Neo4j Graph Database Configuration
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "neo4j_secret"
+
     # Gateway URL for internal service communication
     GATEWAY_URL: str = "http://gateway:3000"
 

@@ -22,3 +22,7 @@ redis>=5.0.0
 kombu>=5.3.0
 # Vector search for semantic RAG
 pgvector>=0.2.0
+# Graph database for Research Graph
+neo4j>=5.15.0
+# Async event streaming
+aioredis>=2.0.0

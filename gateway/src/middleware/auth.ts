@@ -6,13 +6,64 @@ import { AuthenticatedRequest, User, TokenPayload } from '../types/index.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Check if request has valid internal API key authentication.
+ * Internal services can authenticate using X-Internal-API-Key header.
+ * Returns user if authenticated, null otherwise.
+ */
+const checkInternalAuth = async (req: AuthenticatedRequest): Promise<User | null> => {
+  const internalApiKey = req.headers['x-internal-api-key'] as string | undefined;
+  const userId = req.headers['x-user-id'] as string | undefined;
+
+  // Check if this is an internal service call
+  if (!internalApiKey || internalApiKey !== config.formsService.apiKey) {
+    return null;
+  }
+
+  // X-User-ID is required for internal auth
+  if (!userId) {
+    logger.debug('Internal auth: X-Internal-API-Key provided but missing X-User-ID');
+    return null;
+  }
+
+  // Look up user by ID
+  const userResult = await query<User>(
+    `SELECT id, email, full_name, role, is_active, email_verified, created_at, updated_at
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+
+  if (userResult.rows.length === 0) {
+    logger.warn(`Internal auth: User not found for ID ${userId}`);
+    return null;
+  }
+
+  const user = userResult.rows[0];
+
+  if (!user.is_active) {
+    logger.warn(`Internal auth: User ${userId} is deactivated`);
+    return null;
+  }
+
+  logger.debug(`Internal auth: Authenticated as user ${userId}`);
+  return user;
+};
+
 export const authenticate = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Get token from header or cookie
+    // First, try internal API key authentication (for service-to-service calls)
+    const internalUser = await checkInternalAuth(req);
+    if (internalUser) {
+      req.user = internalUser;
+      req.sessionId = undefined; // No session for internal auth
+      return next();
+    }
+
+    // Fall back to JWT authentication
     const authHeader = req.headers.authorization;
     const cookieToken = req.cookies?.access_token;
 

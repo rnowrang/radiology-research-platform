@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { formsController } from '../controllers/formsController.js';
 import { fileController } from '../controllers/fileController.js';
 import { activityController } from '../controllers/activityController.js';
+import { protocolAssistantController } from '../controllers/protocolAssistantController.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
@@ -20,6 +21,7 @@ router.get('/forms', asyncHandler(formsController.getForms));
 router.post('/forms', asyncHandler(formsController.createForm));
 router.get('/forms/:formId', asyncHandler(formsController.getForm));
 router.post('/forms/:formId/data', asyncHandler(formsController.updateFormData));
+router.patch('/forms/:formId/data', asyncHandler(formsController.updateFormData));  // Support both POST and PATCH
 
 // Versions
 router.get('/forms/:formId/versions', asyncHandler(formsController.getVersions));
@@ -66,5 +68,10 @@ router.get('/forms/:formId/locks', asyncHandler(formsController.getAllLocks));
 router.get('/forms/:formId/sections/:sectionId/lock', asyncHandler(formsController.checkSectionLock));
 router.post('/forms/:formId/sections/:sectionId/lock', asyncHandler(formsController.acquireSectionLock));
 router.delete('/forms/:formId/sections/:sectionId/lock', asyncHandler(formsController.releaseSectionLock));
+
+// ============================================================
+// Intelligent Form Filling - Learning Routes
+// ============================================================
+router.post('/forms/:formId/correction', asyncHandler(protocolAssistantController.recordFormCorrection));
 
 export default router;

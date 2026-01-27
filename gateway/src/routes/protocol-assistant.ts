@@ -80,6 +80,10 @@ router.post('/sessions/:sessionId/wizard/prefill-form', protocolAssistantControl
 // Task-linked form pre-fill endpoint
 router.post('/sessions/:sessionId/prefill-task-form', protocolAssistantController.prefillTaskForm);
 
+// Institution patterns (for learning system)
+router.get('/institutions/:institutionId/patterns', protocolAssistantController.getInstitutionPatterns);
+router.get('/institutions/:institutionId/suggest-pi', protocolAssistantController.suggestPI);
+
 // Admin - stats endpoint (legacy)
 router.get('/admin/stats', protocolAssistantController.getStats);
 

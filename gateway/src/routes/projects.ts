@@ -3,9 +3,11 @@ import { projectController } from '../controllers/projectController.js';
 import { fileController } from '../controllers/fileController.js';
 import { activityController } from '../controllers/activityController.js';
 import { taskController } from '../controllers/taskController.js';
+import { protocolAssistantController } from '../controllers/protocolAssistantController.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAdmin } from '../middleware/roles.js';
+import { uploadMemory } from '../middleware/upload.js';
 
 const router = Router();
 
@@ -47,5 +49,29 @@ router.post('/:id/submit-for-approval', asyncHandler(projectController.submitFor
 router.post('/:id/approve', asyncHandler(projectController.approveProject));
 router.post('/:id/reject', asyncHandler(projectController.rejectProject));
 router.post('/:id/request-changes', asyncHandler(projectController.requestChangesProject));
+
+// ============================================================
+// Intelligent Form Filling - Questionnaire Routes
+// ============================================================
+router.get('/:projectId/questionnaire', asyncHandler(protocolAssistantController.getProjectQuestionnaire));
+router.post('/:projectId/questionnaire/answer', asyncHandler(protocolAssistantController.submitQuestionnaireAnswer));
+router.post('/:projectId/questionnaire/skip/:questionId', asyncHandler(protocolAssistantController.skipQuestionnaireQuestion));
+router.get('/:projectId/questionnaire/progress', asyncHandler(protocolAssistantController.getQuestionnaireProgressByProject));
+router.post('/:projectId/questionnaire/reset', asyncHandler(protocolAssistantController.resetQuestionnaire));
+
+// ============================================================
+// Intelligent Form Filling - Knowledge Base Routes
+// ============================================================
+router.get('/:projectId/knowledge', asyncHandler(protocolAssistantController.getProjectKnowledge));
+router.post('/:projectId/knowledge/facts', asyncHandler(protocolAssistantController.addKnowledgeFacts));
+router.post('/:projectId/knowledge/search', asyncHandler(protocolAssistantController.searchKnowledgeBase));
+router.get('/:projectId/knowledge/stats', asyncHandler(protocolAssistantController.getKnowledgeStats));
+router.post('/:projectId/documents', uploadMemory.single('file'), asyncHandler(protocolAssistantController.uploadKnowledgeDocument));
+
+// ============================================================
+// Intelligent Form Filling - Form Fill Routes
+// ============================================================
+router.post('/:projectId/fill-form', asyncHandler(protocolAssistantController.fillFormByProject));
+router.get('/:projectId/fill-preview/:templateId', asyncHandler(protocolAssistantController.previewFormFill));
 
 export default router;

@@ -22,6 +22,7 @@ router.get('/', taskController.list);
 router.post('/', taskController.create);
 router.get('/:id', taskController.get);
 router.put('/:id', taskController.update);
+router.patch('/:id', taskController.update);  // Support both PUT and PATCH for updates
 router.delete('/:id', taskController.delete);
 
 // =============================================================================

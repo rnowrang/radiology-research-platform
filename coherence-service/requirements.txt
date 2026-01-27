@@ -1,0 +1,27 @@
+# Web framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+
+# Redis for event streaming
+redis>=5.0.0
+aioredis>=2.0.0
+
+# Neo4j for graph queries
+neo4j>=5.15.0
+
+# HTTP client for service communication
+httpx>=0.26.0
+
+# Utilities
+python-jose[cryptography]>=3.3.0
+tenacity>=8.2.0
+
+# YAML for rule definitions
+pyyaml>=6.0.0
