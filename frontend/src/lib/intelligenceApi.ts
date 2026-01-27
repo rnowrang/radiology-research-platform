@@ -23,7 +23,7 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('accessToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -246,7 +246,7 @@ export async function streamChatMessage(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
+        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
       },
       body: JSON.stringify({ content }),
     });
@@ -594,7 +594,7 @@ export function subscribeToProjectEvents(
   onEvent: (event: { type: string; data: unknown }) => void,
   onError?: (error: Event) => void
 ): EventSource {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('accessToken');
   const eventSource = new EventSource(
     `${API_BASE}/events/projects/${projectId}/stream?token=${token}`
   );
