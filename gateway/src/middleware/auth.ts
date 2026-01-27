@@ -166,3 +166,22 @@ export const optionalAuth = async (
   }
   next();
 };
+
+/**
+ * Middleware that requires the user to be authenticated.
+ * Should be used after authenticate middleware.
+ */
+export const requireAuth = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    next(new UnauthorizedError('Authentication required'));
+    return;
+  }
+  next();
+};
+
+// Re-export AuthenticatedRequest as AuthRequest for convenience
+export type AuthRequest = AuthenticatedRequest;

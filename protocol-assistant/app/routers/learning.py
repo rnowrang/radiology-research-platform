@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_session
 from app.middleware.auth import get_current_user_id
 from app.services.learning_service import (
     LearningService,
@@ -141,7 +141,7 @@ class LearningContextResponse(BaseModel):
 @router.get("/profile")
 async def get_my_profile(
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get the current user's learning profile."""
     service = get_learning_service(db)
@@ -161,7 +161,7 @@ async def get_my_profile(
 async def get_common_values(
     field_key: Optional[str] = None,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get commonly used values for the current user."""
     service = get_learning_service(db)
@@ -177,7 +177,7 @@ async def get_common_values(
 async def record_correction(
     request: RecordCorrectionRequest,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Record a user correction to an AI suggestion."""
     service = get_learning_service(db)
@@ -208,7 +208,7 @@ async def get_corrections(
     project_id: Optional[str] = None,
     limit: int = 100,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get user corrections."""
     service = get_learning_service(db)
@@ -239,7 +239,7 @@ async def get_corrections(
 async def get_correction_patterns(
     field_key: Optional[str] = None,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Analyze correction patterns for the current user."""
     service = get_learning_service(db)
@@ -255,7 +255,7 @@ async def get_correction_patterns(
 async def record_feedback(
     request: RecordFeedbackRequest,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Record feedback on an AI suggestion."""
     service = get_learning_service(db)
@@ -287,7 +287,7 @@ async def record_feedback(
 async def get_feedback_stats(
     suggestion_type: Optional[str] = None,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get feedback statistics for the current user."""
     service = get_learning_service(db)
@@ -304,7 +304,7 @@ async def update_provenance(
     project_id: str,
     request: UpdateProvenanceRequest,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Create or update fact provenance."""
     service = get_learning_service(db)
@@ -337,7 +337,7 @@ async def get_provenance(
     project_id: str,
     fact_key: str,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get provenance for a fact."""
     service = get_learning_service(db)
@@ -367,7 +367,7 @@ async def get_fact_history(
     fact_key: str,
     limit: int = 50,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Get history of a fact."""
     service = get_learning_service(db)
@@ -394,7 +394,7 @@ async def add_reference(
     project_id: str,
     request: AddReferenceRequest,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Add a reference to a fact."""
     service = get_learning_service(db)
@@ -415,7 +415,7 @@ async def verify_fact(
     project_id: str,
     fact_key: str,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """Mark a fact as verified by the current user."""
     service = get_learning_service(db)
@@ -431,7 +431,7 @@ async def verify_fact(
 async def get_learning_context(
     field_key: str,
     user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
 ) -> LearningContextResponse:
     """Get learning context for a field to improve suggestions."""
     service = get_learning_service(db)

@@ -7,9 +7,17 @@
  * - Event subscription and handling
  */
 
-import Redis from 'ioredis';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+
+// Dynamic import for ioredis to handle cases where it's not available
+let Redis: typeof import('ioredis').default | null = null;
+try {
+  // Use require for compatibility with tsx
+  Redis = require('ioredis').default || require('ioredis');
+} catch (err) {
+  console.warn('[EventService] ioredis not available, event bus disabled');
+}
 
 // Event types matching the protocol-assistant event bus
 export enum EventType {
@@ -74,8 +82,8 @@ const STREAMS: Record<string, string> = {
 };
 
 class EventService {
-  private redis: Redis | null = null;
-  private subscriber: Redis | null = null;
+  private redis: InstanceType<typeof import('ioredis').default> | null = null;
+  private subscriber: InstanceType<typeof import('ioredis').default> | null = null;
   private sseClients: Map<string, Set<Response>> = new Map();
   private connected: boolean = false;
 
@@ -85,12 +93,18 @@ class EventService {
   async connect(): Promise<void> {
     if (this.connected) return;
 
+    // If Redis module isn't available, skip connection
+    if (!Redis) {
+      console.warn('[EventService] Redis module not available, event bus disabled');
+      return;
+    }
+
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
     try {
       this.redis = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
-        retryStrategy: (times) => {
+        retryStrategy: (times: number) => {
           if (times > 3) return null;
           return Math.min(times * 100, 3000);
         },

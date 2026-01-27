@@ -269,6 +269,18 @@ def require_admin() -> Callable:
     return require_role(["admin"])
 
 
+async def get_current_user_id(
+    user: UserContext = Depends(get_current_user)
+) -> str:
+    """
+    Get the current user's ID as a string.
+
+    This is a convenience dependency that returns just the user ID
+    as a string for use in endpoints that need it.
+    """
+    return str(user.id)
+
+
 async def get_current_admin_id(
     user: UserContext = Depends(require_admin())
 ) -> UUID:
