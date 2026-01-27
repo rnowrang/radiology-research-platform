@@ -196,7 +196,7 @@ export interface GeneratedDocument {
 // ============================================================================
 
 export async function getOrCreateSession(projectId: string): Promise<ChatSession> {
-  const response = await api.post('/protocol-assistant/sessions', { projectId });
+  const response = await api.post('/protocol-assistant/sessions', { project_id: projectId });
   return response.data;
 }
 
