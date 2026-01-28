@@ -97,12 +97,13 @@ class KnowledgeEmbeddingsService:
         embedding_id = uuid4()
 
         # Insert into database
+        # Note: Using CAST() syntax instead of :: to avoid asyncpg parameter parsing issues
         await self.db.execute(
             text("""
                 INSERT INTO knowledge_embeddings
                     (id, knowledge_base_id, content, content_type, source_key, embedding)
                 VALUES
-                    (:id, :kb_id, :content, :content_type, :source_key, :embedding::vector)
+                    (:id, :kb_id, :content, :content_type, :source_key, CAST(:embedding AS vector))
             """),
             {
                 "id": str(embedding_id),
@@ -213,8 +214,12 @@ class KnowledgeEmbeddingsService:
         Returns:
             List of EmbeddingMatch results sorted by score descending
         """
-        # Generate query embedding
-        query_embedding = await self.embed_text(query)
+        # Generate query embedding - if this fails, we shouldn't affect the DB transaction
+        try:
+            query_embedding = await self.embed_text(query)
+        except Exception as e:
+            logger.error(f"Failed to generate embedding for query: {e}")
+            raise
         embedding_str = f"[{','.join(str(x) for x in query_embedding)}]"
 
         # Build query with optional content type filter
@@ -232,18 +237,19 @@ class KnowledgeEmbeddingsService:
             params["content_types"] = type_values
 
         # Use pgvector cosine similarity (1 - cosine_distance)
+        # Note: Using CAST() syntax instead of :: to avoid asyncpg parameter parsing issues
         result = await self.db.execute(
             text(f"""
                 SELECT
                     content,
                     content_type,
                     source_key,
-                    1 - (embedding <=> :embedding::vector) as score
+                    1 - (embedding <=> CAST(:embedding AS vector)) as score
                 FROM knowledge_embeddings
                 WHERE knowledge_base_id = :kb_id
                     {type_filter}
-                    AND 1 - (embedding <=> :embedding::vector) >= :min_score
-                ORDER BY embedding <=> :embedding::vector
+                    AND 1 - (embedding <=> CAST(:embedding AS vector)) >= :min_score
+                ORDER BY embedding <=> CAST(:embedding AS vector)
                 LIMIT :top_k
             """),
             params
@@ -287,17 +293,18 @@ class KnowledgeEmbeddingsService:
         """
         embedding_str = f"[{','.join(str(x) for x in embedding)}]"
 
+        # Note: Using CAST() syntax instead of :: to avoid asyncpg parameter parsing issues
         result = await self.db.execute(
             text("""
                 SELECT
                     content,
                     content_type,
                     source_key,
-                    1 - (embedding <=> :embedding::vector) as score
+                    1 - (embedding <=> CAST(:embedding AS vector)) as score
                 FROM knowledge_embeddings
                 WHERE knowledge_base_id = :kb_id
-                    AND 1 - (embedding <=> :embedding::vector) >= :min_score
-                ORDER BY embedding <=> :embedding::vector
+                    AND 1 - (embedding <=> CAST(:embedding AS vector)) >= :min_score
+                ORDER BY embedding <=> CAST(:embedding AS vector)
                 LIMIT :top_k
             """),
             {

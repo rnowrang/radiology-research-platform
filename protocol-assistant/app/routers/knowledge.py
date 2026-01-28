@@ -139,7 +139,7 @@ async def add_facts(
                 source_reference=fact_req.source_reference,
             )
 
-            # Add embedding for semantic search
+            # Add embedding for semantic search (optional - gracefully skip if pgvector not available)
             try:
                 await embeddings_service.store_embedding(
                     kb_id=kb_id,
@@ -148,7 +148,9 @@ async def add_facts(
                     source_key=f"fact:{fact_req.key}",
                 )
             except Exception as e:
-                logger.warning(f"Failed to store embedding for fact {fact_req.key}: {e}")
+                # Rollback to clear the failed transaction before continuing
+                await db.rollback()
+                logger.debug(f"Embeddings not available for fact {fact_req.key}: {e}")
 
             added_count += 1
 
@@ -277,12 +279,15 @@ async def upload_document(
                 extraction_result = extracted
 
                 # Convert extracted protocol to facts
+                # IMPORTANT: Use field names that match questionnaire protocol_field values
+                # See questionnaire_engine.py for expected field names
                 facts_to_add = []
 
                 if extracted.study_title:
                     facts_to_add.append(("study_title", extracted.study_title))
                 if extracted.principal_investigator:
-                    facts_to_add.append(("principal_investigator", extracted.principal_investigator))
+                    # Store as principal_investigator.name to match questionnaire field
+                    facts_to_add.append(("principal_investigator.name", extracted.principal_investigator))
                 if extracted.study_type:
                     facts_to_add.append(("study_type", extracted.study_type.value if hasattr(extracted.study_type, 'value') else str(extracted.study_type)))
 
@@ -300,7 +305,8 @@ async def upload_document(
                     if extracted.methodology.population:
                         facts_to_add.append(("target_population", extracted.methodology.population))
                     if extracted.methodology.sample_size:
-                        facts_to_add.append(("sample_size", extracted.methodology.sample_size))
+                        # Store as sample_size.total to match questionnaire field
+                        facts_to_add.append(("sample_size.total", extracted.methodology.sample_size))
                     if extracted.methodology.inclusion_criteria:
                         facts_to_add.append(("inclusion_criteria", "\n".join(extracted.methodology.inclusion_criteria)))
                     if extracted.methodology.exclusion_criteria:
@@ -313,19 +319,120 @@ async def upload_document(
                     if extracted.data_collection.variables:
                         facts_to_add.append(("data_variables", "\n".join(extracted.data_collection.variables)))
                     if extracted.data_collection.timeline:
-                        facts_to_add.append(("data_collection_timeline", extracted.data_collection.timeline))
+                        facts_to_add.append(("duration_per_subject", extracted.data_collection.timeline))
 
-                # Risks and benefits
+                # Risks and benefits - use questionnaire field names
                 if extracted.risks_benefits:
                     if extracted.risks_benefits.risks:
                         facts_to_add.append(("risks", "\n".join(extracted.risks_benefits.risks)))
                     if extracted.risks_benefits.benefits:
-                        facts_to_add.append(("benefits", "\n".join(extracted.risks_benefits.benefits)))
+                        benefits_text = "\n".join(extracted.risks_benefits.benefits)
+                        # Store as both benefit types
+                        facts_to_add.append(("benefits_to_subjects", benefits_text))
+                        facts_to_add.append(("benefits_to_society", benefits_text))
                     if extracted.risks_benefits.mitigation:
                         facts_to_add.append(("risk_mitigation", "\n".join(extracted.risks_benefits.mitigation)))
 
                 if extracted.confidentiality_measures:
                     facts_to_add.append(("confidentiality_measures", extracted.confidentiality_measures))
+
+                # Recruitment information
+                if extracted.recruitment:
+                    if extracted.recruitment.sources:
+                        facts_to_add.append(("recruitment.sources", ", ".join(extracted.recruitment.sources)))
+                    if extracted.recruitment.uses_flyers is not None:
+                        facts_to_add.append(("recruitment.flyers_used", str(extracted.recruitment.uses_flyers).lower()))
+                    if extracted.recruitment.uses_verbal is not None:
+                        facts_to_add.append(("recruitment.verbal_used", str(extracted.recruitment.uses_verbal).lower()))
+                    if extracted.recruitment.uses_electronic is not None:
+                        facts_to_add.append(("recruitment.electronic_used", str(extracted.recruitment.uses_electronic).lower()))
+                    if extracted.recruitment.electronic_description:
+                        facts_to_add.append(("recruitment.electronic_description", extracted.recruitment.electronic_description))
+                    if extracted.recruitment.description:
+                        facts_to_add.append(("recruitment.description", extracted.recruitment.description))
+
+                # Consent process
+                if extracted.consent:
+                    if extracted.consent.plan_description:
+                        facts_to_add.append(("consent.plan", extracted.consent.plan_description))
+                    if extracted.consent.location:
+                        facts_to_add.append(("consent.location", extracted.consent.location))
+                    if extracted.consent.timing:
+                        facts_to_add.append(("consent.timing", extracted.consent.timing))
+                    if extracted.consent.documents_required:
+                        facts_to_add.append(("consent.documents_required", ", ".join(extracted.consent.documents_required)))
+                    if extracted.consent.waiver_requested is not None:
+                        facts_to_add.append(("consent.waiver_requested", str(extracted.consent.waiver_requested).lower()))
+                    if extracted.consent.waiver_type:
+                        facts_to_add.append(("consent.waiver_type", extracted.consent.waiver_type))
+                    if extracted.consent.inducement:
+                        facts_to_add.append(("consent.inducement", extracted.consent.inducement))
+
+                # Population details
+                if extracted.population_details:
+                    if extracted.population_details.healthy_count is not None:
+                        facts_to_add.append(("population.healthy_llu", str(extracted.population_details.healthy_count)))
+                    if extracted.population_details.patient_count is not None:
+                        facts_to_add.append(("population.patients_llu", str(extracted.population_details.patient_count)))
+                    if extracted.population_details.total_count is not None:
+                        facts_to_add.append(("population.total_llu", str(extracted.population_details.total_count)))
+                    if extracted.population_details.healthy_age_range:
+                        facts_to_add.append(("population.healthy_age_range", extracted.population_details.healthy_age_range))
+                    if extracted.population_details.patient_age_range:
+                        facts_to_add.append(("population.patients_age_range", extracted.population_details.patient_age_range))
+                    if extracted.population_details.overall_age_range:
+                        facts_to_add.append(("population.age_range", extracted.population_details.overall_age_range))
+                    if extracted.population_details.vulnerable_populations:
+                        facts_to_add.append(("population.vulnerable", ", ".join(extracted.population_details.vulnerable_populations)))
+                    if extracted.population_details.special_populations:
+                        facts_to_add.append(("population.special", ", ".join(extracted.population_details.special_populations)))
+
+                # Procedures
+                if extracted.procedures:
+                    if extracted.procedures.location:
+                        facts_to_add.append(("methods.location", extracted.procedures.location))
+                    if extracted.procedures.minimal_risk:
+                        facts_to_add.append(("methods.procedures_minimal", ", ".join(extracted.procedures.minimal_risk)))
+                    if extracted.procedures.greater_risk:
+                        facts_to_add.append(("methods.procedures_greater", ", ".join(extracted.procedures.greater_risk)))
+                    if extracted.procedures.safety_monitoring:
+                        facts_to_add.append(("methods.safety_monitoring", extracted.procedures.safety_monitoring))
+
+                # Data security
+                if extracted.data_security:
+                    if extracted.data_security.electronic_collection is not None:
+                        facts_to_add.append(("confidentiality.electronic_collection", str(extracted.data_security.electronic_collection).lower()))
+                    if extracted.data_security.electronic_protections:
+                        facts_to_add.append(("confidentiality.electronic_protections", ", ".join(extracted.data_security.electronic_protections)))
+                    if extracted.data_security.hardcopy_stored is not None:
+                        facts_to_add.append(("confidentiality.hardcopy_stored", str(extracted.data_security.hardcopy_stored).lower()))
+                    if extracted.data_security.hardcopy_storage:
+                        facts_to_add.append(("confidentiality.hardcopy_storage", ", ".join(extracted.data_security.hardcopy_storage)))
+                    if extracted.data_security.collecting_health_info is not None:
+                        facts_to_add.append(("confidentiality.collecting_health_info", str(extracted.data_security.collecting_health_info).lower()))
+                    if extracted.data_security.phi_shared_externally is not None:
+                        facts_to_add.append(("confidentiality.phi_shared", str(extracted.data_security.phi_shared_externally).lower()))
+                    if extracted.data_security.phi_shared_with:
+                        facts_to_add.append(("confidentiality.phi_shared_with", ", ".join(extracted.data_security.phi_shared_with)))
+
+                # Regulatory status
+                if extracted.regulatory:
+                    if extracted.regulatory.fda_regulated is not None:
+                        facts_to_add.append(("study.fda_regulations_apply", str(extracted.regulatory.fda_regulated).lower()))
+                    if extracted.regulatory.ind_number:
+                        facts_to_add.append(("study.ind_number", extracted.regulatory.ind_number))
+                    if extracted.regulatory.ide_number:
+                        facts_to_add.append(("study.ide_number", extracted.regulatory.ide_number))
+                    if extracted.regulatory.uses_ionizing_radiation is not None:
+                        facts_to_add.append(("study.ionizing_radiation", str(extracted.regulatory.uses_ionizing_radiation).lower()))
+                    if extracted.regulatory.involves_infectious_agents is not None:
+                        facts_to_add.append(("study.ibc_infectious", str(extracted.regulatory.involves_infectious_agents).lower()))
+                    if extracted.regulatory.involves_recombinant_dna is not None:
+                        facts_to_add.append(("study.ibc_recombinant", str(extracted.regulatory.involves_recombinant_dna).lower()))
+                    if extracted.regulatory.involves_hazardous_materials is not None:
+                        facts_to_add.append(("study.ibc_hazardous", str(extracted.regulatory.involves_hazardous_materials).lower()))
+                    if extracted.regulatory.is_student_project is not None:
+                        facts_to_add.append(("study.is_student_project", str(extracted.regulatory.is_student_project).lower()))
 
                 # Add all facts to knowledge base
                 for key, value in facts_to_add:

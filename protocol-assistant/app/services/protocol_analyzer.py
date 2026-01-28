@@ -44,30 +44,107 @@ Document content:
 
 Extract the following information into a JSON object. Be thorough and include ALL relevant information from the document:
 
+## BASIC STUDY INFORMATION
 - study_title: The complete title of the study
 - principal_investigator: Full name and credentials of the PI if mentioned
 - study_type: One of: retrospective, prospective, clinical_trial, quality_improvement, educational, other
+
+## OBJECTIVES
 - objectives:
   - primary: The COMPLETE primary study objective with full description (copy verbatim if possible)
   - secondary: List ALL secondary objectives mentioned (each as a complete statement)
+
+## METHODOLOGY
 - methodology:
   - design: FULL study design description including study type, phases, arms, randomization, blinding, etc.
   - population: Complete description of the target population including demographics, clinical characteristics
   - sample_size: Sample size with justification and power analysis if mentioned
   - inclusion_criteria: List EVERY inclusion criterion mentioned (do not summarize)
   - exclusion_criteria: List EVERY exclusion criterion mentioned (do not summarize)
+
+## DATA COLLECTION
 - data_collection:
   - sources: All data sources (medical records, questionnaires, lab values, imaging, etc.)
   - variables: List ALL variables to be collected (primary endpoints, secondary endpoints, safety measures, demographics)
   - timeline: Complete data collection timeline with visit schedules and time points
+
+## RISKS AND BENEFITS
 - risks_benefits:
   - risks: List EVERY risk mentioned including physical, psychological, social, and privacy risks
   - benefits: List ALL potential benefits to participants and society
   - mitigation: All risk mitigation strategies and safety monitoring procedures
+
+## CONFIDENTIALITY
 - confidentiality_measures: Complete description of data protection, storage, access controls, and privacy safeguards
+
+## RECRUITMENT (new section)
+- recruitment:
+  - sources: List of recruitment sources (e.g., "clinic", "physician referral", "advertisements", "patient registry", "research database", "community outreach")
+  - uses_flyers: Boolean - true if recruitment flyers/posters are mentioned
+  - uses_verbal: Boolean - true if verbal/in-person recruitment is mentioned
+  - uses_electronic: Boolean - true if electronic recruitment (email, website, social media) is mentioned
+  - electronic_description: Description of electronic recruitment methods if used
+  - description: Overall recruitment plan narrative
+
+## CONSENT PROCESS (new section)
+- consent:
+  - plan_description: Full description of how informed consent will be obtained
+  - location: Where consent will be obtained (clinic, research office, phone, etc.)
+  - timing: When consent occurs relative to enrollment (before, at first visit, etc.)
+  - documents_required: List of consent documents (e.g., "informed consent form", "HIPAA authorization", "assent form")
+  - waiver_requested: Boolean - true if waiver of consent/documentation is requested
+  - waiver_type: Type of waiver if requested (full waiver, waiver of documentation, partial waiver)
+  - inducement: Description of subject compensation or payment if mentioned
+
+## POPULATION DETAILS (new section)
+- population_details:
+  - healthy_count: Number of healthy volunteers if specified (integer)
+  - patient_count: Number of patients if specified (integer)
+  - total_count: Total sample size (integer)
+  - healthy_age_range: Age range for healthy volunteers (e.g., "18-65 years")
+  - patient_age_range: Age range for patients (e.g., "18 and older")
+  - overall_age_range: Overall age range if not broken down
+  - vulnerable_populations: List any vulnerable populations included (e.g., "children", "pregnant women", "prisoners", "cognitively impaired", "economically disadvantaged")
+  - special_populations: List any special populations (e.g., "LLU employees", "LLU students", "non-English speakers")
+
+## PROCEDURES (new section)
+- procedures:
+  - location: Where study procedures will be performed (specific clinic, hospital, research center)
+  - minimal_risk: List of minimal risk procedures (e.g., "surveys", "questionnaires", "venipuncture", "urine collection", "saliva collection", "vital signs", "height/weight")
+  - greater_risk: List of greater than minimal risk procedures (e.g., "MRI with contrast", "biopsy", "investigational drug", "experimental device")
+  - safety_monitoring: Safety monitoring plan (e.g., "PI monitoring", "DSMB", "sponsor safety committee", "none required")
+
+## DATA SECURITY (new section)
+- data_security:
+  - electronic_collection: Boolean - true if data collected electronically (REDCap, database, etc.)
+  - electronic_protections: List of electronic data protections (e.g., "password protection", "encryption", "firewall", "VPN", "role-based access", "audit trail")
+  - hardcopy_stored: Boolean - true if hardcopy/paper data is stored
+  - hardcopy_storage: List of hardcopy storage methods (e.g., "locked cabinet", "locked office", "restricted access area")
+  - collecting_health_info: Boolean - true if collecting PHI/protected health information
+  - phi_shared_externally: Boolean - true if PHI shared outside institution
+  - phi_shared_with: List who PHI is shared with (e.g., "sponsor", "FDA", "DSMB", "collaborating institution")
+
+## REGULATORY STATUS (new section)
+- regulatory:
+  - fda_regulated: Boolean - true if FDA regulations apply (drug, device, biologic)
+  - ind_number: IND number if mentioned
+  - ide_number: IDE number if mentioned
+  - uses_ionizing_radiation: Boolean - true if ionizing radiation used (X-ray, CT, PET, nuclear medicine)
+  - involves_infectious_agents: Boolean - true if infectious agents/select agents used
+  - involves_recombinant_dna: Boolean - true if recombinant DNA used
+  - involves_hazardous_materials: Boolean - true if hazardous chemicals/materials used
+  - is_student_project: Boolean - true if this is a student research project (thesis, dissertation, class project)
+
+## QUALITY ASSESSMENT
 - missing_sections: List any IRB-required sections that appear to be missing or incomplete
 - quality_score: Score from 0-100 based on completeness and clarity (be realistic - most drafts score 40-70)
 - recommendations: Specific, actionable recommendations for improvement
+
+IMPORTANT NOTES:
+1. For boolean fields, only set to true if there is clear evidence in the document. Set to null if not mentioned.
+2. For list fields, include all items mentioned even if they seem redundant.
+3. For optional string fields, include full text rather than summarizing.
+4. If a section is not applicable (e.g., recruitment for retrospective studies), you may still extract what is mentioned or leave null.
 
 Respond with valid JSON only."""
 

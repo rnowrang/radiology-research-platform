@@ -55,6 +55,76 @@ class ExtractedRisksBenefits(BaseModel):
     mitigation: list[str] = Field(default_factory=list, description="Risk mitigation strategies")
 
 
+class ExtractedRecruitment(BaseModel):
+    """Recruitment plan extracted from protocol."""
+
+    sources: list[str] = Field(default_factory=list, description="Recruitment sources (clinic, ads, registry, etc.)")
+    uses_flyers: Optional[bool] = Field(default=None, description="Whether recruitment flyers are used")
+    uses_verbal: Optional[bool] = Field(default=None, description="Whether verbal recruitment is used")
+    uses_electronic: Optional[bool] = Field(default=None, description="Whether electronic recruitment (email, web) is used")
+    electronic_description: Optional[str] = Field(default=None, description="Description of electronic recruitment methods")
+    description: Optional[str] = Field(default=None, description="Overall recruitment plan description")
+
+
+class ExtractedConsent(BaseModel):
+    """Consent process extracted from protocol."""
+
+    plan_description: Optional[str] = Field(default=None, description="Description of the consent process")
+    location: Optional[str] = Field(default=None, description="Where consent will be obtained")
+    timing: Optional[str] = Field(default=None, description="When consent will be obtained (before enrollment, at visit, etc.)")
+    documents_required: list[str] = Field(default_factory=list, description="Required consent documents (ICF, HIPAA, etc.)")
+    waiver_requested: Optional[bool] = Field(default=None, description="Whether consent waiver is requested")
+    waiver_type: Optional[str] = Field(default=None, description="Type of waiver if requested (full, partial, documentation)")
+    inducement: Optional[str] = Field(default=None, description="Subject compensation or inducement description")
+
+
+class ExtractedPopulationDetails(BaseModel):
+    """Detailed population breakdown extracted from protocol."""
+
+    healthy_count: Optional[int] = Field(default=None, description="Number of healthy volunteers")
+    patient_count: Optional[int] = Field(default=None, description="Number of patients")
+    total_count: Optional[int] = Field(default=None, description="Total number of subjects")
+    healthy_age_range: Optional[str] = Field(default=None, description="Age range for healthy volunteers")
+    patient_age_range: Optional[str] = Field(default=None, description="Age range for patients")
+    overall_age_range: Optional[str] = Field(default=None, description="Overall age range")
+    vulnerable_populations: list[str] = Field(default_factory=list, description="Vulnerable populations (children, prisoners, pregnant, etc.)")
+    special_populations: list[str] = Field(default_factory=list, description="Special populations (employees, students, etc.)")
+
+
+class ExtractedProcedures(BaseModel):
+    """Study procedures extracted from protocol."""
+
+    location: Optional[str] = Field(default=None, description="Where study procedures will be performed")
+    minimal_risk: list[str] = Field(default_factory=list, description="Minimal risk procedures (surveys, blood draw, etc.)")
+    greater_risk: list[str] = Field(default_factory=list, description="Greater than minimal risk procedures")
+    safety_monitoring: Optional[str] = Field(default=None, description="Safety monitoring plan (DSMB, PI, sponsor, etc.)")
+
+
+class ExtractedDataSecurity(BaseModel):
+    """Data security details extracted from protocol."""
+
+    electronic_collection: Optional[bool] = Field(default=None, description="Whether data is collected electronically")
+    electronic_protections: list[str] = Field(default_factory=list, description="Electronic data protections (encryption, passwords, etc.)")
+    hardcopy_stored: Optional[bool] = Field(default=None, description="Whether hardcopy data is stored")
+    hardcopy_storage: list[str] = Field(default_factory=list, description="Hardcopy storage methods (locked cabinet, etc.)")
+    collecting_health_info: Optional[bool] = Field(default=None, description="Whether PHI/health information is collected")
+    phi_shared_externally: Optional[bool] = Field(default=None, description="Whether PHI is shared with external parties")
+    phi_shared_with: list[str] = Field(default_factory=list, description="Entities PHI is shared with (sponsor, FDA, etc.)")
+
+
+class ExtractedRegulatory(BaseModel):
+    """Regulatory status extracted from protocol."""
+
+    fda_regulated: Optional[bool] = Field(default=None, description="Whether FDA regulations apply")
+    ind_number: Optional[str] = Field(default=None, description="IND number if applicable")
+    ide_number: Optional[str] = Field(default=None, description="IDE number if applicable")
+    uses_ionizing_radiation: Optional[bool] = Field(default=None, description="Whether ionizing radiation is used")
+    involves_infectious_agents: Optional[bool] = Field(default=None, description="Whether infectious agents are used")
+    involves_recombinant_dna: Optional[bool] = Field(default=None, description="Whether recombinant DNA is used")
+    involves_hazardous_materials: Optional[bool] = Field(default=None, description="Whether hazardous materials are used")
+    is_student_project: Optional[bool] = Field(default=None, description="Whether this is a student research project")
+
+
 class ExtractedProtocol(BaseModel):
     """Complete extracted protocol information."""
 
@@ -71,6 +141,25 @@ class ExtractedProtocol(BaseModel):
     risks_benefits: ExtractedRisksBenefits = Field(..., description="Risks and benefits")
     confidentiality_measures: Optional[str] = Field(
         default=None, description="Data confidentiality measures"
+    )
+    # New enhanced extraction fields
+    recruitment: Optional[ExtractedRecruitment] = Field(
+        default=None, description="Recruitment plan details"
+    )
+    consent: Optional[ExtractedConsent] = Field(
+        default=None, description="Consent process details"
+    )
+    population_details: Optional[ExtractedPopulationDetails] = Field(
+        default=None, description="Detailed population breakdown"
+    )
+    procedures: Optional[ExtractedProcedures] = Field(
+        default=None, description="Study procedures details"
+    )
+    data_security: Optional[ExtractedDataSecurity] = Field(
+        default=None, description="Data security details"
+    )
+    regulatory: Optional[ExtractedRegulatory] = Field(
+        default=None, description="Regulatory status details"
     )
     missing_sections: list[str] = Field(
         default_factory=list, description="Sections that appear to be missing or incomplete"
