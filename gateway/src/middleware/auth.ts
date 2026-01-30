@@ -66,6 +66,8 @@ export const authenticate = async (
     // Fall back to JWT authentication
     const authHeader = req.headers.authorization;
     const cookieToken = req.cookies?.access_token;
+    // Support token in query params for SSE connections (EventSource can't set headers)
+    const queryToken = req.query.token as string | undefined;
 
     let token: string | undefined;
 
@@ -73,6 +75,8 @@ export const authenticate = async (
       token = authHeader.substring(7);
     } else if (cookieToken) {
       token = cookieToken;
+    } else if (queryToken) {
+      token = queryToken;
     }
 
     if (!token) {

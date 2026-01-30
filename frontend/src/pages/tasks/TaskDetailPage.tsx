@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Target,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,12 +65,20 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/stores/authStore';
 import { tasksApi, filesApi } from '@/lib/api';
+import { protocolAssistantApi } from '@/lib/protocolAssistantApi';
 import { UploadDropzone } from '@/components/tasks/UploadDropzone';
 import { FileCard, type FileCardFile } from '@/components/files/FileCard';
 import { FilePreviewModal, type FilePreviewModalFile } from '@/components/files/FilePreviewModal';
+import { FormFillPreviewModal } from '@/components/protocol-assistant/FormFillPreviewModal';
 
 // Task status types
 type TaskStatus =
@@ -204,6 +213,9 @@ export function TaskDetailPage() {
   // Activity log collapsible state
   const [activityLogOpen, setActivityLogOpen] = useState(false);
 
+  // Form fill modal state
+  const [showFormFillModal, setShowFormFillModal] = useState(false);
+
   // Fetch task details
   const { data: task, isLoading: taskLoading, error: taskError } = useQuery({
     queryKey: ['task', taskId],
@@ -223,6 +235,23 @@ export function TaskDetailPage() {
     },
     enabled: !!taskId && task?.task_type === 'document_upload',
   });
+
+  // Fetch KB stats for form pre-fill readiness check
+  const { data: kbStats } = useQuery({
+    queryKey: ['kbStats', task?.project_id],
+    queryFn: () => protocolAssistantApi.getKnowledgeStats(task!.project_id!),
+    enabled: !!task?.project_id && task?.task_type === 'form_completion',
+  });
+
+  // Fetch form templates for pre-fill
+  const { data: formTaskData } = useQuery({
+    queryKey: ['projectFormTask', task?.project_id],
+    queryFn: () => protocolAssistantApi.getProjectFormTask(task!.project_id!),
+    enabled: !!task?.project_id && task?.task_type === 'form_completion',
+  });
+
+  // Check if KB is ready for pre-fill (>30% complete or >10 facts)
+  const kbReady = kbStats && (kbStats.completion_percentage >= 30 || kbStats.total_facts >= 10);
 
   // Mutations
   const startTaskMutation = useMutation({
@@ -799,17 +828,65 @@ export function TaskDetailPage() {
               </CardHeader>
               <CardContent>
                 {hasForm ? (
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">{task.form_title || 'Form'}</p>
-                      <p className="text-sm text-muted-foreground">Form ID: {task.form_instance_id}</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-lg border">
+                      <div>
+                        <p className="font-medium">{task.form_title || 'Form'}</p>
+                        <p className="text-sm text-muted-foreground">Form ID: {task.form_instance_id}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {/* Pre-fill from KB button */}
+                        {task.project_id && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  disabled={!kbReady}
+                                  onClick={() => setShowFormFillModal(true)}
+                                >
+                                  <Sparkles className="h-4 w-4 mr-2 text-purple-600" />
+                                  Pre-fill from KB
+                                </Button>
+                              </TooltipTrigger>
+                              {!kbReady && (
+                                <TooltipContent side="top">
+                                  <p>Complete the Research Intelligence questionnaire first to enable pre-fill</p>
+                                  {kbStats && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Current: {kbStats.total_facts} facts, {Math.round(kbStats.completion_percentage)}% complete
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        <Button asChild>
+                          <Link to={`/forms/${task.form_instance_id}`}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Open Form
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
-                    <Button asChild>
-                      <Link to={`/forms/${task.form_instance_id}`}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Open Form
-                      </Link>
-                    </Button>
+
+                    {/* KB readiness info banner */}
+                    {task.project_id && kbStats && (
+                      <div className={`p-3 rounded-lg ${kbReady ? 'bg-purple-50 border border-purple-200' : 'bg-muted/50 border border-muted'}`}>
+                        <div className="flex items-center gap-2">
+                          <Sparkles className={`h-4 w-4 ${kbReady ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                          <span className={`text-sm font-medium ${kbReady ? 'text-purple-900' : 'text-muted-foreground'}`}>
+                            Knowledge Base: {kbStats.total_facts} facts ({Math.round(kbStats.completion_percentage)}% complete)
+                          </span>
+                        </div>
+                        {!kbReady && (
+                          <p className="text-xs text-muted-foreground mt-1 ml-6">
+                            Complete the Research Intelligence questionnaire to enable AI-powered form pre-fill
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -1170,6 +1247,18 @@ export function TaskDetailPage() {
           setPreviewFile(null);
         }}
       />
+
+      {/* Form Fill Preview Modal */}
+      {showFormFillModal && task.project_id && formTaskData && (
+        <FormFillPreviewModal
+          open={showFormFillModal}
+          onOpenChange={setShowFormFillModal}
+          projectId={task.project_id}
+          templateId={formTaskData.task?.task_definition?.template_id || formTaskData.available_templates[0]?.id || 1}
+          templateName={formTaskData.task?.task_definition?.name || task.form_title || 'IRB Form'}
+          formId={task.form_instance_id}
+        />
+      )}
     </div>
   );
 }

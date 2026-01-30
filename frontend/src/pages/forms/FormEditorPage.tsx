@@ -19,6 +19,7 @@ import {
   ChevronsUpDown,
   AlertTriangle,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,7 @@ import { formsApi } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 import { PdfPreviewModal } from '@/components/forms/PdfPreviewModal';
 import { ConflictReviewBanner } from '@/components/forms/ConflictReviewBanner';
+import { FormFillPreviewModal } from '@/components/protocol-assistant/FormFillPreviewModal';
 import { cn } from '@/lib/utils';
 import type { FormInstance, FormField as FormFieldType, FormSchema } from '@/types';
 
@@ -143,6 +145,7 @@ export function FormEditorPage() {
   const [versionLabel, setVersionLabel] = useState('');
   const [creatingVersion, setCreatingVersion] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [showAIFillModal, setShowAIFillModal] = useState(false);
 
   // Parse conflict field IDs from URL query params
   const prefillConflicts = useMemo(() => {
@@ -1458,6 +1461,16 @@ export function FormEditorPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {form?.projectId && isEditable && (
+            <Button
+              variant="outline"
+              onClick={() => setShowAIFillModal(true)}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              AI Fill
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setShowVersionModal(true)}>
             <History className="mr-2 h-4 w-4" />
             Save Version
@@ -1606,6 +1619,24 @@ export function FormEditorPage() {
           isOpen={showPdfPreview}
           onClose={() => setShowPdfPreview(false)}
         />
+
+        {/* AI Fill Modal */}
+        {form?.projectId && form?.templateId && (
+          <FormFillPreviewModal
+            open={showAIFillModal}
+            onOpenChange={(open) => {
+              setShowAIFillModal(open);
+              if (!open) {
+                // Reload the form after filling
+                loadForm(parseInt(id!, 10));
+              }
+            }}
+            projectId={form.projectId}
+            templateId={form.templateId}
+            templateName={form.template_name || form.title || 'Form'}
+            formId={parseInt(id!, 10)}
+          />
+        )}
       </div>
     </>
   );

@@ -650,7 +650,7 @@ export const protocolAssistantProxy = {
   fillForm: async (
     projectId: string,
     templateId: number,
-    options: { fill_mode?: string; overwrite_existing?: boolean } = {},
+    options: { fill_mode?: string; overwrite_existing?: boolean; form_id?: number; create_if_missing?: boolean } = {},
     user: string | UserContext
   ): Promise<AxiosResponse> => {
     const userContext = typeof user === 'string' ? { userId: user, role: 'researcher' } : user;

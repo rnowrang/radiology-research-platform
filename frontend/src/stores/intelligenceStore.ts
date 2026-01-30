@@ -73,6 +73,7 @@ export interface GeneratedDocument {
   id: string;
   type: string;
   name: string;
+  content?: string;
   generatedAt: string;
   downloadUrl?: string;
 }

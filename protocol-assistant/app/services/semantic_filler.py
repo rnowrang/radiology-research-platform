@@ -120,6 +120,8 @@ class SemanticFormFiller:
                 )
             except Exception as e:
                 logger.warning(f"Embedding search failed for {field_id}: {e}")
+                # Rollback to clear any failed transaction state
+                await self.db.rollback()
                 matches = []
 
             # Also check direct facts by field key patterns
@@ -251,7 +253,10 @@ class SemanticFormFiller:
                 top_k=3,
                 min_score=0.5,
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Embedding search failed for {field_id}: {e}")
+            # Rollback to clear any failed transaction state
+            await self.db.rollback()
             matches = []
 
         facts = await kb_service.get_facts(kb_id)
@@ -362,6 +367,36 @@ class SemanticFormFiller:
                 return None
         return current
 
+    # Common abbreviation mappings for field matching
+    FIELD_SYNONYMS = {
+        "pi": "principal_investigator",
+        "principal_investigator": "pi",
+        "ext": "extension",
+        "extension": "ext",
+        "dept": "department",
+        "department": "dept",
+        "fax": "fax_number",
+        "email": "e_mail",
+        "e_mail": "email",
+        "name": "full_name",
+        "title": "protocol_title",
+        "protocol_title": "study_title",
+        "study_title": "title",
+    }
+
+    # Field ID to fact key mappings for common mismatches
+    FIELD_TO_FACT_MAPPINGS = {
+        "investigator.pi_name": ["principal_investigator.name", "principal_investigator_name", "pi_name"],
+        "investigator.pi_email": ["principal_investigator.email", "principal_investigator_email", "pi_email"],
+        "investigator.pi_dept": ["principal_investigator.department", "principal_investigator_department", "department"],
+        "investigator.pi_ext": ["principal_investigator.extension", "principal_investigator_ext"],
+        "protocol.title": ["study_title", "title", "protocol_title"],
+        "project.start_date": ["start_date", "study_start_date"],
+        "project.end_date": ["end_date", "study_end_date"],
+        "funding.extramural_sponsor": ["sponsor", "funding_source", "sponsor_name"],
+        "study.phase": ["study_phase", "phase"],
+    }
+
     def _find_fact_match(
         self,
         field_id: str,
@@ -380,10 +415,20 @@ class SemanticFormFiller:
         """
         # Normalize field identifiers for matching
         field_id_normalized = field_id.lower().replace(".", "_").replace("-", "_")
-        field_label_normalized = field_label.lower().replace(" ", "_")
+        field_label_normalized = field_label.lower().replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
+
+        # Check explicit mappings first
+        mapped_keys = self.FIELD_TO_FACT_MAPPINGS.get(field_id.lower(), [])
 
         for fact in facts:
             fact_key = fact.key.lower().replace(".", "_").replace("-", "_")
+            fact_key_original = fact.key.lower()
+
+            # Check explicit mappings
+            for mapped in mapped_keys:
+                mapped_normalized = mapped.lower().replace(".", "_")
+                if fact_key == mapped_normalized or fact_key_original == mapped:
+                    return (fact.value, fact.confidence)
 
             # Direct key match
             if fact_key == field_id_normalized:
@@ -397,7 +442,42 @@ class SemanticFormFiller:
             if field_id_normalized in fact_key or fact_key in field_id_normalized:
                 return (fact.value, fact.confidence * 0.8)  # Lower confidence for partial
 
+            # Check with synonyms expansion
+            expanded_field = self._expand_synonyms(field_id_normalized)
+            expanded_fact = self._expand_synonyms(fact_key)
+            if expanded_field == expanded_fact:
+                return (fact.value, fact.confidence * 0.9)
+
+            # Token overlap matching - if significant words overlap
+            field_tokens = set(field_id_normalized.split("_")) - {"", "the", "a", "an", "of", "for", "to"}
+            fact_tokens = set(fact_key.split("_")) - {"", "the", "a", "an", "of", "for", "to", "q"}
+
+            if len(field_tokens) >= 2 and len(fact_tokens) >= 2:
+                overlap = field_tokens & fact_tokens
+                if len(overlap) >= 2:
+                    # Multiple word overlap suggests a match
+                    return (fact.value, fact.confidence * 0.75)
+
         return None
+
+    def _expand_synonyms(self, key: str) -> str:
+        """Expand abbreviations in a key using synonym mappings.
+
+        Args:
+            key: Normalized key string
+
+        Returns:
+            Key with abbreviations expanded
+        """
+        parts = key.split("_")
+        expanded = []
+        for part in parts:
+            # Replace abbreviations with full form
+            if part in self.FIELD_SYNONYMS:
+                expanded.append(self.FIELD_SYNONYMS[part])
+            else:
+                expanded.append(part)
+        return "_".join(expanded)
 
     def _find_wizard_match(
         self,

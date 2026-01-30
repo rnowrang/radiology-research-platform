@@ -532,11 +532,19 @@ class FormFillPreview(BaseModel):
 class FillFormRequest(BaseModel):
     """Request to fill a form."""
     template_id: int
+    form_id: Optional[int] = Field(
+        default=None,
+        description="Existing form ID to fill. If not provided and create_if_missing is true, a new form will be created."
+    )
     fill_mode: str = Field(
         default="all",
         description="'all', 'high_confidence_only', or 'preview'"
     )
     overwrite_existing: bool = False
+    create_if_missing: bool = Field(
+        default=False,
+        description="If true and form_id not provided, create a new form from the template."
+    )
 
 
 # ============================================================================

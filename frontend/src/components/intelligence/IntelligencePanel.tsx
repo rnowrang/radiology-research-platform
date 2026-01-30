@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useIntelligenceStore, IntelligenceMode } from '@/stores/intelligenceStore';
 import * as intelligenceApi from '@/lib/intelligenceApi';
 import { ModeSelector } from './ModeSelector';
@@ -17,11 +17,8 @@ import { ChatMode } from './ChatMode';
 import { GuidedMode } from './GuidedMode';
 import { DocumentMode } from './DocumentMode';
 import { ReviewMode } from './ReviewMode';
-import { IntelligenceSidebar } from './IntelligenceSidebar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, PanelLeftClose, PanelLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface IntelligencePanelProps {
   projectId: string;
@@ -34,7 +31,6 @@ export function IntelligencePanel({
   initialMode = 'guided',
   onComplete,
 }: IntelligencePanelProps) {
-  const queryClient = useQueryClient();
   const [sessionReady, setSessionReady] = useState(false);
 
   // Store state
@@ -46,13 +42,7 @@ export function IntelligencePanel({
     switchMode,
     initQuestions,
     setCoherenceStatus,
-    isLoading,
     error,
-    setLoading,
-    setError,
-    sidebarOpen,
-    setSidebarOpen,
-    getProgress,
   } = useIntelligenceStore();
 
   // Initialize project context
@@ -124,7 +114,8 @@ export function IntelligencePanel({
   // Update store with coherence status
   useEffect(() => {
     if (coherenceQuery.data) {
-      const issues = coherenceQuery.data.topIssues.map((desc, i) => ({
+      const topIssues = coherenceQuery.data.topIssues || [];
+      const issues = topIssues.map((desc: string, i: number) => ({
         id: `issue_${i}`,
         ruleId: 'unknown',
         ruleName: 'Issue',
@@ -136,9 +127,9 @@ export function IntelligencePanel({
       }));
 
       setCoherenceStatus(
-        coherenceQuery.data.coherenceScore,
+        coherenceQuery.data.coherenceScore ?? 100,
         issues,
-        coherenceQuery.data.lastCheckedAt
+        coherenceQuery.data.lastCheckedAt || new Date().toISOString()
       );
     }
   }, [coherenceQuery.data, setCoherenceStatus]);
@@ -200,85 +191,47 @@ export function IntelligencePanel({
     );
   }
 
-  const progress = getProgress();
-
+  // All modes have their own integrated sidebars, so use a simple layout
   return (
-    <div className="flex h-full min-h-[600px] bg-background">
-      {/* Sidebar */}
-      <div
-        className={cn(
-          'border-r bg-muted/30 transition-all duration-300',
-          sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
-        )}
-      >
-        {sidebarOpen && (
-          <IntelligenceSidebar
-            projectId={projectId}
-            currentMode={currentMode}
-            progress={progress}
-            coherenceScore={coherenceQuery.data?.coherenceScore ?? 100}
-            onModeChange={handleModeChange}
-          />
-        )}
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      {/* Mode Selector Header */}
+      <div className="border-b px-4 py-2 flex items-center justify-end bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+        <ModeSelector currentMode={currentMode} onModeChange={handleModeChange} />
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="border-b px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="h-8 w-8"
-            >
-              {sidebarOpen ? (
-                <PanelLeftClose className="h-4 w-4" />
-              ) : (
-                <PanelLeft className="h-4 w-4" />
-              )}
-            </Button>
-            <h2 className="text-lg font-semibold">Research Intelligence Assistant</h2>
-          </div>
+      {/* Mode Content - fills remaining space */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {currentMode === 'guided' && (
+          <GuidedMode
+            projectId={projectId}
+            sessionId={sessionId || ''}
+            onComplete={onComplete}
+            onSwitchToChat={() => handleModeChange('chat')}
+          />
+        )}
 
-          <ModeSelector currentMode={currentMode} onModeChange={handleModeChange} />
-        </div>
+        {currentMode === 'chat' && sessionId && (
+          <ChatMode
+            projectId={projectId}
+            sessionId={sessionId}
+            onSwitchToGuided={() => handleModeChange('guided')}
+          />
+        )}
 
-        {/* Mode Content */}
-        <div className="flex-1 overflow-hidden">
-          {currentMode === 'chat' && sessionId && (
-            <ChatMode
-              projectId={projectId}
-              sessionId={sessionId}
-              onSwitchToGuided={() => handleModeChange('guided')}
-            />
-          )}
+        {currentMode === 'document' && (
+          <DocumentMode
+            projectId={projectId}
+            sessionId={sessionId || ''}
+          />
+        )}
 
-          {currentMode === 'guided' && (
-            <GuidedMode
-              projectId={projectId}
-              sessionId={sessionId || ''}
-              onComplete={onComplete}
-              onSwitchToChat={() => handleModeChange('chat')}
-            />
-          )}
-
-          {currentMode === 'document' && (
-            <DocumentMode
-              projectId={projectId}
-              sessionId={sessionId || ''}
-            />
-          )}
-
-          {currentMode === 'review' && (
-            <ReviewMode
-              projectId={projectId}
-              coherenceStatus={coherenceQuery.data}
-              onRefresh={() => coherenceQuery.refetch()}
-            />
-          )}
-        </div>
+        {currentMode === 'review' && (
+          <ReviewMode
+            projectId={projectId}
+            coherenceStatus={coherenceQuery.data}
+            onRefresh={() => coherenceQuery.refetch()}
+          />
+        )}
       </div>
     </div>
   );

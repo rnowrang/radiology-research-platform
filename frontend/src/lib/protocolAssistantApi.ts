@@ -329,15 +329,25 @@ export interface FilledField {
   evidence?: string;
 }
 
-export interface FillFormResponse {
-  success: boolean;
-  form_id: number;
+export interface FillFormResult {
+  template_id: number;
+  template_name?: string;
   filled_fields: FilledField[];
-  skipped_fields: string[];
+  unfilled_fields: string[];
   fill_rate: number;
   high_confidence_count: number;
   medium_confidence_count: number;
   low_confidence_count: number;
+  needs_review_count: number;
+  suggested_wizard_questions: string[];
+}
+
+export interface FillFormResponse {
+  success: boolean;
+  form_id: number;
+  template_id: number;
+  fill_result: FillFormResult;
+  message: string;
 }
 
 export interface FormFillPreviewResponse {

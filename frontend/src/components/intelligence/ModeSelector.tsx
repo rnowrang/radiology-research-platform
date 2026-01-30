@@ -69,7 +69,7 @@ export function ModeSelector({
       onValueChange={(value) => onModeChange(value as IntelligenceMode)}
       className={className}
     >
-      <TabsList className="grid grid-cols-4 w-[400px]">
+      <TabsList className="grid grid-cols-4 w-[340px]">
         {modes.map(({ value, label, icon: Icon }) => (
           <TabsTrigger
             key={value}

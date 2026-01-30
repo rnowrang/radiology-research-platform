@@ -104,6 +104,7 @@ services:
       SECRET_KEY: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-service-key}
       GATEWAY_URL: http://gateway:3000
+      FORMS_SERVICE_URL: http://forms-service:8000
       STORAGE_PATH: /app/storage
       # LLM Configuration
       DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-anthropic}

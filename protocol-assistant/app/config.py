@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     # Feature Flags
     ENABLE_RAG: bool = True
     ENABLE_AB_TESTING: bool = True
+    ENABLE_LLM_FORM_FILLER: bool = True  # Use LLM for holistic form filling
 
     @field_validator("LLM_TASK_ROUTING", mode="before")
     @classmethod

@@ -41,12 +41,16 @@ async def _get_session_protocol(
     db: AsyncSession,
 ) -> tuple[ExtractedProtocol, dict]:
     """
-    Retrieve and validate protocol data from a session.
+    Retrieve and validate protocol data from a session or Knowledge Base.
+
+    First checks the session for extracted_protocol.
+    If not found, builds protocol from the project's Knowledge Base facts.
 
     Returns tuple of (ExtractedProtocol, collected_answers).
-    Raises HTTPException if session not found or no protocol data.
+    Raises HTTPException if session not found or no protocol data available.
     """
     from app.models.chat import ChatSession
+    from app.services.knowledge_base import get_knowledge_base_service
     from sqlalchemy import select
 
     result = await db.execute(
@@ -60,25 +64,259 @@ async def _get_session_protocol(
             detail=f"Session {session_id} not found",
         )
 
-    if not session.extracted_protocol:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No protocol data extracted for this session. "
-            "Please upload a protocol document first.",
-        )
-
-    try:
-        protocol = ExtractedProtocol.model_validate(session.extracted_protocol)
-    except Exception as e:
-        logger.error(f"Failed to validate protocol data: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Protocol data is invalid or corrupted",
-        )
-
     collected_answers = session.collected_answers or {}
 
-    return protocol, collected_answers
+    # First try: use session's extracted_protocol
+    if session.extracted_protocol:
+        try:
+            protocol = ExtractedProtocol.model_validate(session.extracted_protocol)
+            return protocol, collected_answers
+        except Exception as e:
+            logger.warning(f"Failed to validate session protocol data: {e}")
+            # Fall through to try Knowledge Base
+
+    # Second try: build protocol from Knowledge Base
+    if session.project_id:
+        try:
+            kb_service = get_knowledge_base_service(db)
+            kb = await kb_service.get_by_project(session.project_id)
+
+            if kb:
+                facts = await kb_service.get_facts(kb["id"])
+                wizard_answers = await kb_service.get_wizard_answers(kb["id"])
+
+                # Build protocol from KB facts
+                protocol_data = _build_protocol_from_kb(facts, wizard_answers)
+
+                if protocol_data:
+                    try:
+                        protocol = ExtractedProtocol.model_validate(protocol_data)
+                        logger.info(f"Built protocol from Knowledge Base for session {session_id}")
+                        return protocol, collected_answers
+                    except Exception as e:
+                        logger.warning(f"Failed to validate KB-built protocol: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to build protocol from KB: {e}")
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="No protocol data available. Please complete the questionnaire "
+        "or upload a protocol document first.",
+    )
+
+
+def _build_protocol_from_kb(facts: list, wizard_answers: dict) -> dict:
+    """Build an ExtractedProtocol-compatible dict from Knowledge Base facts.
+
+    This function maps KB facts and wizard answers to the ExtractedProtocol schema,
+    providing sensible defaults for required fields when data is missing.
+    """
+    # Create a lookup dict from facts
+    fact_dict = {}
+    for fact in facts:
+        if hasattr(fact, 'key') and hasattr(fact, 'value'):
+            fact_dict[fact.key] = fact.value
+        elif isinstance(fact, dict):
+            fact_dict[fact.get('key', '')] = fact.get('value', '')
+
+    # Also include wizard answers (they store the question_id as key)
+    for key, value in (wizard_answers or {}).items():
+        if key.startswith('_'):  # Skip internal keys like _skipped
+            continue
+        if isinstance(value, dict):
+            fact_dict[key] = value.get('answer', value)
+        else:
+            fact_dict[key] = value
+
+    # Helper to get value from multiple possible keys
+    def get_value(*keys, default=None):
+        for key in keys:
+            val = fact_dict.get(key)
+            if val:
+                return val
+        return default
+
+    # Extract values with multiple key fallbacks
+    study_title = get_value(
+        "study_title", "q_study_title", "title",
+        default="Research Study"
+    )
+
+    # Study type - try to map to valid enum value
+    study_type_raw = get_value("study_type", "q_study_type", default="other")
+    # Normalize study type to valid enum value
+    study_type_map = {
+        "retrospective": "retrospective",
+        "prospective": "prospective",
+        "clinical_trial": "clinical_trial",
+        "clinical trial": "clinical_trial",
+        "quality_improvement": "quality_improvement",
+        "quality improvement": "quality_improvement",
+        "qi": "quality_improvement",
+        "educational": "educational",
+    }
+    study_type = study_type_map.get(study_type_raw.lower() if study_type_raw else "", "other")
+
+    principal_investigator = get_value(
+        "principal_investigator.name", "principal_investigator", "q_pi_name"
+    )
+
+    # Objectives - primary is required with min_length=10
+    primary_objective = get_value(
+        "primary_objective", "q_primary_objective",
+        default="To investigate the research question as defined in the study protocol."
+    )
+    # Ensure min length of 10
+    if len(primary_objective) < 10:
+        primary_objective = f"Objective: {primary_objective}" if primary_objective else "To be determined based on study protocol."
+
+    secondary_objectives = _parse_list(
+        get_value("secondary_objectives", "q_secondary_objectives")
+    )
+
+    # Methodology - design and population are required
+    study_design = get_value(
+        "study_design", "methodology_description", "q_study_design",
+        default="Study design to be specified."
+    )
+    target_population = get_value(
+        "target_population", "q_target_population",
+        default="Target population to be defined."
+    )
+    sample_size = get_value(
+        "sample_size.total", "sample_size", "q_sample_size"
+    )
+    inclusion_criteria = _parse_list(
+        get_value("inclusion_criteria", "q_inclusion_criteria")
+    )
+    exclusion_criteria = _parse_list(
+        get_value("exclusion_criteria", "q_exclusion_criteria")
+    )
+
+    # Data collection (optional)
+    data_sources = _parse_list(get_value("data_sources", "q_data_sources"))
+    data_variables = _parse_list(get_value("data_variables", "q_data_variables"))
+    timeline = get_value("duration_per_subject", "q_study_duration")
+
+    # Risks and benefits (required object but lists have defaults)
+    risks = _parse_list(get_value("risks", "q_risks"))
+    benefits = _parse_list(
+        get_value("benefits_to_subjects", "benefits_to_society", "q_benefits")
+    )
+    mitigation = _parse_list(get_value("risk_mitigation", "q_risk_mitigation"))
+
+    confidentiality_measures = get_value(
+        "confidentiality_measures", "q_confidentiality"
+    )
+
+    # Calculate quality score based on data completeness
+    filled_fields = 0
+    total_fields = 10  # Key fields to check
+
+    if study_title and study_title != "Research Study":
+        filled_fields += 1
+    if study_type != "other":
+        filled_fields += 1
+    if principal_investigator:
+        filled_fields += 1
+    if primary_objective and "to be determined" not in primary_objective.lower():
+        filled_fields += 1
+    if study_design and "to be specified" not in study_design.lower():
+        filled_fields += 1
+    if target_population and "to be defined" not in target_population.lower():
+        filled_fields += 1
+    if sample_size:
+        filled_fields += 1
+    if inclusion_criteria:
+        filled_fields += 1
+    if risks:
+        filled_fields += 1
+    if benefits:
+        filled_fields += 1
+
+    quality_score = int((filled_fields / total_fields) * 100)
+
+    # Identify missing sections
+    missing_sections = []
+    if not principal_investigator:
+        missing_sections.append("Principal Investigator")
+    if study_design and "to be specified" in study_design.lower():
+        missing_sections.append("Study Design")
+    if not inclusion_criteria and not exclusion_criteria:
+        missing_sections.append("Eligibility Criteria")
+    if not risks and not benefits:
+        missing_sections.append("Risks and Benefits")
+    if not data_sources and not data_variables:
+        missing_sections.append("Data Collection")
+
+    # Generate recommendations
+    recommendations = []
+    if missing_sections:
+        recommendations.append(f"Complete the following sections: {', '.join(missing_sections)}")
+    if quality_score < 50:
+        recommendations.append("Consider uploading the full protocol document for better extraction.")
+    if not sample_size:
+        recommendations.append("Specify the target sample size for the study.")
+
+    # Build the protocol data structure
+    protocol_data = {
+        "study_title": study_title,
+        "study_type": study_type,
+        "principal_investigator": principal_investigator,
+        "objectives": {
+            "primary": primary_objective,
+            "secondary": secondary_objectives,
+        },
+        "methodology": {
+            "design": study_design,
+            "population": target_population,
+            "sample_size": sample_size,
+            "inclusion_criteria": inclusion_criteria,
+            "exclusion_criteria": exclusion_criteria,
+        },
+        "data_collection": {
+            "sources": data_sources,
+            "variables": data_variables,
+            "timeline": timeline,
+        },
+        "risks_benefits": {
+            "risks": risks,
+            "benefits": benefits,
+            "mitigation": mitigation,
+        },
+        "confidentiality_measures": confidentiality_measures,
+        "missing_sections": missing_sections,
+        "quality_score": quality_score,
+        "recommendations": recommendations,
+    }
+
+    # Only return if we have at least some meaningful data
+    # (even with defaults, we need at least title or objective from actual data)
+    has_real_data = (
+        (study_title and study_title != "Research Study") or
+        (get_value("primary_objective", "q_primary_objective") is not None) or
+        principal_investigator or
+        study_type != "other" or
+        len(facts) > 0
+    )
+
+    if has_real_data:
+        return protocol_data
+
+    return None
+
+
+def _parse_list(value) -> list:
+    """Parse a value that might be a list, newline-separated string, or None."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        # Split by newlines or commas
+        items = [item.strip() for item in value.replace('\n', ',').split(',')]
+        return [item for item in items if item]
+    return []
 
 
 @router.post(

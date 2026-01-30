@@ -739,7 +739,7 @@ export const protocolAssistantController = {
   fillFormByProject: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { projectId } = req.params;
-      const { template_id, fill_mode, overwrite_existing } = req.body;
+      const { template_id, fill_mode, overwrite_existing, form_id, create_if_missing } = req.body;
       const userContext = getUserContext(req.user);
 
       if (!template_id) {
@@ -749,7 +749,7 @@ export const protocolAssistantController = {
       const response = await protocolAssistantProxy.fillForm(
         projectId,
         template_id,
-        { fill_mode, overwrite_existing },
+        { fill_mode, overwrite_existing, form_id, create_if_missing },
         userContext
       );
 

@@ -13,7 +13,9 @@ from app.config import get_settings
 from app.database import get_async_session
 from app.middleware.auth import get_current_user, UserContext
 from app.services.semantic_filler import get_semantic_form_filler
+from app.services.llm_form_filler import get_llm_form_filler
 from app.services.learning_system import get_learning_system
+from app.services.llm.base import LLMError
 from app.schemas.knowledge import (
     FormFillResult,
     FormFillPreview,
@@ -49,8 +51,12 @@ async def fill_form(
 ):
     """Fill a form using the project knowledge base.
 
-    Uses semantic matching to find relevant values and applies them
-    with confidence scoring.
+    Uses LLM-powered holistic form filling when enabled, with fallback
+    to deterministic semantic matching if LLM fails.
+
+    If form_id is provided, the form will be updated with filled values.
+    If form_id is not provided and create_if_missing is true, a new form
+    will be created from the template.
     """
     settings = get_settings()
 
@@ -62,43 +68,111 @@ async def fill_form(
             detail="Invalid project ID format",
         )
 
-    filler = get_semantic_form_filler(db)
+    form_id = request.form_id
 
     try:
-        # Fetch template schema from forms service
         async with httpx.AsyncClient(
             base_url=settings.FORMS_SERVICE_URL,
             timeout=30.0,
             headers={"X-Internal-API-Key": settings.INTERNAL_API_KEY},
         ) as client:
+            # Fetch template schema
             response = await client.get(f"/api/templates/{request.template_id}")
             response.raise_for_status()
             template_data = response.json()
 
-        template_schema = template_data.get("schema", {})
-        template_name = template_data.get("name", "Unknown")
+            template_schema = template_data.get("schema", {})
+            template_name = template_data.get("name", "Unknown")
 
-        # Fill the form
-        result = await filler.fill_form(
-            project_id=project_uuid,
-            template_schema=template_schema,
-            template_id=request.template_id,
-            template_name=template_name,
-            overwrite_existing=request.overwrite_existing,
-        )
+            # Create form if needed
+            if form_id is None and request.create_if_missing:
+                create_response = await client.post(
+                    "/api/forms",
+                    json={
+                        "template_id": request.template_id,
+                        "title": f"{template_name} - Auto-filled",
+                        "owner_id": str(user.id),
+                        "project_id": project_id,
+                    },
+                )
+                create_response.raise_for_status()
+                created_form = create_response.json()
+                form_id = created_form.get("id")
+                logger.info(f"Created new form {form_id} for project {project_id}")
+
+            # Calculate fill results
+            result = None
+            if settings.ENABLE_LLM_FORM_FILLER:
+                try:
+                    llm_filler = get_llm_form_filler(db)
+                    result = await llm_filler.fill_form(
+                        project_id=project_uuid,
+                        template_schema=template_schema,
+                        template_id=request.template_id,
+                        template_name=template_name,
+                        overwrite_existing=request.overwrite_existing,
+                    )
+                    logger.info(f"LLM form fill succeeded: {result.fill_rate}% fill rate")
+                except LLMError as e:
+                    logger.warning(f"LLM form fill failed, using fallback: {e}")
+                except Exception as e:
+                    logger.warning(f"LLM form fill error, using fallback: {e}")
+
+            # Fallback to semantic filler
+            if result is None:
+                filler = get_semantic_form_filler(db)
+                result = await filler.fill_form(
+                    project_id=project_uuid,
+                    template_schema=template_schema,
+                    template_id=request.template_id,
+                    template_name=template_name,
+                    overwrite_existing=request.overwrite_existing,
+                )
+
+            # Apply filled values to form if we have a form_id
+            logger.info(f"Checking form update: form_id={form_id}, filled_fields_count={len(result.filled_fields) if result.filled_fields else 0}")
+            if form_id and result.filled_fields:
+                # Filter by confidence if mode is high_confidence_only
+                fields_to_apply = result.filled_fields
+                if request.fill_mode == "high_confidence_only":
+                    fields_to_apply = [f for f in fields_to_apply if f.confidence_level == "high"]
+
+                if fields_to_apply:
+                    # Build changes for form update
+                    changes = [
+                        {
+                            "field_id": field.field_id,
+                            "field_label": field.field_label,
+                            "old_value": None,
+                            "new_value": field.value,
+                        }
+                        for field in fields_to_apply
+                    ]
+
+                    # Update the form via forms-service
+                    update_response = await client.post(
+                        f"/api/forms/{form_id}/data",
+                        json={
+                            "changes": changes,
+                            "user_id": str(user.id),
+                        },
+                    )
+                    update_response.raise_for_status()
+                    logger.info(f"Updated form {form_id} with {len(changes)} fields")
 
         return FormFillResponse(
             success=True,
+            form_id=form_id,
             template_id=request.template_id,
             fill_result=result,
             message=f"Filled {len(result.filled_fields)} of {len(result.filled_fields) + len(result.unfilled_fields)} fields",
         )
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"Failed to fetch template: {e}")
+        logger.error(f"Failed to fetch template or update form: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to fetch form template",
+            detail=f"Failed to communicate with forms service: {e.response.text if e.response else str(e)}",
         )
     except Exception as e:
         logger.error(f"Form fill failed: {e}")
@@ -122,7 +196,8 @@ async def preview_form_fill(
     """Preview what form filling would produce.
 
     Returns all fields with their proposed values and confidence scores,
-    without actually applying the changes.
+    without actually applying the changes. Uses LLM-powered filling when
+    enabled, with fallback to deterministic semantic matching.
     """
     settings = get_settings()
 
@@ -133,8 +208,6 @@ async def preview_form_fill(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid project ID format",
         )
-
-    filler = get_semantic_form_filler(db)
 
     try:
         # Fetch template schema
@@ -150,13 +223,32 @@ async def preview_form_fill(
         template_schema = template_data.get("schema", {})
         template_name = template_data.get("name", "Unknown")
 
-        # Generate preview
-        preview = await filler.preview_fill(
-            project_id=project_uuid,
-            template_schema=template_schema,
-            template_id=template_id,
-            template_name=template_name,
-        )
+        # Try LLM filler first if enabled
+        preview = None
+        if settings.ENABLE_LLM_FORM_FILLER:
+            try:
+                llm_filler = get_llm_form_filler(db)
+                preview = await llm_filler.preview_fill(
+                    project_id=project_uuid,
+                    template_schema=template_schema,
+                    template_id=template_id,
+                    template_name=template_name,
+                )
+                logger.info(f"LLM form fill preview succeeded: {preview.fill_rate}% fill rate")
+            except LLMError as e:
+                logger.warning(f"LLM form fill preview failed, using fallback: {e}")
+            except Exception as e:
+                logger.warning(f"LLM form fill preview error, using fallback: {e}")
+
+        # Fallback to semantic filler
+        if preview is None:
+            filler = get_semantic_form_filler(db)
+            preview = await filler.preview_fill(
+                project_id=project_uuid,
+                template_schema=template_schema,
+                template_id=template_id,
+                template_name=template_name,
+            )
 
         return preview
 

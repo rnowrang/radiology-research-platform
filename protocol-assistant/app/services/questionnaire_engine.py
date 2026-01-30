@@ -430,6 +430,230 @@ UNIVERSAL_REQUIREMENTS = [
         "forms": ["IRB Application"],
         "answer_type": AnswerType.DATE,
     },
+    # =========================================================================
+    # HIGH-IMPACT QUESTIONS - Added to improve form fill rate
+    # =========================================================================
+    # Contact Person Information (fills 5 form fields)
+    {
+        "field": "contact_person.name",
+        "section": "personnel",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    {
+        "field": "contact_person.building_room",
+        "section": "personnel",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    {
+        "field": "contact_person.phone_ext",
+        "section": "personnel",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    {
+        "field": "contact_person.fax",
+        "section": "personnel",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    {
+        "field": "contact_person.email",
+        "section": "personnel",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+        "validation": r"^[\w\.-]+@[\w\.-]+\.\w+$",
+    },
+    # Research Personnel (fills 2 form fields)
+    {
+        "field": "research_personnel",
+        "section": "personnel",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXTAREA,
+    },
+    {
+        "field": "other_personnel",
+        "section": "personnel",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXTAREA,
+    },
+    # Study Initiation (fills 2 form fields)
+    {
+        "field": "study_initiated_by",
+        "section": "study_info",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.SELECT,
+        "options": ["local", "industry", "cooperative_group", "federal", "other"],
+    },
+    # Recruitment Methods (fills 6 form fields)
+    {
+        "field": "recruitment_source",
+        "section": "recruitment",
+        "priority": QuestionPriority.REQUIRED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.MULTISELECT,
+        "options": ["medical_records", "clinic_patients", "referrals", "advertisements", "community", "other"],
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "recruitment_uses_flyers",
+        "section": "recruitment",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "recruitment_uses_phone",
+        "section": "recruitment",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "recruitment_uses_electronic",
+        "section": "recruitment",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "recruitment_electronic_description",
+        "section": "recruitment",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXTAREA,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    # Consent Logistics (fills 4 form fields)
+    {
+        "field": "consent_location",
+        "section": "consent",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "consent_timing",
+        "section": "consent",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.SELECT,
+        "options": ["before_procedures", "same_day", "during_procedures"],
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "subject_payment",
+        "section": "consent",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXTAREA,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
+    {
+        "field": "consent_waiver_requested",
+        "section": "consent",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    # Student Project (fills 3 form fields)
+    {
+        "field": "is_student_project",
+        "section": "study_info",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    {
+        "field": "student_name",
+        "section": "study_info",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    {
+        "field": "student_program",
+        "section": "study_info",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+    },
+    # Regulatory - Schedule Drugs (fills 2 form fields)
+    {
+        "field": "schedule_drugs",
+        "section": "regulatory",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    # Regulatory - Biosafety/IBC (fills 3 form fields)
+    {
+        "field": "ibc_infectious_agents",
+        "section": "regulatory",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    {
+        "field": "ibc_recombinant_dna",
+        "section": "regulatory",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    {
+        "field": "ibc_hazardous_materials",
+        "section": "regulatory",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    # Regulatory - SCRO (fills 1 form field)
+    {
+        "field": "scro_stem_cells",
+        "section": "regulatory",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    # Privacy - PHI Sharing (fills 3 form fields)
+    {
+        "field": "phi_shared_externally",
+        "section": "privacy",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.BOOLEAN,
+    },
+    {
+        "field": "phi_shared_with",
+        "section": "privacy",
+        "priority": QuestionPriority.OPTIONAL,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.MULTISELECT,
+        "options": ["sponsor", "other_institutions", "government", "data_repository", "other"],
+    },
+    # Methods - Study Location (fills 1 form field)
+    {
+        "field": "study_location",
+        "section": "procedures",
+        "priority": QuestionPriority.RECOMMENDED,
+        "forms": ["IRB Application"],
+        "answer_type": AnswerType.TEXT,
+        "skip_for": [StudyType.RETROSPECTIVE],
+    },
 ]
 
 
@@ -486,6 +710,8 @@ class QuestionnaireEngine:
         """
         # Get project tasks and their form templates
         form_fields = await self._get_project_form_fields(project_id)
+
+        logger.debug(f"Analyzing project with study type: {project_type}")
 
         # Get unique requirements from universal list
         requirements = self._get_filtered_requirements(project_type)
@@ -561,14 +787,25 @@ class QuestionnaireEngine:
         # Always try to seed from project data - will only add facts that don't exist
         await self._seed_kb_from_project(kb_id, project_id, user_id, kb_service)
 
-        # Detect project type from knowledge base
+        # Detect project type from knowledge base (check facts and wizard answers)
         project_type = None
         study_type_value = await kb_service.get_fact_value(kb_id, "study_type")
+
+        # Also check wizard answers if fact not found
+        if not study_type_value:
+            wizard_answers = await kb_service.get_wizard_answers(kb_id)
+            study_type_answer = wizard_answers.get("q_study_type", {})
+            if isinstance(study_type_answer, dict):
+                study_type_value = study_type_answer.get("answer")
+            elif isinstance(study_type_answer, str):
+                study_type_value = study_type_answer
+
         if study_type_value:
             try:
                 project_type = StudyType(study_type_value)
+                logger.info(f"Detected study type: {project_type} for project {project_id}")
             except ValueError:
-                pass
+                logger.warning(f"Unknown study type value: {study_type_value}")
 
         # Generate base questionnaire
         spec = await self.analyze_project(project_id, project_type)
@@ -578,6 +815,28 @@ class QuestionnaireEngine:
         fact_dict = {f.key: f for f in facts}
 
         wizard_answers = await kb_service.get_wizard_answers(kb_id)
+
+        # Fallback key mappings for legacy/alternative fact keys
+        # Maps protocol_field -> list of alternative fact keys to try
+        field_fallbacks = {
+            "principal_investigator.name": ["principal_investigator", "pi_name"],
+            "sample_size.total": ["sample_size", "total_sample_size", "n_subjects"],
+            "sample_size.justification": ["sample_size_justification"],
+            "benefits_to_subjects": ["benefits", "subject_benefits"],
+            "benefits_to_society": ["benefits", "societal_benefits"],
+            "duration_per_subject": ["data_collection_timeline", "study_duration"],
+            "methodology_description": ["study_design", "methods"],
+        }
+
+        def find_fact(field: str) -> Optional[any]:
+            """Find a fact by field name, trying fallbacks if needed."""
+            if field in fact_dict:
+                return fact_dict[field]
+            # Try fallback keys
+            for alt_key in field_fallbacks.get(field, []):
+                if alt_key in fact_dict:
+                    return fact_dict[alt_key]
+            return None
 
         # Update questions with suggestions and answered status
         for section in spec.sections:
@@ -590,12 +849,13 @@ class QuestionnaireEngine:
                     question.suggestion_source = "Previously answered"
                     question.suggestion_confidence = 0.95
                     completed += 1
-                # Check if fact exists
-                elif question.protocol_field in fact_dict:
-                    fact = fact_dict[question.protocol_field]
-                    question.suggested_answer = str(fact.value)
-                    question.suggestion_source = f"Extracted ({fact.source_reference or fact.source.value})"
-                    question.suggestion_confidence = fact.confidence
+                # Check if fact exists (with fallback support)
+                else:
+                    fact = find_fact(question.protocol_field)
+                    if fact:
+                        question.suggested_answer = str(fact.value)
+                        question.suggestion_source = f"Extracted ({fact.source_reference or fact.source.value})"
+                        question.suggestion_confidence = fact.confidence
 
             section.completed_count = completed
 
@@ -722,14 +982,28 @@ class QuestionnaireEngine:
             Filtered list of requirements
         """
         requirements = []
+        skipped_count = 0
+
+        logger.debug(f"Filtering requirements for study type: {project_type}")
 
         for req in UNIVERSAL_REQUIREMENTS:
             # Check if should skip for this project type
             skip_for = req.get("skip_for", [])
-            if project_type and project_type in skip_for:
-                continue
+            if project_type and skip_for:
+                # Compare by value since skip_for contains enum members
+                should_skip = any(
+                    (isinstance(s, StudyType) and s == project_type) or
+                    (isinstance(s, str) and s == project_type.value if isinstance(project_type, StudyType) else s == project_type)
+                    for s in skip_for
+                )
+                if should_skip:
+                    skipped_count += 1
+                    continue
 
             requirements.append(req)
+
+        if skipped_count > 0:
+            logger.info(f"Filtered out {skipped_count} questions for study type {project_type}, returning {len(requirements)} questions")
 
         return requirements
 
@@ -786,6 +1060,35 @@ class QuestionnaireEngine:
             "funding_type": "What type of funding is this?",
             "start_date": "When do you plan to start the study?",
             "end_date": "When do you expect the study to end?",
+            # High-impact questions for better form fill rate
+            "contact_person.name": "Who should the IRB contact about this study (if different from PI)?",
+            "contact_person.building_room": "What is the contact person's building and room number?",
+            "contact_person.phone_ext": "What is the contact person's phone extension?",
+            "contact_person.fax": "What is the contact person's fax number (if any)?",
+            "contact_person.email": "What is the contact person's email address?",
+            "research_personnel": "List all persons who will conduct human subjects research (name, degree, role).",
+            "other_personnel": "List other personnel involved in design, conduct, or reporting (if any).",
+            "study_initiated_by": "Is this study initiated by a local investigator, industry sponsor, cooperative group, or other?",
+            "recruitment_source": "What are your sources for recruiting subjects?",
+            "recruitment_uses_flyers": "Will recruitment require use of flyers, posters, or other advertising?",
+            "recruitment_uses_phone": "Will recruitment involve telephone contact?",
+            "recruitment_uses_electronic": "Will recruitment involve electronic (web or email) methods?",
+            "recruitment_electronic_description": "Describe your electronic recruitment method.",
+            "consent_location": "Where will subjects sign the consent form?",
+            "consent_timing": "When will consent be obtained relative to study procedures?",
+            "subject_payment": "What payment or compensation will subjects receive (if any)?",
+            "consent_waiver_requested": "Are you requesting a waiver of consent?",
+            "is_student_project": "Is this a student project (includes fellows, residents, graduate students)?",
+            "student_name": "What is the student's name?",
+            "student_program": "What is the student's program or department?",
+            "schedule_drugs": "Will any Schedule I or II controlled substances be investigated?",
+            "ibc_infectious_agents": "Does this study involve infectious agents (bacteria, viruses, etc.)?",
+            "ibc_recombinant_dna": "Will recombinant or synthetic nucleic acids be used?",
+            "ibc_hazardous_materials": "Will carcinogens, mutagens, or other hazardous materials be used?",
+            "scro_stem_cells": "Does this project involve human embryonic stem cells or iPSCs?",
+            "phi_shared_externally": "Will Protected Health Information (PHI) be shared outside your institution?",
+            "phi_shared_with": "With whom will PHI be shared?",
+            "study_location": "Where will study procedures take place?",
         }
 
         if field in question_templates:

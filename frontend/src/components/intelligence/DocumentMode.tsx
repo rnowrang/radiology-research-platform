@@ -1,11 +1,10 @@
 /**
  * Document Mode - Section-by-section document editing with AI assistance
  *
- * Provides:
- * - Document section navigation
- * - AI-assisted content editing
- * - Real-time coherence checking
- * - Content suggestions
+ * Matching questionnaire wizard appearance with:
+ * - Sidebar with section navigation and progress
+ * - Card-based content editing
+ * - Consistent navigation
  */
 
 import { useState, useEffect } from 'react';
@@ -15,10 +14,10 @@ import * as intelligenceApi from '@/lib/intelligenceApi';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
   FileText,
@@ -31,6 +30,8 @@ import {
   CheckCircle2,
   RefreshCw,
   Eye,
+  Circle,
+  Check,
 } from 'lucide-react';
 
 interface DocumentModeProps {
@@ -38,27 +39,29 @@ interface DocumentModeProps {
   sessionId: string;
 }
 
-// Document sections for protocol
+// Document sections with emojis
 const DOCUMENT_SECTIONS = [
-  { id: 'title', name: 'Title & Summary', description: 'Study title and brief overview' },
-  { id: 'background', name: 'Background', description: 'Scientific background and rationale' },
-  { id: 'objectives', name: 'Objectives', description: 'Primary and secondary objectives' },
-  { id: 'study_design', name: 'Study Design', description: 'Design methodology and approach' },
-  { id: 'population', name: 'Population', description: 'Eligibility criteria and recruitment' },
-  { id: 'procedures', name: 'Procedures', description: 'Study procedures and timeline' },
-  { id: 'risks', name: 'Risks & Benefits', description: 'Potential risks and benefits' },
-  { id: 'privacy', name: 'Privacy', description: 'Data protection and confidentiality' },
-  { id: 'analysis', name: 'Analysis Plan', description: 'Statistical methods and endpoints' },
+  { id: 'title', name: 'Title & Summary', emoji: '📋', description: 'Study title and brief overview' },
+  { id: 'background', name: 'Background', emoji: '📚', description: 'Scientific background and rationale' },
+  { id: 'objectives', name: 'Objectives', emoji: '🎯', description: 'Primary and secondary objectives' },
+  { id: 'study_design', name: 'Study Design', emoji: '🔬', description: 'Design methodology and approach' },
+  { id: 'population', name: 'Population', emoji: '👥', description: 'Eligibility criteria and recruitment' },
+  { id: 'procedures', name: 'Procedures', emoji: '📝', description: 'Study procedures and timeline' },
+  { id: 'risks', name: 'Risks & Benefits', emoji: '⚠️', description: 'Potential risks and benefits' },
+  { id: 'privacy', name: 'Privacy', emoji: '🔒', description: 'Data protection and confidentiality' },
+  { id: 'analysis', name: 'Analysis Plan', emoji: '📊', description: 'Statistical methods and endpoints' },
 ];
 
 export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
   const queryClient = useQueryClient();
-  const { currentDocumentId, currentSectionId, setCurrentDocument } = useIntelligenceStore();
+  const { currentDocumentId, currentSectionId, setCurrentDocument, getProgress } = useIntelligenceStore();
 
   const [selectedSection, setSelectedSection] = useState(DOCUMENT_SECTIONS[0].id);
   const [sectionContent, setSectionContent] = useState<Record<string, string>>({});
   const [editedContent, setEditedContent] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+  const progress = getProgress();
 
   // Fetch knowledge stats to understand available data
   const knowledgeQuery = useQuery({
@@ -71,7 +74,6 @@ export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
   useEffect(() => {
     if (selectedSection) {
       setCurrentDocument('protocol', selectedSection);
-      // Load existing content for this section
       const existing = sectionContent[selectedSection] || '';
       setEditedContent(existing);
     }
@@ -80,7 +82,6 @@ export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
   // Generate section content mutation
   const generateMutation = useMutation({
     mutationFn: async (sectionId: string) => {
-      // Use the chat API to generate section content
       const response = await intelligenceApi.sendChatMessage(
         sessionId,
         `Generate the "${DOCUMENT_SECTIONS.find(s => s.id === sectionId)?.name}" section for my research protocol based on the information I've provided.`
@@ -96,7 +97,6 @@ export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
   // Save section content mutation
   const saveMutation = useMutation({
     mutationFn: async ({ sectionId, content }: { sectionId: string; content: string }) => {
-      // Add as fact to knowledge base
       await intelligenceApi.addFact(
         projectId,
         `protocol.${sectionId}`,
@@ -137,62 +137,110 @@ export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
 
   const currentSectionInfo = DOCUMENT_SECTIONS.find((s) => s.id === selectedSection);
   const currentIndex = DOCUMENT_SECTIONS.findIndex((s) => s.id === selectedSection);
+  const completedSections = Object.keys(sectionContent).filter(k => sectionContent[k]).length;
+  const completionPercentage = Math.round((completedSections / DOCUMENT_SECTIONS.length) * 100);
 
   return (
-    <div className="flex h-full">
-      {/* Section list */}
-      <div className="w-64 border-r bg-muted/30">
+    <div className="flex h-full overflow-hidden">
+      {/* Sidebar */}
+      <div className="w-64 border-r bg-muted/30 flex flex-col h-full shrink-0">
+        {/* Document Progress */}
         <div className="p-4 border-b">
-          <h3 className="font-semibold">Protocol Sections</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Edit your protocol section by section
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Document Progress</span>
+            <span className="text-sm text-muted-foreground">
+              {completionPercentage}%
+            </span>
+          </div>
+          <Progress value={completionPercentage} className="h-2" />
+          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+            <span>{completedSections} complete</span>
+            <span>{DOCUMENT_SECTIONS.length - completedSections} remaining</span>
+          </div>
         </div>
-        <ScrollArea className="h-[calc(100%-80px)]">
+
+        {/* Sections List */}
+        <ScrollArea className="flex-1">
           <div className="p-2">
             {DOCUMENT_SECTIONS.map((section, index) => {
               const hasContent = !!sectionContent[section.id];
               const isSelected = selectedSection === section.id;
 
               return (
-                <button
+                <Button
                   key={section.id}
-                  onClick={() => setSelectedSection(section.id)}
+                  variant="ghost"
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left mb-1 transition-colors',
-                    isSelected
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted'
+                    'w-full justify-start h-auto py-3 px-3 mb-1',
+                    isSelected && 'bg-primary/10 border border-primary/20',
+                    hasContent && !isSelected && 'text-muted-foreground'
                   )}
+                  onClick={() => setSelectedSection(section.id)}
                 >
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs">
-                    {hasContent ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      index + 1
+                  <div className="flex items-start gap-3 w-full">
+                    {/* Status Icon */}
+                    <div className="mt-0.5">
+                      {hasContent ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Circle className={cn(
+                          'h-4 w-4',
+                          isSelected ? 'text-primary' : 'text-muted-foreground'
+                        )} />
+                      )}
+                    </div>
+
+                    {/* Section Info */}
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{section.emoji}</span>
+                        <span className={cn(
+                          'text-sm font-medium',
+                          hasContent && !isSelected && 'text-muted-foreground'
+                        )}>
+                          {section.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Arrow for current */}
+                    {isSelected && (
+                      <ChevronRight className="h-4 w-4 text-primary" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm truncate">{section.name}</div>
-                  </div>
-                </button>
+                </Button>
               );
             })}
           </div>
         </ScrollArea>
+
+        {/* Summary Stats */}
+        <div className="p-4 border-t bg-background">
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="p-2 rounded bg-muted/50">
+              <div className="text-lg font-semibold text-green-600">
+                {completedSections}
+              </div>
+              <div className="text-xs text-muted-foreground">Complete</div>
+            </div>
+            <div className="p-2 rounded bg-muted/50">
+              <div className="text-lg font-semibold text-amber-600">
+                {DOCUMENT_SECTIONS.length - completedSections}
+              </div>
+              <div className="text-xs text-muted-foreground">Remaining</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Editor area */}
-      <div className="flex-1 flex flex-col">
-        {/* Section header */}
-        <div className="border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">{currentSectionInfo?.name}</h2>
-              <p className="text-sm text-muted-foreground">
-                {currentSectionInfo?.description}
-              </p>
-            </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="p-4 border-b bg-background shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">
+              Section {currentIndex + 1} of {DOCUMENT_SECTIONS.length}
+            </span>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -217,133 +265,166 @@ export function DocumentMode({ projectId, sessionId }: DocumentModeProps) {
               </Button>
             </div>
           </div>
-
-          {/* Coherence warnings */}
-          {checkCoherenceMutation.data?.conflicts &&
-            checkCoherenceMutation.data.conflicts.length > 0 && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  {checkCoherenceMutation.data.conflicts.length} consistency issue(s) found.
-                  {checkCoherenceMutation.data.conflicts.map((c, i) => (
-                    <div key={i} className="mt-1 text-sm">
-                      {c.description}
-                    </div>
-                  ))}
-                </AlertDescription>
-              </Alert>
-            )}
+          <Progress value={(currentIndex / DOCUMENT_SECTIONS.length) * 100} className="h-1" />
         </div>
 
         {/* Content area */}
         <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-3xl mx-auto">
-            {showPreview ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="prose prose-sm max-w-none">
-                    {editedContent || (
-                      <p className="text-muted-foreground italic">
-                        No content yet. Click "Generate" to create content from your
-                        questionnaire answers.
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {/* Generate button if no content */}
-                {!editedContent && !sectionContent[selectedSection] && (
-                  <Alert>
-                    <Sparkles className="h-4 w-4" />
-                    <AlertDescription className="flex items-center justify-between">
-                      <span>
-                        Generate content based on your questionnaire answers
-                      </span>
-                      <Button
-                        size="sm"
-                        onClick={handleGenerate}
-                        disabled={generateMutation.isPending}
-                      >
-                        {generateMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-4 w-4 mr-2" />
-                        )}
-                        Generate
-                      </Button>
+          <Card className="max-w-3xl mx-auto">
+            <CardHeader className="pb-3">
+              {/* Section Badge */}
+              <div className="flex items-center justify-between mb-2">
+                <Badge variant="outline" className="capitalize">
+                  {currentSectionInfo?.emoji} {currentSectionInfo?.name}
+                </Badge>
+              </div>
+
+              {/* Section Title */}
+              <h3 className="text-lg font-semibold leading-snug">{currentSectionInfo?.name}</h3>
+              <p className="text-sm text-muted-foreground">{currentSectionInfo?.description}</p>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {/* Coherence warnings */}
+              {checkCoherenceMutation.data?.conflicts &&
+                checkCoherenceMutation.data.conflicts.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      {checkCoherenceMutation.data.conflicts.length} consistency issue(s) found.
+                      {checkCoherenceMutation.data.conflicts.map((c, i) => (
+                        <div key={i} className="mt-1 text-sm">
+                          {c.description}
+                        </div>
+                      ))}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                <Textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  placeholder={`Write or generate the ${currentSectionInfo?.name} section...`}
-                  className="min-h-[400px] font-mono text-sm"
-                />
+              {/* Generate suggestion */}
+              {!editedContent && !sectionContent[selectedSection] && (
+                <Alert className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                  <AlertDescription className="flex flex-col gap-2">
+                    <span className="font-medium text-purple-900">
+                      Generate content from your questionnaire answers
+                    </span>
+                    <p className="text-sm text-purple-700">
+                      I can create a draft for this section based on the information you've provided.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleGenerate}
+                      disabled={generateMutation.isPending}
+                      className="bg-purple-600 hover:bg-purple-700 w-fit"
+                    >
+                      {generateMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-2" />
+                      )}
+                      Generate Draft
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Content editor/preview */}
+              {showPreview ? (
+                <div className="prose prose-sm max-w-none p-4 rounded-lg bg-muted/30 min-h-[300px]">
+                  {editedContent || (
+                    <p className="text-muted-foreground italic">
+                      No content yet. Click "Generate Draft" to create content.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-2 block">
+                    {sectionContent[selectedSection] ? 'Edit content:' : 'Write or generate content:'}
+                  </label>
+                  <Textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    placeholder={`Write or generate the ${currentSectionInfo?.name} section...`}
+                    className="min-h-[300px] font-mono text-sm"
+                  />
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter className="flex justify-between items-center border-t pt-4">
+              <div className="text-xs text-muted-foreground">
+                {sectionContent[selectedSection] ? 'Content saved' : 'Not saved yet'}
               </div>
-            )}
-          </div>
+              <div className="flex gap-2">
+                {sectionContent[selectedSection] && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerate}
+                    disabled={generateMutation.isPending}
+                  >
+                    {generateMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Regenerate
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saveMutation.isPending || !editedContent}
+                >
+                  {saveMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Save Section
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
         </div>
 
-        {/* Footer with navigation and save */}
-        <div className="border-t px-6 py-4">
-          <div className="max-w-3xl mx-auto flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (currentIndex > 0) {
-                  setSelectedSection(DOCUMENT_SECTIONS[currentIndex - 1].id);
-                }
-              }}
-              disabled={currentIndex === 0}
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous
-            </Button>
+        {/* Navigation */}
+        <div className="flex items-center justify-between p-4 border-t bg-background shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (currentIndex > 0) {
+                setSelectedSection(DOCUMENT_SECTIONS[currentIndex - 1].id);
+              }
+            }}
+            disabled={currentIndex === 0}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={handleGenerate}
-                disabled={generateMutation.isPending}
-              >
-                {generateMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                Regenerate
-              </Button>
-
-              <Button
-                onClick={handleSave}
-                disabled={saveMutation.isPending || !editedContent}
-              >
-                {saveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Section
-              </Button>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (currentIndex < DOCUMENT_SECTIONS.length - 1) {
-                  setSelectedSection(DOCUMENT_SECTIONS[currentIndex + 1].id);
-                }
-              }}
-              disabled={currentIndex === DOCUMENT_SECTIONS.length - 1}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              {completedSections} of {DOCUMENT_SECTIONS.length} sections complete
+            </span>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (currentIndex < DOCUMENT_SECTIONS.length - 1) {
+                setSelectedSection(DOCUMENT_SECTIONS[currentIndex + 1].id);
+              }
+            }}
+            disabled={currentIndex === DOCUMENT_SECTIONS.length - 1}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         </div>
       </div>
     </div>
