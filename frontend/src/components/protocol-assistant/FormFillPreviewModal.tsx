@@ -107,13 +107,25 @@ export function FormFillPreviewModal({
     mutationFn: (request: FillFormRequest) =>
       protocolAssistantApi.fillFormByProject(projectId, request),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['form', data.form_id] });
-      toast({
-        title: 'Form filled successfully',
-        description: `${data.filled_fields.length} fields were populated.`,
-      });
-      onOpenChange(false);
-      navigate(`/forms/${data.form_id}`);
+      // Use the form_id from the response, or fall back to the prop
+      const targetFormId = data.form_id ?? formId;
+
+      if (targetFormId) {
+        queryClient.invalidateQueries({ queryKey: ['form', targetFormId] });
+        toast({
+          title: 'Form filled successfully',
+          description: `${data.fill_result.filled_fields.length} fields were populated.`,
+        });
+        onOpenChange(false);
+        navigate(`/forms/${targetFormId}`);
+      } else {
+        // No form exists yet - show results only
+        toast({
+          title: 'Form fill preview complete',
+          description: `${data.fill_result.filled_fields.length} fields can be populated. Create a form from a template to apply these values.`,
+        });
+        onOpenChange(false);
+      }
     },
     onError: (error: Error) => {
       toast({
